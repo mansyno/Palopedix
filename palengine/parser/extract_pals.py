@@ -1,3 +1,5 @@
+# basedpyright: basic
+# pyright: basic
 """Module to extract Pal instances from Level.sav."""
 
 from typing import Any, cast
@@ -11,15 +13,18 @@ from typing import Any, cast
 # a graceful partial read that handles trailing unknown bytes.
 # ──────────────────────────────────────────────────────────────────────────────
 
-import importlib, pkgutil
+import functools
+import importlib
+import pkgutil
 import palworld_save_tools.rawdata as _rawdata_pkg
 from palworld_save_tools.rawdata import (
-    character, group, map_object, map_model,
+    character, group, map_object,
 )
 
 
 def _tolerant_wrap(fn):
     """Wrap decode_bytes to swallow 'Warning: EOF not reached' exceptions."""
+    @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         try:
             return fn(*args, **kwargs)
@@ -27,7 +32,6 @@ def _tolerant_wrap(fn):
             if "Warning: EOF not reached" in str(exc):
                 return None  # caller must handle None gracefully
             raise
-    wrapper.__wrapped__ = fn
     return wrapper
 
 
@@ -36,7 +40,7 @@ for _info in pkgutil.iter_modules(_rawdata_pkg.__path__):
     try:
         _mod = importlib.import_module(f"palworld_save_tools.rawdata.{_info.name}")
         if hasattr(_mod, "decode_bytes") and not getattr(_mod.decode_bytes, "__wrapped__", False):
-            _mod.decode_bytes = _tolerant_wrap(_mod.decode_bytes)
+            setattr(_mod, "decode_bytes", _tolerant_wrap(_mod.decode_bytes))
     except Exception:
         pass
 
@@ -213,7 +217,8 @@ def load_gvas_from_sav(sav_path: str, custom_properties_keys: list[str]) -> Gvas
         if prop in custom_properties_keys:
             custom_properties[prop] = PALWORLD_CUSTOM_PROPERTIES[prop]
 
-    import sys, os, contextlib
+    import contextlib
+    import os
     with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
         gvas_file = GvasFile.read(
             gvas_data,
@@ -252,7 +257,8 @@ def load_player_containers(level_sav_path: str) -> dict[str, tuple[str, str]]:
             else:
                 gvas_data, _ = decompress_sav_to_gvas(raw)
 
-            import sys, os, contextlib
+            import contextlib
+            import os
             with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
                 gvas = GvasFile.read(
                     gvas_data,
@@ -374,6 +380,9 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
         iv_melee = clean_value(save_param.get("Talent_Melee", {}).get("value", 0))
         iv_shot = clean_value(save_param.get("Talent_Shot", {}).get("value", 0))
         iv_defense = clean_value(save_param.get("Talent_Defense", {}).get("value", 0))
+        
+        # Newer Palworld saves renamed Talent_Melee to Talent_Shot.
+        actual_melee_iv = max(int(iv_melee), int(iv_shot)) if str(iv_melee).isdigit() and str(iv_shot).isdigit() else 0
 
         passive_list_prop = cast(dict[str, Any], save_param.get("PassiveSkillList", {}).get("value", {}))
         passives = cast(list[str], passive_list_prop.get("values", []))
@@ -408,7 +417,7 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
             "gender": gender,
             "ivs": {
                 "hp": iv_hp,
-                "melee": iv_melee,
+                "melee": actual_melee_iv,
                 "shot": iv_shot,
                 "defense": iv_defense,
             },

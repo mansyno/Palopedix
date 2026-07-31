@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node / React UI
+ui/node_modules/
+ui/dist/
+ui/.env.local
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Project
+*.sav
+*.sav.json
+
+data/

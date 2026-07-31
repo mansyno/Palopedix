@@ -1,0 +1,61 @@
+PalEngine Product Requirements Document (PRD)
+1. Vision & Architecture
+A lightweight local backend service with a single unified data core serving two interfaces:
+
+Interactive UI: Web dashboard (React/Vite) for browsing, searching, and filtering.
+
+CLI / Tool API: Command-line tool and JSON API designed for prompt engineers and AI coding tools (like Antigravity) to inspect local game state and reason over breeding/base choices.
+
+                  +-----------------------------------+
+                  |      User Interaction Layer       |
+                  |  [ Web Dashboard ]    [ CLI Tool ] |
+                  +-----------------+-----------------+
+                                    |
++-----------------------------------v-----------------------------------+
+|                            PalEngine Core                             |
+|                                                                       |
+|  +---------------------------+     +-------------------------------+  |
+|  |    Static Data Engine     |     |       Save File Engine        |  |
+|  | - Complete Paldex JSON    |     | - Fast GVAS/Level.sav Parser  |  |
+|  | - Passives, Stats, Traits |     | - Palbox & Base Extractor     |  |
+|  +-------------+-------------+     +---------------+---------------+  |
+|                |                                   |                  |
+|                +-----------------+-----------------+                  |
+|                                  |                                    |
+|                       +----------v----------+                         |
+|                       |  In-Memory SQLite   |                         |
+|                       |   Unified Schema    |                         |
+|                       +---------------------+                         |
++-----------------------------------------------------------------------+
+2. Core Functional Requirements
+Static Data Engine (Paldex)
+Seed static JSON for all Palworld 1.0 Pals, Partner Skills, Passive Skills, Active Skills, and Base Structures.
+
+Store base stats, elemental affinities, work suitabilities (levels 1-5+), and breeding power values.
+
+Save File Ingestion (Level.sav)
+Read local save game directory: %LOCALAPPDATA%\Pal\Saved\SaveGames\<SteamID>\<SaveID>\Level.sav.
+
+Extract instance data:
+
+Palbox & Party: Individual Pals, level, IVs, active passives, gender, condensed rank, and current location.
+
+Base Infrastructure Inventory: Scan built structures per base perimeter (Palbox ID) and count base assets (e.g., Base 1: 4x Straw Pal Bed, 2x Electric Furnace, 1x Breeding Farm).
+
+Search & Querying Capabilities
+Cross-sectional Filtering: Query owned Pals by overlaps between traits, base stats, and suitabilities (e.g., Work Speed > 100 AND Passive = 'Artisan' AND Location = 'Palbox').
+
+Breeding Finder: Select a target output Pal or specific target passives, and query owned Pals to find valid breeding pairs already in stock.
+
+Base Asset Audit: Report current base structures across all placed Palboxes.
+
+CLI & Tool Interface
+Standalone executable command suite returning raw JSON or formatted markdown tables for easy AI integration.
+
+Examples:
+
+palengine pids --search "Kindling >= 3" --json
+
+palengine breed --target "Jormuntide" --owned-only
+
+palengine base --id 1 --structures

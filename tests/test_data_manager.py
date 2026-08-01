@@ -13,6 +13,9 @@ DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data")
 @pytest.fixture
 def temp_manager():
     """Creates a temporary working directory populated with real data files for isolated CRUD testing."""
+    from palengine.config import get_static_data_source, set_static_data_source
+    orig = get_static_data_source()
+    set_static_data_source("legacy")
     temp_dir = tempfile.mkdtemp()
     for filename in [
         "pals.json",
@@ -29,6 +32,7 @@ def temp_manager():
 
     manager = PaldexDataManager(data_dir=temp_dir)
     yield manager
+    set_static_data_source(orig)
     shutil.rmtree(temp_dir)
 
 

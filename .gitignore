@@ -32,5 +32,8 @@ desktop.ini
 # Project
 *.sav
 *.sav.json
+*.db
+*.sqlite
+*.log
 
 data/

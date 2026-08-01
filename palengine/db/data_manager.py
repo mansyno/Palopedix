@@ -5,7 +5,14 @@ Supports dynamic additions, edits, and deletions to accommodate game patches and
 
 import json
 import os
+import sqlite3
 from typing import Any, Dict, List, Optional
+
+from palengine.config import (
+    get_palworld_db_path,
+    get_static_data_source,
+)
+from palengine.db.sqlite_engine import transform_icon_path
 
 
 class PaldexDataManager:
@@ -48,15 +55,47 @@ class PaldexDataManager:
     # ---------- Pal CRUD Operations ----------
 
     def get_all_pals(self) -> List[Dict[str, Any]]:
-        """Returns list of all Pals."""
+        """Returns list of all Pals based on active static data source."""
+        source = get_static_data_source()
+        db_path = get_palworld_db_path()
+
+        if source == "palworld_db" and os.path.exists(db_path):
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT * FROM pals ORDER BY paldex_number ASC").fetchall()
+            pals = []
+            for r in rows:
+                d = dict(r)
+                d["internal_name"] = d.get("code") or d.get("id")
+                d["display_name"] = d.get("name")
+                d["element_types"] = [e for e in [d.get("element1"), d.get("element2")] if e]
+                d["base_stats"] = {
+                    "hp": d.get("hp"),
+                    "attack_melee": d.get("attack"),
+                    "attack_ranged": d.get("attack"),
+                    "defense": d.get("defense"),
+                    "work_speed": d.get("run_speed"),
+                }
+                d["breeding_power"] = d.get("breeding_rank")
+                d["food_requirement"] = d.get("food")
+                d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                pals.append(d)
+            conn.close()
+            return pals
+
         return self._read_json(self.pals_path)
 
     def get_pal(self, internal_name: str) -> Optional[Dict[str, Any]]:
-        """Retrieves a single Pal by internal name (case-insensitive)."""
+        """Retrieves a single Pal by internal name or display name (case-insensitive)."""
         pals = self.get_all_pals()
         target = internal_name.lower()
         for p in pals:
-            if p.get("internal_name", "").lower() == target:
+            if (
+                p.get("internal_name", "").lower() == target
+                or p.get("display_name", "").lower() == target
+                or p.get("code", "").lower() == target
+                or p.get("id", "").lower() == target
+            ):
                 return p
         return None
 
@@ -70,38 +109,59 @@ class PaldexDataManager:
             raise ValueError("pal_data must contain 'internal_name'")
 
         pals = self.get_all_pals()
-        if any(p.get("internal_name", "").lower() == internal_name.lower() for p in pals):
+        if any(
+            p.get("internal_name", "").lower() == internal_name.lower()
+            for p in pals
+        ):
             raise ValueError(f"Pal with internal_name '{internal_name}' already exists.")
 
-        pals.append(pal_data)
-        self._write_json(self.pals_path, pals)
+        # Always update local JSON dataset to preserve master DB read-only reference
+        if os.path.exists(self.pals_path):
+            json_pals = self._read_json(self.pals_path)
+            json_pals.append(pal_data)
+            self._write_json(self.pals_path, json_pals)
+
         return pal_data
 
     def update_pal(self, internal_name: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         """Updates fields of an existing Pal by internal_name."""
         pals = self.get_all_pals()
         target = internal_name.lower()
-        found_idx = None
-        for idx, p in enumerate(pals):
-            if p.get("internal_name", "").lower() == target:
-                found_idx = idx
+        found_pal = None
+        for p in pals:
+            if (
+                p.get("internal_name", "").lower() == target
+                or p.get("display_name", "").lower() == target
+            ):
+                found_pal = p
                 break
 
-        if found_idx is None:
+        if found_pal is None:
             raise KeyError(f"Pal '{internal_name}' not found.")
 
-        pals[found_idx].update(updates)
-        self._write_json(self.pals_path, pals)
-        return pals[found_idx]
+        found_pal.update(updates)
+
+        if os.path.exists(self.pals_path):
+            json_pals = self._read_json(self.pals_path)
+            for idx, p in enumerate(json_pals):
+                if p.get("internal_name", "").lower() == target or p.get("display_name", "").lower() == target:
+                    json_pals[idx].update(updates)
+                    self._write_json(self.pals_path, json_pals)
+                    break
+
+        return found_pal
 
     def delete_pal(self, internal_name: str) -> bool:
         """Deletes a Pal by internal_name. Returns True if deleted."""
-        pals = self.get_all_pals()
         target = internal_name.lower()
-        initial_len = len(pals)
-        pals = [p for p in pals if p.get("internal_name", "").lower() != target]
+        deleted = False
 
-        if len(pals) < initial_len:
-            self._write_json(self.pals_path, pals)
-            return True
-        return False
+        if os.path.exists(self.pals_path):
+            json_pals = self._read_json(self.pals_path)
+            initial_len = len(json_pals)
+            json_pals = [p for p in json_pals if p.get("internal_name", "").lower() != target and p.get("display_name", "").lower() != target]
+            if len(json_pals) < initial_len:
+                self._write_json(self.pals_path, json_pals)
+                deleted = True
+
+        return deleted

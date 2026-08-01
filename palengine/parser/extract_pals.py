@@ -336,7 +336,7 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
             }
 
 
-    # 2. Load player container IDs from Players/*.sav (where Palworld actually stores them)
+    # 2. Load player container IDs from Players/*.sav and CharacterSaveParameterMap
     player_containers: dict[str, tuple[str, str]] = load_player_containers(sav_path)
 
     char_save_parameter_map = cast(
@@ -344,7 +344,24 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
         world_save_data.get("CharacterSaveParameterMap", {}).get("value", []),
     )
 
+    for char_entry in char_save_parameter_map:
+        val = cast(dict[str, Any], char_entry.get("value", {}))
+        raw_data = cast(dict[str, Any], val.get("RawData", {}).get("value") or {})
+        char_obj = cast(dict[str, Any], raw_data.get("object") or {})
+        save_param = cast(dict[str, Any], char_obj.get("SaveParameter", {}).get("value") or {})
+        is_player = bool(clean_value(save_param.get("IsPlayer", {}).get("value", False)))
+        if is_player:
+            key_struct = clean_value(char_entry.get("key")) or {}
+            player_uid = clean_value(key_struct.get("PlayerUId"))
+            if player_uid is not None:
+                p_uid_str = str(player_uid)
+                otomo_id = clean_value(save_param.get("OtomoCharacterContainerId"))
+                if otomo_id:
+                    player_containers[str(otomo_id)] = (p_uid_str, "party")
 
+                storage_id = clean_value(save_param.get("PalStorageContainerId"))
+                if storage_id:
+                    player_containers[str(storage_id)] = (p_uid_str, "palbox")
 
     # 3. Extract Pal instances
     pals: list[dict[str, Any]] = []
@@ -382,18 +399,18 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
         iv_defense = clean_value(save_param.get("Talent_Defense", {}).get("value", 0))
         
         # Newer Palworld saves renamed Talent_Melee to Talent_Shot.
-        actual_melee_iv = max(int(iv_melee), int(iv_shot)) if str(iv_melee).isdigit() and str(iv_shot).isdigit() else 0
+        actual_melee_iv = int(iv_melee) if (str(iv_melee).isdigit() and int(iv_melee) > 0) else (int(iv_shot) if str(iv_shot).isdigit() else 0)
 
         passive_list_prop = cast(dict[str, Any], save_param.get("PassiveSkillList", {}).get("value", {}))
         passives = cast(list[str], passive_list_prop.get("values", []))
 
         rank = clean_value(save_param.get("Rank", {}).get("value", 0))
 
-        slot_id = cast(dict[str, Any], save_param.get("SlotId", {}).get("value") or {})
-        # PalContainerId struct: ContainerId.value.ID.value = UUID
-        container_id = clean_value(
-            slot_id.get("ContainerId", {}).get("value", {}).get("ID", {}).get("value")
-        )
+        slot_id = cast(dict[str, Any], save_param.get("SlotID", {}).get("value") or save_param.get("SlotId", {}).get("value") or {})
+        raw_cid = slot_id.get("ContainerId")
+        container_id = clean_value(raw_cid)
+        if isinstance(container_id, dict) and "ID" in container_id:
+            container_id = clean_value(container_id["ID"])
 
 
         location_type = "unknown"

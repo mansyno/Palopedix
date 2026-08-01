@@ -1,15 +1,22 @@
 """FastAPI application for PalEngine.
 
-Exposes endpoints for querying static Paldex, breeding calculations, andsave file dynamic instances.
+Exposes endpoints for querying static Paldex, breeding calculations, asset serving, and save file dynamic instances.
 """
 
+import os
 from typing import Any, Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from palengine.cli.main import get_resolved_save_path
+from palengine.config import (
+    get_assets_dir,
+    get_static_data_source,
+    set_static_data_source,
+)
 from palengine.db.sqlite_engine import SQLiteEngine
 
 app = FastAPI(title="PalEngine API", version="1.0.0")
@@ -23,12 +30,42 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Mount local asset directory if available
+assets_dir = get_assets_dir()
+if os.path.exists(assets_dir):
+    app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
 # Global database connection instance
 db_engine = SQLiteEngine()
 
 
 class LoadSaveRequest(BaseModel):
     save_path: Optional[str] = None
+
+
+class ConfigUpdateRequest(BaseModel):
+    static_data_source: str
+
+
+@app.get("/api/config")
+def get_config() -> dict[str, Any]:
+    """Returns current API configuration."""
+    return {
+        "static_data_source": get_static_data_source(),
+        "assets_dir": get_assets_dir(),
+    }
+
+
+@app.post("/api/config")
+def update_config(payload: ConfigUpdateRequest) -> dict[str, Any]:
+    """Updates API static data source ('palworld_db' or 'legacy')."""
+    global db_engine
+    set_static_data_source(payload.static_data_source)
+    db_engine = SQLiteEngine()
+    return {
+        "status": "success",
+        "static_data_source": get_static_data_source(),
+    }
 
 
 @app.post("/api/save/load")
@@ -55,7 +92,7 @@ def get_save_status() -> dict[str, Any]:
         count = cursor.fetchone()["count"]
         return {
             "loaded": count > 0,
-            "path": db_engine.current_save_path if count > 0 else None
+            "path": db_engine.current_save_path if count > 0 else None,
         }
     except Exception:
         return {"loaded": False, "path": None}
@@ -155,12 +192,64 @@ def get_breed_parents(child: str) -> list[tuple[str, str]]:
     return db_engine.find_parents_for_child(child)
 
 
-@app.get("/api/breeding/path")
-def get_breed_path(
-    owned: str = Query(..., description="Comma-separated list of owned species."),
-    target: str = Query(..., description="Target species display name."),
-) -> list[dict[str, str]]:
-    """Calculates the shortest breeding path from owned species to a target child."""
-    owned_list = [s.strip() for s in owned.split(",") if s.strip()]
-    path = db_engine.find_breeding_path(owned_list, target)
-    return path
+@app.get("/api/items")
+def get_items(
+    category: Optional[str] = None,
+    rarity: Optional[int] = None,
+    search: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Queries items and equipment catalog."""
+    filters: dict[str, Any] = {}
+    if category:
+        filters["category"] = category
+    if rarity is not None:
+        filters["rarity"] = rarity
+    if search:
+        filters["search"] = search
+    return db_engine.query_items(filters)
+
+
+@app.get("/api/items/{item_id}/recipe")
+def get_recipe(item_id: str) -> dict[str, Any]:
+    """Retrieves crafting recipe and material ingredients for an item."""
+    recipe = db_engine.get_item_recipe(item_id)
+    if not recipe:
+        raise HTTPException(
+            status_code=404, detail=f"No crafting recipe found for item: '{item_id}'"
+        )
+    return recipe
+
+
+@app.get("/api/buildings")
+def get_buildings(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Queries base camp buildings & infrastructure."""
+    filters: dict[str, Any] = {}
+    if category:
+        filters["category"] = category
+    if search:
+        filters["search"] = search
+    return db_engine.query_buildings(filters)
+
+
+@app.get("/api/tech_tree")
+def get_tech_tree(
+    level: Optional[int] = None,
+    is_ancient: Optional[bool] = None,
+) -> list[dict[str, Any]]:
+    """Queries technology tree unlock nodes."""
+    filters: dict[str, Any] = {}
+    if level is not None:
+        filters["level"] = level
+    if is_ancient is not None:
+        filters["is_ancient"] = is_ancient
+    return db_engine.query_tech_tree(filters)
+
+
+@app.get("/api/work_types")
+def get_work_types() -> list[dict[str, Any]]:
+    """Lists all 12 official Palworld work suitability types with HUD icon paths."""
+    return db_engine.query_work_types()
+

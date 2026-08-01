@@ -1,5 +1,238 @@
 import React, { useState, useEffect } from 'react'
 
+const WORK_SUITABILITY_MAP = {
+  EmitFlame: 'Kindling',
+  Watering: 'Watering',
+  Seeding: 'Planting',
+  GenerateElectricity: 'Generating Electricity',
+  Electricity: 'Generating Electricity',
+  Handcraft: 'Handiwork',
+  Collection: 'Gathering',
+  Deforest: 'Lumbering',
+  Wood: 'Lumbering',
+  Mining: 'Mining',
+  Mine: 'Mining',
+  ProductMedicine: 'Medicine Production',
+  Medicine: 'Medicine Production',
+  Cool: 'Cooling',
+  Cooling: 'Cooling',
+  Transport: 'Transporting',
+  MonsterFarm: 'Farming',
+  OilExtraction: 'Oil Extraction',
+};
+
+function RecipeModal({ itemId, onClose }) {
+  const [recipe, setRecipe] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/items/${encodeURIComponent(itemId)}/recipe`)
+      .then(res => res.json())
+      .then(data => { setRecipe(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [itemId]);
+
+  if (!itemId) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content recipe-modal-content" onClick={e => e.stopPropagation()}>
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        {loading ? (
+          <p style={{ textAlign: 'center', padding: '2rem' }}>Loading crafting recipe...</p>
+        ) : recipe && !recipe.detail ? (
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>🛠️ Crafting Recipe: {recipe.item_name}</h2>
+            <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+              Work Amount: <strong style={{ color: 'var(--accent-gold)' }}>{recipe.work_amount}</strong> | Facility: {recipe.facility_name || recipe.facility_id || 'Handicraft Table'}
+            </p>
+            
+            <h3 style={{ fontWeight: 700, marginBottom: '1rem' }}>Required Ingredients</h3>
+            {recipe.ingredients && recipe.ingredients.map(ing => (
+              <div key={ing.material_item_id} className="ingredient-row">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  {ing.icon_path && (
+                    <img src={ing.icon_path} alt={ing.material_name} className="item-icon-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                  )}
+                  <span style={{ fontWeight: 600 }}>{ing.material_name}</span>
+                </div>
+                <span style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>x{ing.count}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>No crafting recipe available for this item.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ItemsCatalogView() {
+  const [items, setItems] = useState([]);
+  const [category, setCategory] = useState('');
+  const [search, setSearch] = useState('');
+  const [selectedRecipeItem, setSelectedRecipeItem] = useState(null);
+
+  useEffect(() => {
+    let url = '/api/items?';
+    if (category) url += `category=${encodeURIComponent(category)}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => setItems(data))
+      .catch(err => console.error("Error fetching items:", err));
+  }, [category, search]);
+
+  return (
+    <div>
+      <div className="filter-bar glass-card">
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Category</label>
+          <select value={category} onChange={e => setCategory(e.target.value)}>
+            <option value="">All Categories</option>
+            <option value="Weapon">Weapons</option>
+            <option value="Armor">Armor & Clothing</option>
+            <option value="Sphere">Pal Spheres</option>
+            <option value="Accessory">Accessories</option>
+            <option value="Material">Crafting Materials</option>
+            <option value="Food">Consumable Food</option>
+            <option value="Medicine">Medical Supplies</option>
+            <option value="Essential">Key / Essential Items</option>
+          </select>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+          <input type="text" placeholder="Search items by name or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        {items.map(item => (
+          <div key={item.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                {item.icon_path ? (
+                  <img src={item.icon_path} alt={item.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
+                )}
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{item.name}</h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>{'⭐'.repeat(Math.min(item.rarity || 1, 5))} ({item.category || 'Item'})</span>
+                </div>
+              </div>
+              {item.description && (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.4 }}>{item.description}</p>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px' }}>
+                <div>Price: <strong style={{ color: 'var(--text-primary)' }}>{item.price || 0}g</strong></div>
+                <div>Weight: <strong style={{ color: 'var(--text-primary)' }}>{item.weight || 0}</strong></div>
+                <div>Max Stack: <strong style={{ color: 'var(--text-primary)' }}>{item.max_stack || 9999}</strong></div>
+                {item.defense > 0 && <div>Defense: <strong style={{ color: 'var(--accent-gold)' }}>+{item.defense}</strong></div>}
+              </div>
+            </div>
+
+            <button className="btn btn-primary" style={{ marginTop: '1rem', width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => setSelectedRecipeItem(item.id)}>
+              🛠️ View Crafting Recipe
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {selectedRecipeItem && (
+        <RecipeModal itemId={selectedRecipeItem} onClose={() => setSelectedRecipeItem(null)} />
+      )}
+    </div>
+  );
+}
+
+function BuildingsTechView() {
+  const [subTab, setSubTab] = useState('buildings');
+  const [buildings, setBuildings] = useState([]);
+  const [techTree, setTechTree] = useState([]);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (subTab === 'buildings') {
+      fetch(`/api/buildings?search=${encodeURIComponent(search)}`)
+        .then(res => res.json())
+        .then(data => setBuildings(data));
+    } else {
+      fetch(`/api/tech_tree`)
+        .then(res => res.json())
+        .then(data => setTechTree(data));
+    }
+  }, [subTab, search]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+        <button className={`btn ${subTab === 'buildings' ? 'btn-primary' : ''}`} onClick={() => setSubTab('buildings')}>
+          🏗️ Base Buildings ({buildings.length})
+        </button>
+        <button className={`btn ${subTab === 'tech' ? 'btn-primary' : ''}`} onClick={() => setSubTab('tech')}>
+          ⚡ Technology Tree ({techTree.length})
+        </button>
+      </div>
+
+      {subTab === 'buildings' && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {buildings.map(b => (
+            <div key={b.id} className="glass-card" style={{ padding: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                {b.icon_path ? (
+                  <img src={b.icon_path} alt={b.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>🏰</div>
+                )}
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{b.name}</h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>Tech Level: Lv. {b.tech_level} ({b.category || 'Facility'})</span>
+                </div>
+              </div>
+              {b.description && (
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{b.description}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {subTab === 'tech' && (
+        <div className="glass-card table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Technology Node Name</th>
+                <th>Points Cost</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {techTree.map(t => (
+                <tr key={t.id}>
+                  <td style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>Lv. {t.level}</td>
+                  <td style={{ fontWeight: 600 }}>{t.name}</td>
+                  <td>{t.tech_point_cost} pts</td>
+                  <td>
+                    {t.is_ancient ? (
+                      <span className="badge" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff' }}>⚡ Ancient Technology</span>
+                    ) : (
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Standard</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BaseCampCard({ base }) {
   const [workerSortCol, setWorkerSortCol] = useState('level');
   const [workerSortDesc, setWorkerSortDesc] = useState(true);
@@ -66,7 +299,14 @@ function BaseCampCard({ base }) {
               <tbody>
                 {sortedWorkers.map((w, idx) => (
                   <tr key={idx}>
-                    <td style={{ fontWeight: 600 }}>{w.display_name}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <div className="pal-avatar-container">
+                        {w.icon_path && (
+                          <img src={w.icon_path} alt={w.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                        )}
+                        <span>{w.display_name}</span>
+                      </div>
+                    </td>
                     <td>Lv. {w.level}</td>
                     <td>{w.gender}</td>
                     <td>{w.rank} ⭐</td>
@@ -126,6 +366,219 @@ function BaseCampCard({ base }) {
   );
 }
 
+function PalDetailModal({ pal, onClose }) {
+  if (!pal) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <button className="modal-close-btn" onClick={onClose}>✕</button>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
+          {/* Left Column: Image & Bio */}
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              {pal.icon_path ? (
+                <img src={pal.icon_path} alt={pal.display_name} style={{ width: '128px', height: '128px', borderRadius: '20px', border: '2px solid var(--border-color-hover)', objectFit: 'cover', background: 'rgba(0,0,0,0.3)', boxShadow: '0 8px 25px rgba(0,0,0,0.5)' }} />
+              ) : (
+                <div style={{ width: '128px', height: '128px', borderRadius: '20px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: '3rem', fontWeight: 800 }}>
+                  {pal.display_name ? pal.display_name[0] : 'P'}
+                </div>
+              )}
+              <h2 style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '1rem' }}>{pal.display_name}</h2>
+              <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>#{String(pal.paldex_number || 0).padStart(3, '0')}</span>
+              
+              <div className="badge-container" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
+                {pal.element_1 && (
+                  <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <img src={`/assets/elements/${pal.element_1}.png`} alt={pal.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                    {pal.element_1}
+                  </span>
+                )}
+                {pal.element_2 && (
+                  <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <img src={`/assets/elements/${pal.element_2}.png`} alt={pal.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                    {pal.element_2}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {pal.description && (
+              <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: 1.5, background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px' }}>
+                "{pal.description}"
+              </p>
+            )}
+
+            <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Size</span>
+                <span style={{ fontWeight: 600 }}>{pal.size || 'M'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Habit</span>
+                <span style={{ fontWeight: 600 }}>{pal.nocturnal ? '🌙 Nocturnal' : '☀️ Diurnal'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Food Need</span>
+                <span style={{ fontWeight: 600 }}>🍖 {pal.food_requirement || 1}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Breeding Power</span>
+                <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.breeding_power}</span>
+              </div>
+              {pal.rarity && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Rarity</span>
+                  <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{'⭐'.repeat(Math.min(pal.rarity, 5))} ({pal.rarity})</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Base Stats, Suitabilities, Skills & Drops */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {/* Base Stats */}
+            <div>
+              <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                📊 Base Stats
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <div className="stat-label"><span>HP</span><span style={{fontWeight:700}}>{pal.hp || pal.attack_melee || 'N/A'}</span></div>
+                  <div className="stat-bar"><div className="stat-fill" style={{ width: `${Math.min(((pal.hp || 70)/150)*100, 100)}%` }}></div></div>
+                </div>
+                <div>
+                  <div className="stat-label"><span>Attack</span><span style={{fontWeight:700}}>{pal.attack_melee || 'N/A'}</span></div>
+                  <div className="stat-bar"><div className="stat-fill" style={{ width: `${Math.min(((pal.attack_melee || 70)/150)*100, 100)}%`, background: 'linear-gradient(135deg, #ef4444, #f97316)' }}></div></div>
+                </div>
+                <div>
+                  <div className="stat-label"><span>Defense</span><span style={{fontWeight:700}}>{pal.defense || 'N/A'}</span></div>
+                  <div className="stat-bar"><div className="stat-fill" style={{ width: `${Math.min(((pal.defense || 70)/150)*100, 100)}%`, background: 'linear-gradient(135deg, #3b82f6, #06b6d4)' }}></div></div>
+                </div>
+                <div>
+                  <div className="stat-label"><span>Work / Run Speed</span><span style={{fontWeight:700}}>{pal.work_speed || pal.run_speed || 'N/A'}</span></div>
+                  <div className="stat-bar"><div className="stat-fill" style={{ width: `${Math.min(((pal.work_speed || 400)/700)*100, 100)}%`, background: 'linear-gradient(135deg, #10b981, #34d399)' }}></div></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Work Suitabilities */}
+            {(pal.work_suitability_details && pal.work_suitability_details.length > 0) ? (
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  🛠️ Work Suitabilities
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {pal.work_suitability_details.map(wsd => (
+                    <span key={wsd.id} className="suitability-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                      {wsd.icon_path && (
+                        <img src={wsd.icon_path} alt={wsd.name} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
+                      )}
+                      <span>{wsd.name}</span>
+                      <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {wsd.level}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (pal.work_suitabilities && Object.keys(pal.work_suitabilities).length > 0) && (
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  🛠️ Work Suitabilities
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {Object.entries(pal.work_suitabilities).map(([work, level]) => (
+                    <span key={work} className="suitability-pill">
+                      <span>{WORK_SUITABILITY_MAP[work] || work}</span>
+                      <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {level}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Partner Skill */}
+            {pal.partner_skill && (
+              <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
+                  {pal.partner_skill.unlock_item && (
+                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
+                  )}
+                </div>
+                {pal.partner_skill.description && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>
+                )}
+              </div>
+            )}
+
+            {/* Species Default Active & Passive Skills */}
+            {pal.skills && pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length > 0 && (
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  ⚔️ Active & Passive Skills ({pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length})
+                </h3>
+                <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').map(sk => (
+                    <div key={sk.id} className="skill-row">
+                      {sk.icon_path ? (
+                        <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
+                      ) : (
+                        <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>⚡</div>
+                      )}
+                      <div style={{ flexGrow: 1 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: 700 }}>{sk.name}</span>
+                            {sk.is_guaranteed === 1 && (
+                              <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: 'var(--accent-gold)', fontSize: '0.7rem' }}>Guaranteed</span>
+                            )}
+                          </div>
+                          <div className="badge-container">
+                            {sk.element && <span className="badge badge-element">{sk.element}</span>}
+                            <span className="badge" style={{ background: sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: sk.type === 'Passive' ? '#60a5fa' : '#f87171' }}>{sk.type}</span>
+                          </div>
+                        </div>
+                        {sk.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{sk.description}</p>}
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'flex', gap: '1rem' }}>
+                          {sk.stat_modifier && <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>Modifier: {sk.stat_modifier}</span>}
+                          {sk.power > 0 && <span>Power: <strong style={{color: 'var(--accent-gold)'}}>{sk.power}</strong></span>}
+                          {sk.cooldown > 0 && <span>CD: <strong style={{color: 'var(--text-primary)'}}>{sk.cooldown}s</strong></span>}
+                          <span>Level Learned: <strong>Lv. {sk.level_learned || 1}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Item Drops */}
+            {pal.drops && pal.drops.length > 0 && (
+              <div>
+                <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  🎁 Possible Item Drops
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  {pal.drops.map((d, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.85rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.875rem' }}>
+                      {d.icon_path && (
+                        <img src={d.icon_path} alt={d.item_name} className="item-icon-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                      )}
+                      <span style={{ fontWeight: 600 }}>{d.item_name}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>({d.min_quantity}-{d.max_quantity}x @ {(d.drop_rate * 100).toFixed(0)}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('paldex')
   const [savePath, setSavePath] = useState('')
@@ -137,6 +590,7 @@ function App() {
 
   // Pals Tab States
   const [pals, setPals] = useState([])
+  const [selectedPal, setSelectedPal] = useState(null)
   const [elementFilter, setElementFilter] = useState('')
   const [sizeFilter, setSizeFilter] = useState('')
   const [nocturnalFilter, setNocturnalFilter] = useState('')
@@ -333,7 +787,19 @@ function App() {
             className={`nav-item ${activeTab === 'paldex' ? 'active' : ''}`}
             onClick={() => setActiveTab('paldex')}
           >
-            📚 Static Paldex
+            📚 Master Paldex
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'items' ? 'active' : ''}`}
+            onClick={() => setActiveTab('items')}
+          >
+            📦 Items & Recipes
+          </div>
+          <div 
+            className={`nav-item ${activeTab === 'buildings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('buildings')}
+          >
+            🏗️ Facilities & Tech
           </div>
           <div 
             className={`nav-item ${activeTab === 'save_game' ? 'active' : ''}`}
@@ -360,12 +826,16 @@ function App() {
       <main className="main-content">
         <header>
           <h1>{
-            activeTab === 'paldex' ? 'Static Paldex' :
+            activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
+            activeTab === 'items' ? 'Items & Crafting Catalog' :
+            activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
             activeTab === 'save_game' ? 'Save Game Explorer' :
             activeTab === 'bases' ? 'Base Camp Overview' : 'Breeding Center'
           }</h1>
           <p>{
-            activeTab === 'paldex' ? 'Browse all Pal species, stats, elements, and work capabilities.' :
+            activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
+            activeTab === 'items' ? 'Search 1,891 items, equipment, and crafting recipe ingredients.' :
+            activeTab === 'buildings' ? 'Explore 552 base buildings and 839 technology tree unlocks.' :
             activeTab === 'save_game' ? 'View and filter Pals currently in your party, Palbox, or bases.' :
             activeTab === 'bases' ? 'Audit placed infrastructure and active base camp workers.' :
             'Calculate offspring, reverse lookups, or find optimal breeding paths.'
@@ -380,13 +850,13 @@ function App() {
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
                 <select value={elementFilter} onChange={e => setElementFilter(e.target.value)}>
                   <option value="">All Elements</option>
-                  <option value="Neutral">Neutral</option>
+                  <option value="Neutral">Neutral / Normal</option>
                   <option value="Fire">Fire</option>
                   <option value="Water">Water</option>
-                  <option value="Grass">Grass</option>
-                  <option value="Electric">Electric</option>
+                  <option value="Grass">Grass / Leaf</option>
+                  <option value="Electric">Electric / Electricity</option>
                   <option value="Ice">Ice</option>
-                  <option value="Ground">Ground</option>
+                  <option value="Ground">Ground / Earth</option>
                   <option value="Dark">Dark</option>
                   <option value="Dragon">Dragon</option>
                 </select>
@@ -418,33 +888,99 @@ function App() {
                   <option value="watering">Watering</option>
                   <option value="planting">Planting</option>
                   <option value="generating_electricity">Electricity Generation</option>
-                  <option value="handiwork">Handiwork</option>
+                  <option value="handiwork">Handiwork / Handcraft</option>
                   <option value="gathering">Gathering</option>
                   <option value="lumbering">Lumbering</option>
                   <option value="mining">Mining</option>
                   <option value="medicine_production">Medicine Production</option>
                   <option value="cooling">Cooling</option>
                   <option value="transporting">Transporting</option>
-                  <option value="farming">Farming</option>
+                  <option value="farming">Farming / Monster Farm</option>
                 </select>
               </div>
             </div>
 
             <div className="pals-grid">
               {pals.map(p => (
-                <div key={p.internal_name} className="glass-card pal-card">
+                <div key={p.internal_name || p.id} className="glass-card pal-card" onClick={() => setSelectedPal(p)}>
                   <div className="pal-card-header">
-                    <span className="pal-number">#{String(p.paldex_number).padStart(3, '0')}</span>
+                    <span className="pal-number">#{String(p.paldex_number || 0).padStart(3, '0')}</span>
                     <div className="badge-container">
-                      {p.element_1 && <span className="badge badge-element">{p.element_1}</span>}
-                      {p.element_2 && <span className="badge badge-element">{p.element_2}</span>}
+                      {p.element_1 && (
+                        <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          <img src={`/assets/elements/${p.element_1}.png`} alt={p.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                          {p.element_1}
+                        </span>
+                      )}
+                      {p.element_2 && (
+                        <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          <img src={`/assets/elements/${p.element_2}.png`} alt={p.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                          {p.element_2}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <h3 className="pal-name">{p.display_name}</h3>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                    <p>Size: {p.size}</p>
-                    <p>Nocturnal: {p.nocturnal ? 'Yes' : 'No'}</p>
+                  
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.75rem 0' }}>
+                    {p.icon_path ? (
+                      <img src={p.icon_path} alt={p.display_name} className="pal-card-avatar" onError={(e) => { e.target.style.display = 'none'; }} />
+                    ) : (
+                      <div className="pal-card-avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem', background: 'var(--primary-gradient)' }}>
+                        {p.display_name ? p.display_name[0] : 'P'}
+                      </div>
+                    )}
+                    <div>
+                      <h3 className="pal-name" style={{ margin: 0, fontSize: '1.25rem' }}>{p.display_name}</h3>
+                      {p.code && p.code !== p.display_name && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {p.code}</span>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Base Stats Summary */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px', marginBottom: '0.75rem', fontSize: '0.8rem', textAlign: 'center' }}>
+                    <div><span style={{color: 'var(--text-secondary)'}}>HP:</span> <strong>{p.hp || 70}</strong></div>
+                    <div><span style={{color: 'var(--text-secondary)'}}>ATK:</span> <strong>{p.attack_melee || 70}</strong></div>
+                    <div><span style={{color: 'var(--text-secondary)'}}>DEF:</span> <strong>{p.defense || 70}</strong></div>
+                  </div>
+
+                  {/* Partner Skill preview */}
+                  {p.partner_skill && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '0.3rem 0.5rem', borderRadius: '6px', marginBottom: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>🤝</span>
+                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.partner_skill.name}</span>
+                    </div>
+                  )}
+
+                  {/* Work Suitabilities preview with HUD icons */}
+                  {p.work_suitability_details && p.work_suitability_details.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                      {p.work_suitability_details.slice(0, 3).map(wsd => (
+                        <span key={wsd.id} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                          {wsd.icon_path && (
+                            <img src={wsd.icon_path} alt={wsd.name} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
+                          )}
+                          <span>{wsd.name}</span>
+                          <strong style={{ color: 'var(--accent-gold)' }}>L{wsd.level}</strong>
+                        </span>
+                      ))}
+                      {p.work_suitability_details.length > 3 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{p.work_suitability_details.length - 3} more</span>
+                      )}
+                    </div>
+                  ) : (p.work_suitabilities && Object.keys(p.work_suitabilities).length > 0) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                      {Object.entries(p.work_suitabilities).slice(0, 3).map(([work, level]) => (
+                        <span key={work} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                          {WORK_SUITABILITY_MAP[work] || work} <strong style={{ color: 'var(--accent-gold)' }}>L{level}</strong>
+                        </span>
+                      ))}
+                      {Object.keys(p.work_suitabilities).length > 3 && (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{Object.keys(p.work_suitabilities).length - 3} more</span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="pal-card-footer">
                     <span>Power: {p.breeding_power}</span>
                     <span>Food: 🍖 {p.food_requirement}</span>
@@ -453,6 +989,17 @@ function App() {
               ))}
             </div>
           </div>
+        )}
+
+        {/* 📦 Items & Recipes Catalog Tab */}
+        {activeTab === 'items' && <ItemsCatalogView />}
+
+        {/* 🏗️ Base Facilities & Tech Tree Tab */}
+        {activeTab === 'buildings' && <BuildingsTechView />}
+
+        {/* Selected Pal Detail Modal */}
+        {selectedPal && (
+          <PalDetailModal pal={selectedPal} onClose={() => setSelectedPal(null)} />
         )}
 
         {/* 💾 Save Game Explorer Tab */}
@@ -523,7 +1070,14 @@ function App() {
                     <tbody>
                       {sortedInstances.map((pi, idx) => (
                         <tr key={idx}>
-                          <td style={{ fontWeight: 600 }}>{pi.display_name}</td>
+                          <td style={{ fontWeight: 600 }}>
+                            <div className="pal-avatar-container">
+                              {pi.icon_path && (
+                                <img src={pi.icon_path} alt={pi.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                              )}
+                              <span>{pi.display_name}</span>
+                            </div>
+                          </td>
                           <td>Lv. {pi.level}</td>
                           <td>{pi.gender}</td>
                           <td>{pi.rank} ⭐</td>
@@ -591,9 +1145,14 @@ function App() {
 
               {breedResult && (
                 <div className="glass-card" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)' }}>
-                  <div>
-                    <h3 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Child: {breedResult.display_name}</h3>
-                    <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Breeding Power: {breedResult.breeding_power}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                    {breedResult.icon_path && (
+                      <img src={breedResult.icon_path} alt={breedResult.display_name} className="pal-card-avatar" onError={(e) => { e.target.style.display = 'none'; }} />
+                    )}
+                    <div>
+                      <h3 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Child: {breedResult.display_name}</h3>
+                      <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>Breeding Power: {breedResult.breeding_power}</p>
+                    </div>
                   </div>
                   <div className="badge-container">
                     {breedResult.element_1 && <span className="badge badge-element">{breedResult.element_1}</span>}

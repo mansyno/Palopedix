@@ -47,6 +47,13 @@ class ConfigUpdateRequest(BaseModel):
     static_data_source: str
 
 
+from palengine.world_manager import discover_worlds, get_world_by_id
+
+
+class SelectWorldRequest(BaseModel):
+    world_id: str
+
+
 @app.get("/api/config")
 def get_config() -> dict[str, Any]:
     """Returns current API configuration."""
@@ -54,6 +61,27 @@ def get_config() -> dict[str, Any]:
         "static_data_source": get_static_data_source(),
         "assets_dir": get_assets_dir(),
     }
+
+
+@app.get("/api/worlds")
+def get_worlds() -> dict[str, Any]:
+    """Returns list of active discovered save worlds and current selected world."""
+    worlds = discover_worlds()
+    return {
+        "worlds": worlds,
+        "current_world_id": db_engine.current_world_id,
+        "current_save_path": db_engine.current_save_path,
+    }
+
+
+@app.post("/api/worlds/select")
+def select_world(payload: SelectWorldRequest) -> dict[str, Any]:
+    """Switches active world database connection."""
+    try:
+        res = db_engine.switch_world(payload.world_id)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post("/api/config")
@@ -146,6 +174,18 @@ def get_instances(
         filters["passive_id"] = passive
 
     return db_engine.query_instances(filters)
+
+
+@app.get("/api/save/condense")
+def get_condense_candidates() -> list[dict[str, Any]]:
+    """Returns top condensing candidates from the dynamic save instances."""
+    return db_engine.get_condense_candidates()
+
+
+@app.get("/api/save/inventory")
+def get_inventory(container_type: Optional[str] = None) -> list[dict[str, Any]]:
+    """Queries item inventory from dynamic save data."""
+    return db_engine.query_inventory(container_type)
 
 
 @app.get("/api/bases")

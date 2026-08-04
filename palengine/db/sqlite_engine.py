@@ -9,6 +9,7 @@ import os
 import sqlite3
 from typing import Any, Optional
 
+from palengine.world_manager import discover_worlds, get_world_by_id
 from palengine.config import (
     get_assets_dir,
     get_palworld_db_path,
@@ -16,6 +17,7 @@ from palengine.config import (
 )
 from palengine.parser.extract_bases import extract_bases
 from palengine.parser.extract_pals import extract_pals
+from palengine.parser.extract_items import extract_items
 
 
 def transform_icon_path(path: Optional[str]) -> Optional[str]:
@@ -46,6 +48,7 @@ class SQLiteEngine:
         data_dir: Optional[str] = None,
         source: Optional[str] = None,
         db_path: Optional[str] = None,
+        world_id: Optional[str] = None,
     ):
         if data_dir is None:
             data_dir = os.path.abspath(
@@ -54,22 +57,67 @@ class SQLiteEngine:
         self.data_dir = data_dir
         self.source = source or get_static_data_source()
         self.palworld_db_path = db_path or get_palworld_db_path()
-
-        self.conn = sqlite3.connect(":memory:", check_same_thread=False)
-        self.conn.row_factory = sqlite3.Row
+        self.conn = None
+        self.current_world_id = None
         self.current_save_path = None
 
-        # Create schemas and load static data
+        # Auto-select newest world if world_id not specified
+        worlds = discover_worlds()
+        target_world = None
+        if world_id:
+            target_world = get_world_by_id(world_id)
+        elif worlds:
+            target_world = worlds[0]
+
+        if target_world:
+            db_file = target_world["db_path"]
+            self.current_world_id = target_world["world_id"]
+            self.current_save_path = target_world["sav_path"]
+        else:
+            db_file = os.path.join(self.data_dir, "userdata.db")
+
+        os.makedirs(os.path.dirname(db_file), exist_ok=True)
+        self.conn = sqlite3.connect(db_file, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
         self._create_tables()
         self._load_static_metadata()
+        
+        # Auto-load save file into DB if empty
+        if self.current_save_path and self.get_instance_count() == 0:
+            try:
+                self.load_save_data(self.current_save_path)
+            except Exception as e:
+                print(f"Auto-load save warning: {e}")
 
     def _create_tables(self) -> None:
         cursor = self.conn.cursor()
 
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_containers (
+                container_id TEXT PRIMARY KEY,
+                container_type TEXT,
+                slot_count INTEGER
+            )
+        """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_container_slots (
+                container_id TEXT,
+                slot_index INTEGER,
+                item_id TEXT,
+                count INTEGER,
+                PRIMARY KEY (container_id, slot_index),
+                FOREIGN KEY (container_id) REFERENCES item_containers (container_id)
+            )
+        """
+        )
+
         # ---------- Dynamic Save Game Tables ----------
         cursor.execute(
             """
-            CREATE TABLE pal_instances (
+            CREATE TABLE IF NOT EXISTS pal_instances (
                 instance_id TEXT PRIMARY KEY,
                 owner_uid TEXT,
                 species TEXT,
@@ -90,7 +138,7 @@ class SQLiteEngine:
 
         cursor.execute(
             """
-            CREATE TABLE pal_instance_passives (
+            CREATE TABLE IF NOT EXISTS pal_instance_passives (
                 instance_id TEXT,
                 passive_id TEXT,
                 PRIMARY KEY (instance_id, passive_id),
@@ -101,7 +149,7 @@ class SQLiteEngine:
 
         cursor.execute(
             """
-            CREATE TABLE base_camps (
+            CREATE TABLE IF NOT EXISTS base_camps (
                 base_camp_id TEXT PRIMARY KEY,
                 name TEXT
             )
@@ -110,56 +158,33 @@ class SQLiteEngine:
 
         cursor.execute(
             """
-            CREATE TABLE base_structures_instances (
+            CREATE TABLE IF NOT EXISTS item_containers (
+                container_id TEXT PRIMARY KEY,
+                container_type TEXT,
+                slot_count INTEGER
+            )
+        """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS item_container_slots (
+                container_id TEXT,
+                slot_index INTEGER,
+                item_id TEXT,
+                count INTEGER,
+                PRIMARY KEY (container_id, slot_index),
+                FOREIGN KEY (container_id) REFERENCES item_containers (container_id)
+            )
+        """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS base_structures_instances (
                 base_camp_id TEXT,
                 structure_name TEXT,
                 count INTEGER,
                 PRIMARY KEY (base_camp_id, structure_name),
                 FOREIGN KEY (base_camp_id) REFERENCES base_camps (base_camp_id)
-            )
-        """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE passive_skills (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                rank INTEGER,
-                description TEXT
-            )
-        """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE base_structures (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                category TEXT,
-                technology_level INTEGER
-            )
-        """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE breeding_combos (
-                parent1 TEXT,
-                parent2 TEXT,
-                child TEXT,
-                PRIMARY KEY (parent1, parent2, child)
-            )
-        """
-        )
-
-        cursor.execute(
-            """
-            CREATE TABLE partner_skills (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                pal_internal_name TEXT,
-                description TEXT
             )
         """
         )
@@ -175,6 +200,7 @@ class SQLiteEngine:
             cursor.execute(f"ATTACH DATABASE '{db_path_clean}' AS palworld_master")
 
             # Create in-memory tables populated from attached master database
+            cursor.execute("DROP TABLE IF EXISTS main.pals")
             cursor.execute(
                 r"""
                 CREATE TABLE pals AS
@@ -218,6 +244,7 @@ class SQLiteEngine:
             """
             )
 
+            cursor.execute("DROP TABLE IF EXISTS main.pal_work_suitabilities")
             cursor.execute(
                 """
                 CREATE TABLE pal_work_suitabilities AS
@@ -236,6 +263,7 @@ class SQLiteEngine:
             """
             )
 
+            cursor.execute("DROP TABLE IF EXISTS main.active_skills")
             cursor.execute(
                 """
                 CREATE TABLE active_skills AS
@@ -248,9 +276,50 @@ class SQLiteEngine:
                     description,
                     icon_path
                 FROM palworld_master.skills
+                WHERE type = 'Active' OR type = 'active' OR category = 'Active'
             """
             )
 
+            cursor.execute("DROP TABLE IF EXISTS main.passive_skills")
+            cursor.execute(
+                """
+                CREATE TABLE passive_skills AS
+                SELECT id, name, CAST(power AS INTEGER) as rank, description
+                FROM palworld_master.skills
+                WHERE type = 'Passive' OR category = 'Passive' OR category LIKE 'Passive%'
+                """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.partner_skills")
+            cursor.execute(
+                """
+                CREATE TABLE partner_skills AS
+                SELECT s.id, s.name, ps.pal_id as pal_internal_name, s.description
+                FROM palworld_master.skills s
+                JOIN palworld_master.pal_skills ps ON s.id = ps.skill_id
+                WHERE s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%'
+                """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.base_structures")
+            cursor.execute(
+                """
+                CREATE TABLE base_structures AS
+                SELECT id, name, category, tech_level as technology_level
+                FROM palworld_master.buildings
+                """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.breeding_combos")
+            cursor.execute(
+                """
+                CREATE TABLE breeding_combos AS
+                SELECT parent1_id as parent1, parent2_id as parent2, child_id as child
+                FROM palworld_master.breeding_combos
+                """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.work_suitabilities")
             cursor.execute(
                 """
                 CREATE TABLE work_suitabilities AS
@@ -265,7 +334,50 @@ class SQLiteEngine:
             # Legacy In-Memory SQLite Tables
             cursor.execute(
                 """
-                CREATE TABLE pals (
+                CREATE TABLE IF NOT EXISTS passive_skills (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    rank INTEGER,
+                    description TEXT
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS base_structures (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    category TEXT,
+                    technology_level INTEGER
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS breeding_combos (
+                    parent1 TEXT,
+                    parent2 TEXT,
+                    child TEXT,
+                    PRIMARY KEY (parent1, parent2, child)
+                )
+            """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS partner_skills (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    pal_internal_name TEXT,
+                    description TEXT
+                )
+            """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS pals (
                     internal_name TEXT PRIMARY KEY,
                     display_name TEXT,
                     paldex_number INTEGER,
@@ -292,7 +404,7 @@ class SQLiteEngine:
 
             cursor.execute(
                 """
-                CREATE TABLE pal_work_suitabilities (
+                CREATE TABLE IF NOT EXISTS pal_work_suitabilities (
                     pal_internal_name TEXT,
                     suitability_name TEXT,
                     level INTEGER,
@@ -304,7 +416,7 @@ class SQLiteEngine:
 
             cursor.execute(
                 """
-                CREATE TABLE active_skills (
+                CREATE TABLE IF NOT EXISTS active_skills (
                     id TEXT PRIMARY KEY,
                     name TEXT,
                     element TEXT,
@@ -318,7 +430,7 @@ class SQLiteEngine:
 
             cursor.execute(
                 """
-                CREATE TABLE work_suitabilities (
+                CREATE TABLE IF NOT EXISTS work_suitabilities (
                     id TEXT PRIMARY KEY,
                     name TEXT,
                     description TEXT
@@ -331,71 +443,70 @@ class SQLiteEngine:
     def _load_static_metadata(self) -> None:
         cursor = self.conn.cursor()
 
-        # Always load passive skills, base structures, and breeding combos if present
-        passives_path = os.path.join(self.data_dir, "passive_skills.json")
-        if os.path.exists(passives_path):
-            with open(passives_path, "r", encoding="utf-8") as f:
-                passives_data = json.load(f)
-            for ps in passives_data:
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO passive_skills (id, name, rank, description)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (ps.get("id"), ps.get("name"), ps.get("rank"), ps.get("description")),
-                )
-
-        bs_path = os.path.join(self.data_dir, "base_structures.json")
-        if os.path.exists(bs_path):
-            with open(bs_path, "r", encoding="utf-8") as f:
-                bs_data = json.load(f)
-            for bs in bs_data:
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO base_structures (id, name, category, technology_level)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (
-                        bs.get("id"),
-                        bs.get("name"),
-                        bs.get("category"),
-                        bs.get("technology_level"),
-                    ),
-                )
-
-        bc_path = os.path.join(self.data_dir, "breeding_combos.json")
-        if os.path.exists(bc_path):
-            with open(bc_path, "r", encoding="utf-8") as f:
-                bc_data = json.load(f)
-            for bc in bc_data.get("unique_combos", []):
-                cursor.execute(
-                    """
-                    INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child)
-                    VALUES (?, ?, ?)
-                """,
-                    (bc.get("parent1"), bc.get("parent2"), bc.get("child")),
-                )
-
-        ps_path = os.path.join(self.data_dir, "partner_skills.json")
-        if os.path.exists(ps_path):
-            with open(ps_path, "r", encoding="utf-8") as f:
-                ps_data = json.load(f)
-            for ps in ps_data:
-                cursor.execute(
-                    """
-                    INSERT OR REPLACE INTO partner_skills (id, name, pal_internal_name, description)
-                    VALUES (?, ?, ?, ?)
-                """,
-                    (
-                        ps.get("id"),
-                        ps.get("name"),
-                        ps.get("pal_internal_name"),
-                        ps.get("description"),
-                    ),
-                )
-
-        # Load legacy static tables if NOT using palworld_db
         if self.source == "legacy" or not os.path.exists(self.palworld_db_path):
+            passives_path = os.path.join(self.data_dir, "passive_skills.json")
+            if os.path.exists(passives_path):
+                with open(passives_path, "r", encoding="utf-8") as f:
+                    passives_data = json.load(f)
+                for ps in passives_data:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO passive_skills (id, name, rank, description)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (ps.get("id"), ps.get("name"), ps.get("rank"), ps.get("description")),
+                    )
+
+            bs_path = os.path.join(self.data_dir, "base_structures.json")
+            if os.path.exists(bs_path):
+                with open(bs_path, "r", encoding="utf-8") as f:
+                    bs_data = json.load(f)
+                for bs in bs_data:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO base_structures (id, name, category, technology_level)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (
+                            bs.get("id"),
+                            bs.get("name"),
+                            bs.get("category"),
+                            bs.get("technology_level"),
+                        ),
+                    )
+
+            bc_path = os.path.join(self.data_dir, "breeding_combos.json")
+            if os.path.exists(bc_path):
+                with open(bc_path, "r", encoding="utf-8") as f:
+                    bc_data = json.load(f)
+                for bc in bc_data.get("unique_combos", []):
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child)
+                        VALUES (?, ?, ?)
+                    """,
+                        (bc.get("parent1"), bc.get("parent2"), bc.get("child")),
+                    )
+
+            ps_path = os.path.join(self.data_dir, "partner_skills.json")
+            if os.path.exists(ps_path):
+                with open(ps_path, "r", encoding="utf-8") as f:
+                    ps_data = json.load(f)
+                for ps in ps_data:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO partner_skills (id, name, pal_internal_name, description)
+                        VALUES (?, ?, ?, ?)
+                    """,
+                        (
+                            ps.get("id"),
+                            ps.get("name"),
+                            ps.get("pal_internal_name"),
+                            ps.get("description"),
+                        ),
+                    )
+
+
             pals_path = os.path.join(self.data_dir, "pals.json")
             if os.path.exists(pals_path):
                 with open(pals_path, "r", encoding="utf-8") as f:
@@ -487,6 +598,50 @@ class SQLiteEngine:
 
     # ---------- Save Data Reload capability ----------
 
+    def get_instance_count(self) -> int:
+        """Returns total Pal instances stored in current DB."""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) as c FROM pal_instances")
+            return cursor.fetchone()["c"]
+        except Exception:
+            return 0
+
+    def switch_world(self, world_id: str) -> dict[str, Any]:
+        """Switches current database connection to target world database.
+
+        Auto-parses and loads the world Level.sav if DB is empty.
+        """
+        world = get_world_by_id(world_id)
+        if not world:
+            raise ValueError(f"World not found: {world_id}")
+
+        if self.conn:
+            self.conn.close()
+
+        self.current_world_id = world["world_id"]
+        self.current_save_path = world["sav_path"]
+        
+        db_path = world["db_path"]
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
+        self._create_tables()
+        self._load_static_metadata()
+
+        # Load save data if DB is new/empty
+        if self.get_instance_count() == 0:
+            self.load_save_data(self.current_save_path)
+
+        return {
+            "status": "success",
+            "world_id": self.current_world_id,
+            "display_name": world["display_name"],
+            "sav_path": self.current_save_path,
+            "instances_count": self.get_instance_count(),
+        }
+
     def clear_instance_data(self) -> None:
         """Clears all dynamic save-game related tables."""
         cursor = self.conn.cursor()
@@ -494,6 +649,8 @@ class SQLiteEngine:
         cursor.execute("DELETE FROM pal_instance_passives")
         cursor.execute("DELETE FROM base_camps")
         cursor.execute("DELETE FROM base_structures_instances")
+        cursor.execute("DELETE FROM item_container_slots")
+        cursor.execute("DELETE FROM item_containers")
         self.conn.commit()
 
     def load_save_data(self, sav_path: str) -> None:
@@ -503,6 +660,22 @@ class SQLiteEngine:
 
         pals = extract_pals(sav_path)
         bases = extract_bases(sav_path)
+        items_data = extract_items(sav_path)
+
+        cursor = self.conn.cursor()
+        for container in items_data:
+            cursor.execute("""
+                INSERT OR REPLACE INTO item_containers (container_id, container_type, slot_count)
+                VALUES (?, ?, ?)
+            """, (container['container_id'], container['container_type'], container['slot_count']))
+            for item in container['items']:
+                cursor.execute("""
+                    INSERT OR REPLACE INTO item_container_slots (container_id, slot_index, item_id, count)
+                    VALUES (?, ?, ?, ?)
+                """, (container['container_id'], item['slot_index'], item['item_id'], item['count']))
+
+
+
 
         cursor = self.conn.cursor()
 
@@ -1188,9 +1361,9 @@ class SQLiteEngine:
             d["icon_path"] = transform_icon_path(d.get("icon_path"))
             p_rows = self.conn.execute(
                 """
-                SELECT ps.name, ps.id, ps.rank, ps.description
+                SELECT COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id, ps.rank, ps.description
                 FROM pal_instance_passives pip
-                JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
+                LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
                 WHERE pip.instance_id = ?
             """,
                 (d["instance_id"],),
@@ -1234,3 +1407,225 @@ class SQLiteEngine:
         ]
 
         return summary
+
+
+    def query_inventory(self, container_type: Optional[str] = None) -> list[dict[str, Any]]:
+        """Queries item inventory from dynamic save data joined with static master items table."""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute("SELECT COUNT(*) as c FROM item_containers")
+            if cursor.fetchone()["c"] == 0:
+                return []
+        except Exception:
+            return []
+
+        query = """
+            SELECT 
+                c.container_id,
+                c.container_type,
+                c.slot_count,
+                s.slot_index,
+                s.item_id,
+                s.count,
+                m.name as display_name,
+                m.category,
+                m.subcategory,
+                m.rarity,
+                m.weight,
+                m.price,
+                m.icon_path,
+                m.description
+            FROM item_containers c
+            JOIN item_container_slots s ON c.container_id = s.container_id
+            LEFT JOIN palworld_master.items m ON LOWER(s.item_id) = LOWER(m.id)
+        """
+        params = []
+        if container_type:
+            query += " WHERE c.container_type = ?"
+            params.append(container_type)
+            
+        query += " ORDER BY c.container_type, s.slot_index"
+        
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for r in rows:
+            d = dict(r)
+            if not d["display_name"]:
+                d["display_name"] = d["item_id"]
+            if d["icon_path"]:
+                parts = d["icon_path"].split("/")
+                d["icon_path"] = "/assets/" + parts[-2] + "/" + parts[-1]
+            results.append(d)
+            
+        return results
+
+    def get_condense_candidates(self) -> list[dict]:
+        from collections import defaultdict
+        
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) as c FROM pal_instances")
+        count = cursor.fetchone()["c"]
+        if count < 1:
+            return []
+
+        pal_metadata = {}
+        for row in self.conn.execute("SELECT id, code, name, hp, attack, defense FROM palworld_master.pals"):
+            data = {
+                "name": row["name"],
+                "hp": row["hp"],
+                "attack": row["attack"],
+                "defense": row["defense"]
+            }
+            pal_metadata[row["id"].lower()] = data
+            if row["code"]:
+                pal_metadata[row["code"].lower()] = data
+
+        skill_metadata = {}
+        for row in self.conn.execute("SELECT id, name, category FROM palworld_master.skills WHERE type='Passive'"):
+            skill_metadata[row["id"].lower()] = {
+                "name": row["name"],
+                "category": row["category"] or "PassiveTier1"
+            }
+
+        cursor.execute("""
+            SELECT i.species, i.level, i.iv_hp, i.iv_melee, i.iv_defense,
+                   GROUP_CONCAT(p.passive_id, ',') as passives
+            FROM pal_instances i
+            LEFT JOIN pal_instance_passives p ON i.instance_id = p.instance_id
+            GROUP BY i.instance_id
+        """)
+        instances = [dict(r) for r in cursor.fetchall()]
+
+        species_groups = defaultdict(list)
+        for inst in instances:
+            raw_species = inst.get('species')
+            if raw_species:
+                meta = pal_metadata.get(raw_species.lower())
+                display_species = meta['name'] if meta else raw_species
+                inst['display_species'] = display_species
+                inst['base_stats'] = meta if meta else {"hp": 100, "attack": 100, "defense": 100}
+                
+                raw_passives = (inst.get('passives') or '').split(',')
+                display_passives = []
+                passive_score = 0
+                for p in raw_passives:
+                    p = p.strip()
+                    if p and p != 'None':
+                        s_meta = skill_metadata.get(p.lower())
+                        if s_meta:
+                            display_passives.append(s_meta["name"])
+                            cat = s_meta["category"]
+                            try:
+                                tier_str = cat.replace("PassiveTier", "")
+                                passive_score += int(tier_str) * 50
+                            except:
+                                pass
+                        else:
+                            display_passives.append(p)
+                            
+                inst['display_passives'] = display_passives
+                inst['passive_score'] = passive_score
+                species_groups[display_species].append(inst)
+
+        candidates = []
+        for display_species, pals in species_groups.items():
+            if len(pals) < 2:
+                continue
+                
+            def get_score(p):
+                iv_hp = p.get('iv_hp') or 0
+                iv_atk = p.get('iv_melee') or 0
+                iv_def = p.get('iv_defense') or 0
+                iv_sum = iv_hp + iv_atk + iv_def
+                p_score = p.get('passive_score', 0)
+                return (p_score * 1000) + p.get('level', 0) * 100 + iv_sum
+
+            pals.sort(key=get_score, reverse=True)
+            best_pal = pals[0]
+            
+            candidates.append({
+                'species': display_species,
+                'count': len(pals),
+                'best_pal': best_pal,
+                'score': len(pals) * 100000 + get_score(best_pal)
+            })
+            
+        candidates.sort(key=lambda x: (x['count'], x['score']), reverse=True)
+
+        results = []
+        for c in candidates[:10]:
+            species = c['species']
+            total_owned = c['count']
+            sacrifices = total_owned - 1
+            best = c['best_pal']
+            
+            lvl = best.get('level')
+            iv_hp = best.get('iv_hp') or 0
+            iv_atk = best.get('iv_melee') or 0
+            iv_def = best.get('iv_defense') or 0
+            passives_list = best.get('display_passives', [])
+            
+            attainable_stars = 0
+            if total_owned >= 49: attainable_stars = 4
+            elif total_owned >= 25: attainable_stars = 3
+            elif total_owned >= 13: attainable_stars = 2
+            elif total_owned >= 5: attainable_stars = 1
+
+            sp_base = best['base_stats']
+            
+            def calc_hp(base, l, iv):
+                return int(500 + 5 * l + (base * 0.5 * l) * (1 + (iv * 0.3) / 100))
+                
+            def calc_atk(base, l, iv, passives):
+                val = 100 + (base * 0.075 * l) * (1 + (iv * 0.3) / 100)
+                mult = 1.0
+                passives_lower = [p.strip().lower() for p in passives]
+                if 'musclehead' in passives_lower: mult += 0.30
+                if 'ferocious' in passives_lower: mult += 0.20
+                if 'coward' in passives_lower: mult -= 0.10
+                if 'pacifist' in passives_lower: mult -= 0.20
+                if 'hooligan' in passives_lower: mult += 0.15
+                if 'sadist' in passives_lower: mult += 0.15
+                return int(val * mult)
+                
+            def calc_def(base, l, iv, passives):
+                val = 50 + (base * 0.075 * l) * (1 + (iv * 0.3) / 100)
+                mult = 1.0
+                passives_lower = [p.strip().lower() for p in passives]
+                if 'burly body' in passives_lower: mult += 0.20
+                if 'masochist' in passives_lower: mult += 0.15
+                if 'downtrodden' in passives_lower: mult -= 0.10
+                if 'hooligan' in passives_lower: mult -= 0.10
+                return int(val * mult)
+
+            est_hp = calc_hp(sp_base["hp"], lvl, iv_hp)
+            est_atk = calc_atk(sp_base["attack"], lvl, iv_atk, passives_list)
+            est_def = calc_def(sp_base["defense"], lvl, iv_def, passives_list)
+            
+            icon_path = None
+            try:
+                row = self.conn.execute("SELECT icon_path FROM palworld_master.pals WHERE name=?", (species,)).fetchone()
+                if row and row["icon_path"]:
+                    parts = row["icon_path"].split("/")
+                    icon_path = "/assets/" + parts[-2] + "/" + parts[-1]
+            except: pass
+
+            results.append({
+                'species': species,
+                'total_owned': total_owned,
+                'sacrifices_available': sacrifices,
+                'attainable_stars': attainable_stars,
+                'base_level': lvl,
+                'hp': est_hp,
+                'attack': est_atk,
+                'defense': est_def,
+                'iv_hp': iv_hp,
+                'iv_attack': iv_atk,
+                'iv_defense': iv_def,
+                'passives': passives_list,
+                'icon_path': icon_path
+            })
+            
+        return results

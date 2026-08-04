@@ -366,6 +366,472 @@ function BaseCampCard({ base }) {
   );
 }
 
+
+
+function InventoryView() {
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    let url = '/api/save/inventory';
+    if (filterType) url += `?container_type=${encodeURIComponent(filterType)}`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => { setInventory(data); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, [filterType]);
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Loading inventory from save game...</p>;
+
+  const filteredItems = inventory.filter(item => 
+    (item.display_name && item.display_name.toLowerCase().includes(search.toLowerCase())) ||
+    (item.item_id && item.item_id.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  // Group by container type
+  const grouped = filteredItems.reduce((acc, item) => {
+    const type = item.container_type || 'Other';
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(item);
+    return acc;
+  }, {});
+
+  return (
+    <div>
+      <div className="filter-bar glass-card" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Container Type</label>
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+            <option value="">All Storage / Inventories</option>
+            <option value="Inventory">Personal Inventory</option>
+            <option value="Key Items">Key Items</option>
+            <option value="Weapon Loadout">Weapon Loadout</option>
+            <option value="Equipped Armor">Equipped Armor</option>
+            <option value="Food Equip">Food Equip</option>
+            <option value="Base Chest">Base Chests</option>
+          </select>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+          <input type="text" placeholder="Search items in save file..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+      </div>
+
+      {Object.keys(grouped).length === 0 ? (
+        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>No inventory items found. Make sure a save game is loaded.</p>
+      ) : (
+        Object.entries(grouped).map(([type, items]) => (
+          <div key={type} className="glass-card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+              📦 {type} ({items.length} stack{items.length !== 1 ? 's' : ''})
+            </h3>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+              {items.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                  {item.icon_path ? (
+                    <img src={item.icon_path} alt={item.display_name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.display_name}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                      <span>Slot {item.slot_index + 1}</span>
+                      <strong style={{ color: 'var(--accent-gold)' }}>x{item.count.toLocaleString()}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
+
+
+function WelcomeView({ onNavigate, currentWorld, instancesCount, basesCount, inventoryCount }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="hero-banner glass-card" style={{ padding: '2.5rem', borderRadius: '16px', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%)', border: '1px solid var(--border-color-hover)' }}>
+        <h2 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '0.75rem', background: 'var(--primary-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          Welcome to Palopedix
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.1rem', maxWidth: '750px', lineHeight: 1.6 }}>
+          Your ultimate companion dashboard for Palworld. Seamlessly explore game data, inspect save files across multiple worlds, analyze captured Pals & stats, and track storage inventories.
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.5rem' }}>
+        {/* Global Game Data Card */}
+        <div className="glass-card" style={{ padding: '1.75rem', borderRadius: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '1.8rem' }}>🌐</span>
+            <div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Global Game Data</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Static database extracted directly from game files</p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '1.5rem 0' }}>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Master Pals</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)' }}>138+</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Items & Recipes</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)' }}>1,891</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Facilities & Tech</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)' }}>552</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Breeding Combos</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-gold)' }}>18,700+</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="primary-btn" onClick={() => onNavigate('paldex')} style={{ flex: 1 }}>📚 Open Paldex</button>
+            <button className="secondary-btn" onClick={() => onNavigate('items')} style={{ flex: 1 }}>📦 Browse Items</button>
+          </div>
+        </div>
+
+        {/* Active World Overview Card */}
+        <div className="glass-card" style={{ padding: '1.75rem', borderRadius: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <span style={{ fontSize: '1.8rem' }}>🌍</span>
+            <div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>Active World Overview</h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--accent-gold)' }}>
+                {currentWorld ? currentWorld.display_name : 'No World Selected'}
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', margin: '1.5rem 0' }}>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Captured Pals</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>{instancesCount}</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Base Camps</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>{basesCount}</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Item Stacks</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>{inventoryCount}</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Save Size</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#38bdf8' }}>
+                {currentWorld ? `${round(currentWorld.size_bytes / 1024, 1)} KB` : 'N/A'}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button className="primary-btn" onClick={() => onNavigate('save_game')} style={{ flex: 1 }}>🐾 View World Pals</button>
+            <button className="secondary-btn" onClick={() => onNavigate('inventory')} style={{ flex: 1 }}>🎒 View Storage</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  function round(val, dec) {
+    return Number(Math.round(val + 'e' + dec) + 'e-' + dec);
+  }
+}
+
+
+
+
+function HomepageView({ onSelectMode, currentWorld, instancesCount, basesCount, inventoryCount }) {
+  return (
+    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '3rem' }}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        <div className="logo-icon" style={{ width: '64px', height: '64px', fontSize: '2rem', borderRadius: '18px' }}>P</div>
+        <h1 style={{ fontSize: '3.2rem', fontWeight: 800, background: 'var(--primary-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          Palopedix
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px' }}>
+          Palworld Master Database & Save Game Analytics
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+        {/* Card 1: Global Data */}
+        <div 
+          className="glass-card table-row-hover" 
+          onClick={() => onSelectMode('global', 'paldex')}
+          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid var(--border-color-hover)' }}
+        >
+          <div>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+              🌐
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Global Game Data</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Explore master Pal specifications, item recipes, technology trees, and breeding combinations directly from game files.
+            </p>
+          </div>
+          <div>
+            <button className="primary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}>
+              Explore Global Data →
+            </button>
+          </div>
+        </div>
+
+        {/* Card 2: Active World Data */}
+        <div 
+          className="glass-card table-row-hover" 
+          onClick={() => onSelectMode('world', 'world_overview')}
+          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+        >
+          <div>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+              🌍
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Active World Data</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Inspect live save file analytics for your selected active world. Audit captured Pals & IVs, personal inventory, storage chests, and condenser candidates.
+            </p>
+          </div>
+          <div>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Selected Active World:</div>
+              <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>{currentWorld ? currentWorld.display_name : 'No World Loaded'}</strong>
+            </div>
+            <button className="primary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem', background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)' }}>
+              Explore World Data →
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Settings */}
+        <div 
+          className="glass-card table-row-hover" 
+          onClick={() => onSelectMode('settings', 'settings')}
+          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid var(--border-color)' }}
+        >
+          <div>
+            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(148, 163, 184, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
+              ⚙️
+            </div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Settings & System</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              Configure manual Level.sav file paths, scan local Steam save directories, and select database sources for PalEngine.
+            </p>
+          </div>
+          <div>
+            <button className="secondary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}>
+              Open Settings →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorldOverviewView({ currentWorld, instancesCount, basesCount, inventoryCount, onNavigate }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <div className="glass-card" style={{ padding: '2rem', borderRadius: '16px', border: '1px solid var(--border-color-hover)' }}>
+        <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginBottom: '0.5rem', color: '#38bdf8' }}>
+          🌍 {currentWorld ? currentWorld.display_name : 'World Overview'}
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          {currentWorld ? `Save File Path: ${currentWorld.sav_path}` : 'No active save file loaded.'}
+        </p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+        <div className="glass-card table-row-hover" onClick={() => onNavigate('save_game')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🐾</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Captured Pals</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#38bdf8' }}>{instancesCount}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>Inspect Pals →</div>
+        </div>
+
+        <div className="glass-card table-row-hover" onClick={() => onNavigate('inventory')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🎒</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Item Stacks</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#38bdf8' }}>{inventoryCount}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>View Storage →</div>
+        </div>
+
+        <div className="glass-card table-row-hover" onClick={() => onNavigate('bases')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏰</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Base Camps</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#38bdf8' }}>{basesCount}</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>Audit Bases →</div>
+        </div>
+
+        <div className="glass-card table-row-hover" onClick={() => onNavigate('condenser')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⭐</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Condenser Candidates</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#38bdf8' }}>Active</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>Find Candidates →</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function SettingsView({ savePath, setSavePath, handleLoadSave, loading, errorMsg, successMsg }) {
+  const [staticSource, setStaticSource] = useState('palworld_db');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '800px' }}>
+      {/* Save Loader Box */}
+      <div className="glass-card" style={{ padding: '1.75rem' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          💾 Manual Save File Loader
+        </h3>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Manually specify a custom <code>Level.sav</code> file path to parse and reload instance data into PalEngine.
+        </p>
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Leave empty to auto-discover local save game path..."
+            value={savePath}
+            onChange={(e) => setSavePath(e.target.value)}
+            style={{ flex: 1 }}
+          />
+          <button
+            className="primary-btn"
+            onClick={handleLoadSave}
+            disabled={loading}
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            {loading ? 'Parsing Save...' : 'Load & Parse'}
+          </button>
+        </div>
+
+        {errorMsg && (
+          <div style={{ marginTop: '1rem', color: 'var(--accent-red)', background: 'rgba(239,68,68,0.1)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--accent-red)' }}>
+            {errorMsg}
+          </div>
+        )}
+        {successMsg && (
+          <div style={{ marginTop: '1rem', color: 'var(--accent-green)', background: 'rgba(16,185,129,0.1)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--accent-green)' }}>
+            {successMsg}
+          </div>
+        )}
+      </div>
+
+      {/* Static Engine Source Box */}
+      <div className="glass-card" style={{ padding: '1.75rem' }}>
+        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          ⚙️ Static Database Source
+        </h3>
+        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+          Choose the data source used for master Pal specs, skill data, and item definitions.
+        </p>
+
+        <div style={{ display: 'flex', gap: '1.5rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input
+              type="radio"
+              name="staticSource"
+              value="palworld_db"
+              checked={staticSource === 'palworld_db'}
+              onChange={(e) => setStaticSource(e.target.value)}
+            />
+            <span><strong>Master SQLite Database (Recommended)</strong> — palworld.db (1.0+ Game Data)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function CondenserView() {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/save/condense')
+      .then(res => res.json())
+      .then(data => { setCandidates(data); setLoading(false); })
+      .catch(err => { console.error(err); setLoading(false); });
+  }, []);
+
+  if (loading) return <p style={{ color: 'var(--text-secondary)' }}>Calculating condenser candidates...</p>;
+  if (!candidates || candidates.length === 0) return <p style={{ color: 'var(--text-secondary)' }}>No save file loaded or no duplicate Pals found.</p>;
+
+  return (
+    <div style={{ display: 'grid', gap: '1.5rem' }}>
+      <h2 style={{ marginBottom: '0.5rem', fontWeight: 800 }}>⭐ Condenser Recommendations</h2>
+      <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>Based on duplicates, passives, and IVs. The max rank is calculated based on exactly 5, 13, 25, or 49 total Pals needed.</p>
+      
+      {candidates.map((c, i) => (
+        <div key={i} className="glass-card" style={{ display: 'flex', gap: '2rem', padding: '1.5rem' }}>
+          <div style={{ flex: '0 0 120px', textAlign: 'center' }}>
+            {c.icon_path ? (
+              <img src={c.icon_path} alt={c.species} style={{ width: '100px', height: '100px', borderRadius: '15px', objectFit: 'cover' }} />
+            ) : (
+              <div style={{ width: '100px', height: '100px', borderRadius: '15px', background: 'var(--primary-gradient)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800 }}>{c.species[0]}</div>
+            )}
+            <h3 style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>{c.species}</h3>
+            <div style={{ color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1.2rem', marginTop: '0.2rem' }}>
+              {c.attainable_stars > 0 ? '⭐'.repeat(c.attainable_stars) : '0 ⭐'}
+            </div>
+          </div>
+          
+          <div style={{ flex: 1 }}>
+            <h4 style={{ fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+              Total Owned: {c.total_owned} (1 Base + {c.sacrifices_available} Sacrifices)
+            </h4>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Best Base Level</p>
+                <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>Lv. {c.base_level}</p>
+                
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>Passives</p>
+                <div className="badge-container" style={{ marginTop: '0.25rem' }}>
+                  {c.passives && c.passives.length > 0 ? c.passives.map((p, idx) => (
+                    <span key={idx} className="badge badge-element">{p}</span>
+                  )) : <span style={{ color: 'var(--text-secondary)' }}>None</span>}
+                </div>
+              </div>
+              
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>HP</div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.hp}</div>
+                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_hp}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Attack</div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.attack}</div>
+                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_attack}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Defense</div>
+                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.defense}</div>
+                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_defense}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+
 function PalDetailModal({ pal, onClose }) {
   if (!pal) return null;
 
@@ -580,7 +1046,58 @@ function PalDetailModal({ pal, onClose }) {
 }
 
 function App() {
+    const [mode, setMode] = useState('home') // 'home', 'global', 'world', 'settings'
   const [activeTab, setActiveTab] = useState('paldex')
+  const [worlds, setWorlds] = useState([])
+  const [selectedWorldId, setSelectedWorldId] = useState('')
+  const [worldLoading, setWorldLoading] = useState(false)
+
+  // Fetch discovered active worlds
+  const fetchWorlds = async () => {
+    try {
+      const res = await fetch('/api/worlds')
+      const data = await res.json()
+      setWorlds(data.worlds || [])
+      if (data.current_world_id) {
+        setSelectedWorldId(data.current_world_id)
+      }
+    } catch (e) {
+      console.error("Error fetching worlds", e)
+    }
+  }
+
+  useEffect(() => {
+    fetchWorlds()
+  }, [])
+
+    const handleSelectMode = (newMode, defaultTab) => {
+    setMode(newMode);
+    if (defaultTab) setActiveTab(defaultTab);
+  };
+
+  const handleSelectWorld = async (worldId) => {
+    if (!worldId || worldId === selectedWorldId) return
+    setWorldLoading(true)
+    try {
+      const res = await fetch('/api/worlds/select', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ world_id: worldId })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSelectedWorldId(data.world_id)
+        setSaveLoaded(true)
+        fetchInstances()
+        fetchBases()
+      }
+    } catch (e) {
+      console.error("Error selecting world", e)
+    } finally {
+      setWorldLoading(false)
+    }
+  }
+
   const [savePath, setSavePath] = useState('')
   const [saveLoaded, setSaveLoaded] = useState(false)
   const [loadedPath, setLoadedPath] = useState('')
@@ -775,72 +1292,160 @@ function App() {
   }
 
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container" style={{ paddingLeft: mode === 'home' ? 0 : '280px' }}>
       {/* Sidebar navigation */}
-      <aside className="sidebar">
-        <div className="logo-area">
-          <div className="logo-icon">P</div>
-          <div className="logo-text">Palopedix</div>
-        </div>
-        <nav className="nav-links">
-          <div 
-            className={`nav-item ${activeTab === 'paldex' ? 'active' : ''}`}
-            onClick={() => setActiveTab('paldex')}
-          >
-            📚 Master Paldex
+      {mode !== 'home' && (
+        <aside className="sidebar">
+          <div className="logo-area" onClick={() => setMode('home')} style={{ cursor: 'pointer' }}>
+            <div className="logo-icon">P</div>
+            <div className="logo-text">Palopedix</div>
           </div>
-          <div 
-            className={`nav-item ${activeTab === 'items' ? 'active' : ''}`}
-            onClick={() => setActiveTab('items')}
-          >
-            📦 Items & Recipes
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'buildings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('buildings')}
-          >
-            🏗️ Facilities & Tech
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'save_game' ? 'active' : ''}`}
-            onClick={() => setActiveTab('save_game')}
-          >
-            💾 Save Game Viewer
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'bases' ? 'active' : ''}`}
-            onClick={() => setActiveTab('bases')}
-          >
-            🏰 Base Camps
-          </div>
-          <div 
-            className={`nav-item ${activeTab === 'breeding' ? 'active' : ''}`}
-            onClick={() => setActiveTab('breeding')}
-          >
-            🐣 Breeding Center
-          </div>
-        </nav>
-      </aside>
+
+          <nav className="nav-links">
+            <div 
+              className="nav-item" 
+              onClick={() => setMode('home')}
+              style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', marginBottom: '1rem', fontWeight: 700 }}
+            >
+              🏠 Return to Homepage
+            </div>
+
+            {mode === 'global' && (
+              <>
+                <div className="nav-section-header">GLOBAL GAME DATA</div>
+                <div className={`nav-item ${activeTab === 'paldex' ? 'active' : ''}`} onClick={() => setActiveTab('paldex')}>
+                  📚 Master Paldex
+                </div>
+                <div className={`nav-item ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setActiveTab('items')}>
+                  📦 Items & Recipes
+                </div>
+                <div className={`nav-item ${activeTab === 'buildings' ? 'active' : ''}`} onClick={() => setActiveTab('buildings')}>
+                  🏗️ Facilities & Tech
+                </div>
+                <div className={`nav-item ${activeTab === 'breeding' ? 'active' : ''}`} onClick={() => setActiveTab('breeding')}>
+                  🐣 Breeding Center
+                </div>
+              </>
+            )}
+
+            {mode === 'world' && (
+              <>
+                <div className="nav-section-header">ACTIVE WORLD DATA</div>
+                <div className="world-selector-container" style={{ padding: '0.4rem 0.65rem', marginBottom: '0.4rem' }}>
+                  <label style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.2rem', fontWeight: 700 }}>
+                    🌍 ACTIVE WORLD
+                  </label>
+                  <select
+                    value={selectedWorldId}
+                    onChange={(e) => handleSelectWorld(e.target.value)}
+                    disabled={worldLoading}
+                    style={{
+                      width: '100%',
+                      padding: '0.35rem 0.5rem',
+                      fontSize: '0.8rem',
+                      background: 'rgba(0,0,0,0.4)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      color: 'var(--text-primary)',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {worlds.length === 0 && <option value="">No worlds found</option>}
+                    {worlds.map(w => (
+                      <option key={w.world_id} value={w.world_id}>
+                        {w.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={`nav-item ${activeTab === 'world_overview' ? 'active' : ''}`} onClick={() => setActiveTab('world_overview')}>
+                  📊 World Overview
+                </div>
+                <div className={`nav-item ${activeTab === 'save_game' ? 'active' : ''}`} onClick={() => setActiveTab('save_game')}>
+                  🐾 World Pals
+                </div>
+                <div className={`nav-item ${activeTab === 'inventory' ? 'active' : ''}`} onClick={() => setActiveTab('inventory')}>
+                  🎒 Save Inventory
+                </div>
+                <div className={`nav-item ${activeTab === 'bases' ? 'active' : ''}`} onClick={() => setActiveTab('bases')}>
+                  🏰 Base Camps
+                </div>
+                <div className={`nav-item ${activeTab === 'condenser' ? 'active' : ''}`} onClick={() => setActiveTab('condenser')}>
+                  ⭐ Condenser
+                </div>
+              </>
+            )}
+
+            {mode === 'settings' && (
+              <>
+                <div className="nav-section-header">SYSTEM SETTINGS</div>
+                <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
+                  ⚙️ Settings & Loader
+                </div>
+              </>
+            )}
+          </nav>
+        </aside>
+      )}
 
       {/* Main Panel */}
       <main className="main-content">
-        <header>
-          <h1>{
+        <h1>{
+            activeTab === 'welcome' ? 'Palopedix Dashboard' :
             activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
             activeTab === 'items' ? 'Items & Crafting Catalog' :
             activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
-            activeTab === 'save_game' ? 'Save Game Explorer' :
-            activeTab === 'bases' ? 'Base Camp Overview' : 'Breeding Center'
+            activeTab === 'inventory' ? 'Save Inventory & Chest Storage' :
+            activeTab === 'save_game' ? 'World Pals Explorer' :
+            activeTab === 'bases' ? 'Base Camp Overview' :
+            activeTab === 'condenser' ? 'Condenser Recommendations' :
+            activeTab === 'settings' ? 'System Settings' : 'Breeding Center'
           }</h1>
-          <p>{
+          <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{
+            activeTab === 'welcome' ? 'Welcome overview and active save file statistics.' :
             activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
             activeTab === 'items' ? 'Search 1,891 items, equipment, and crafting recipe ingredients.' :
             activeTab === 'buildings' ? 'Explore 552 base buildings and 839 technology tree unlocks.' :
-            activeTab === 'save_game' ? 'View and filter Pals currently in your party, Palbox, or bases.' :
+            activeTab === 'inventory' ? 'Inspect items in your personal inventory, equipped loadouts, and base chests.' :
+            activeTab === 'save_game' ? 'Click any captured Pal to view its full Paldex bio, element, skills, and stats.' :
             activeTab === 'bases' ? 'Audit placed infrastructure and active base camp workers.' :
-            'Calculate offspring, reverse lookups, or find optimal breeding paths.'
+            activeTab === 'condenser' ? 'View the absolute best Pals to condense based on your duplicates, IVs, and passives.' :
+            activeTab === 'settings' ? 'Manage save file loading and database source settings.' :
+            'Calculate offspring results or find parent breeding pairs for any Pal.'
           }</p>
-        </header>
+
+                        {/* 🏠 Homepage Landing */}
+        {mode === 'home' && (
+          <HomepageView
+            onSelectMode={handleSelectMode}
+            currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
+            instancesCount={instances.length}
+            basesCount={bases.length}
+            inventoryCount={199}
+          />
+        )}
+
+        {/* 📊 World Overview Tab */}
+        {mode === 'world' && activeTab === 'world_overview' && (
+          <WorldOverviewView
+            currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
+            instancesCount={instances.length}
+            basesCount={bases.length}
+            inventoryCount={199}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        )}
+        {activeTab === 'welcome' && (
+          <WelcomeView
+            onNavigate={(tab) => setActiveTab(tab)}
+            currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
+            instancesCount={instances.length}
+            basesCount={bases.length}
+            inventoryCount={199}
+          />
+        )}
 
         {/* 📚 Paldex Tab */}
         {activeTab === 'paldex' && (
@@ -1002,6 +1607,9 @@ function App() {
           <PalDetailModal pal={selectedPal} onClose={() => setSelectedPal(null)} />
         )}
 
+                {/* 🎒 Save Inventory Tab */}
+        {activeTab === 'inventory' && <InventoryView />}
+
         {/* 💾 Save Game Explorer Tab */}
         {activeTab === 'save_game' && (
           <div>
@@ -1123,6 +1731,21 @@ function App() {
               </div>
             )}
           </div>
+        )}
+
+        {/* ⭐ Condenser Tab */}
+        {activeTab === 'condenser' && <CondenserView />}
+
+                {/* ⚙️ Settings Tab */}
+        {activeTab === 'settings' && (
+          <SettingsView
+            savePath={savePath}
+            setSavePath={setSavePath}
+            handleLoadSave={handleLoadSave}
+            loading={loading}
+            errorMsg={errorMsg}
+            successMsg={successMsg}
+          />
         )}
 
         {/* 🐣 Breeding Center Tab */}

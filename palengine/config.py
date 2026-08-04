@@ -41,3 +41,8 @@ def set_assets_dir(path: str) -> None:
     """Sets path to Palworld asset directory."""
     global _ASSETS_DIR
     _ASSETS_DIR = path
+
+
+def get_data_dir() -> str:
+    """Returns path to PalEngine data directory."""
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "data"))

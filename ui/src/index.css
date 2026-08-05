@@ -604,5 +604,39 @@ td {
   margin-bottom: 0.5rem;
 }
 
+/* Universal Skill Tooltip Overlay */
+.skill-tooltip-container {
+  position: relative;
+  display: inline-block;
+}
+
+.skill-tooltip-overlay {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  width: 290px;
+  padding: 0.85rem;
+  background: rgba(15, 23, 42, 0.96) !important;
+  border: 1px solid var(--border-color-hover) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.75), 0 0 20px rgba(99, 102, 241, 0.2);
+  pointer-events: none;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+
 
 

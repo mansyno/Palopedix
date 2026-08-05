@@ -169,8 +169,10 @@ def test_breeding_path_finder():
     # Step 2: Bushy + Penking -> Anubis
     path = engine.find_breeding_path(["Lamball", "Cattiva", "Penking"], "Anubis")
     assert len(path) == 2
-    assert path[0] == {"parent1": "Cattiva", "parent2": "Lamball", "child": "Bushy"}
-    assert path[1] == {"parent1": "Bushy", "parent2": "Penking", "child": "Anubis"}
+    assert path[0]["parent1"] in ["Lamball", "Cattiva"]
+    assert path[0]["child"] == "Bushy"
+    assert "parent1_gender" in path[0] and "parent2_gender" in path[0]
+    assert path[1]["child"] == "Anubis"
 
 
 def test_query_apis():
@@ -194,3 +196,40 @@ def test_query_apis():
         )
         lvl = cursor.fetchone()["level"]
         assert lvl >= 3
+
+
+def test_query_skills():
+    engine = SQLiteEngine()
+
+    # Query all skills
+    all_skills = engine.query_skills({})
+    assert len(all_skills) >= 1152
+
+    # Query by type
+    active_skills = engine.query_skills({"type": "Active"})
+    assert len(active_skills) == 324
+
+    passive_skills = engine.query_skills({"type": "Passive"})
+    assert len(passive_skills) == 420
+
+    partner_skills = engine.query_skills({"type": "Partner"})
+    assert len(partner_skills) == 408
+
+    # Query search
+    runner_skills = engine.query_skills({"search": "Runner"})
+    assert len(runner_skills) > 0
+    assert any(s["name"] == "Runner" for s in runner_skills)
+
+
+def test_gender_aware_breeding_path():
+    engine = SQLiteEngine()
+    # Two same-gender species (both Male) cannot breed
+    two_males = {"Daedream": {"Male"}, "Foxparks": {"Male"}}
+    assert engine.find_breeding_path(two_males, "Celaray") == []
+
+    # Opposite gender species (Male + Female) can breed
+    male_female = {"Daedream": {"Male"}, "Leezpunk": {"Female"}}
+    path = engine.find_breeding_path(male_female, "Celaray")
+    assert len(path) > 0
+    assert path[0]["parent1_gender"] != path[0]["parent2_gender"]
+

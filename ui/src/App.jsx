@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 
 const WORK_SUITABILITY_MAP = {
   EmitFlame: 'Kindling',
@@ -227,6 +227,206 @@ function BuildingsTechView() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkillBadgeWithTooltip({ skill, children, className, style }) {
+  const [show, setShow] = useState(false);
+
+  if (!skill) return children || null;
+
+  const typeColor = skill.type === 'Passive' ? '#60a5fa' : skill.type === 'Partner' ? 'var(--accent-gold)' : '#f87171';
+  const typeBg = skill.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : skill.type === 'Partner' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+
+  return (
+    <div
+      className={`skill-tooltip-container ${className || ''}`}
+      style={{ position: 'relative', display: 'inline-block', ...style }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children || (
+        <span className="badge badge-element" style={{ cursor: 'pointer' }}>
+          {skill.name}
+        </span>
+      )}
+
+      {show && (
+        <div className="skill-tooltip-overlay glass-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            {skill.icon_path ? (
+              <img src={skill.icon_path} alt={skill.name} className="skill-icon-small" onError={(e) => { e.target.style.display = 'none'; }} />
+            ) : (
+              <div className="skill-icon-small" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: 'rgba(255,255,255,0.1)', borderRadius: '6px', width: '24px', height: '24px' }}>⚡</div>
+            )}
+            <div style={{ textAlign: 'left' }}>
+              <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', lineHeight: 1.2 }}>{skill.name}</strong>
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                <span className="badge" style={{ background: typeBg, color: typeColor, fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.type || 'Skill'}</span>
+                {skill.element && <span className="badge badge-element" style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.element}</span>}
+                {skill.category && <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.category}</span>}
+                {skill.rank !== undefined && skill.rank !== null && skill.rank !== 0 && (
+                  <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent-gold)', fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>Rank {skill.rank}</span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {(skill.power > 0 || skill.cooldown_sec > 0 || skill.cooldown > 0) && (
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.78rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.3)', padding: '0.35rem 0.5rem', borderRadius: '6px', marginBottom: '0.5rem' }}>
+              {skill.power > 0 && <span>⚔️ Power: <strong style={{ color: 'var(--text-primary)' }}>{skill.power}</strong></span>}
+              {(skill.cooldown_sec || skill.cooldown) > 0 && <span>⏳ Cooldown: <strong style={{ color: 'var(--accent-gold)' }}>{skill.cooldown_sec || skill.cooldown}s</strong></span>}
+            </div>
+          )}
+
+          {skill.stat_modifier && (
+            <p style={{ fontSize: '0.8rem', color: 'var(--accent-green)', fontWeight: 600, margin: '0 0 0.4rem 0', textAlign: 'left' }}>
+              ✨ {skill.stat_modifier}
+            </p>
+          )}
+
+          {skill.unlock_item && (
+            <p style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', margin: '0 0 0.4rem 0', textAlign: 'left' }}>
+              🔑 Requires: {skill.unlock_item}
+            </p>
+          )}
+
+          {skill.description ? (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.35, textAlign: 'left' }}>
+              {skill.description}
+            </p>
+          ) : (
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0, textAlign: 'left' }}>
+              No detailed description available.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SkillsCatalogView() {
+  const [skills, setSkills] = useState([]);
+  const [type, setType] = useState('');
+  const [element, setElement] = useState('');
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    let url = '/api/skills?';
+    if (type) url += `type=${encodeURIComponent(type)}&`;
+    if (element) url += `element=${encodeURIComponent(element)}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    fetch(url)
+      .then(res => res.json())
+      .then(data => { setSkills(data); setLoading(false); })
+      .catch(err => { console.error("Error fetching skills:", err); setLoading(false); });
+  }, [type, element, search]);
+
+  return (
+    <div>
+      <div className="filter-bar glass-card" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Skill Type</label>
+          <select value={type} onChange={e => setType(e.target.value)}>
+            <option value="">All Skill Types (Active, Passive, Partner)</option>
+            <option value="Active">⚔️ Active Skills (324)</option>
+            <option value="Passive">🛡️ Passive Skills (420)</option>
+            <option value="Partner">🤝 Partner Skills (408)</option>
+          </select>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
+          <select value={element} onChange={e => setElement(e.target.value)}>
+            <option value="">All Elements</option>
+            <option value="Neutral">Neutral / Normal</option>
+            <option value="Fire">Fire</option>
+            <option value="Water">Water</option>
+            <option value="Grass">Grass / Leaf</option>
+            <option value="Electric">Electric</option>
+            <option value="Ice">Ice</option>
+            <option value="Ground">Ground</option>
+            <option value="Dark">Dark</option>
+            <option value="Dragon">Dragon</option>
+          </select>
+        </div>
+        <div style={{ flexGrow: 1 }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+          <input type="text" placeholder="Search skills by name, description, or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+        Showing <strong>{skills.length}</strong> matching skills
+      </div>
+
+      {loading ? (
+        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <p style={{ color: 'var(--text-secondary)' }}>Loading skills database...</p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+          {skills.map(sk => {
+            const typeColor = sk.type === 'Passive' ? '#60a5fa' : sk.type === 'Partner' ? 'var(--accent-gold)' : '#f87171';
+            const typeBg = sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : sk.type === 'Partner' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+            
+            return (
+              <SkillBadgeWithTooltip key={sk.id} skill={sk} style={{ display: 'block' }}>
+                <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', cursor: 'pointer' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
+                      {sk.icon_path ? (
+                        <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
+                      ) : (
+                        <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: 'rgba(255,255,255,0.1)' }}>⚡</div>
+                      )}
+                      <div>
+                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{sk.name}</h3>
+                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+                          <span className="badge" style={{ background: typeBg, color: typeColor }}>{sk.type || 'Skill'}</span>
+                          {sk.element && <span className="badge badge-element">{sk.element}</span>}
+                          {sk.category && <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>{sk.category}</span>}
+                          {sk.rank !== undefined && sk.rank !== null && sk.rank !== 0 && (
+                            <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent-gold)' }}>Rank {sk.rank}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {(sk.power > 0 || sk.cooldown_sec > 0 || sk.cooldown > 0) && (
+                      <div style={{ display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem 0.75rem', borderRadius: '8px', marginBottom: '0.75rem' }}>
+                        {sk.power > 0 && <div>⚔️ Power: <strong style={{ color: 'var(--text-primary)' }}>{sk.power}</strong></div>}
+                        {(sk.cooldown_sec || sk.cooldown) > 0 && <div>⏳ Cooldown: <strong style={{ color: 'var(--accent-gold)' }}>{sk.cooldown_sec || sk.cooldown}s</strong></div>}
+                      </div>
+                    )}
+
+                    {sk.stat_modifier && (
+                      <p style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600, marginBottom: '0.5rem' }}>
+                        ✨ {sk.stat_modifier}
+                      </p>
+                    )}
+
+                    {sk.unlock_item && (
+                      <p style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginBottom: '0.5rem' }}>
+                        🔑 Requires: {sk.unlock_item}
+                      </p>
+                    )}
+
+                    {sk.description ? (
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4, margin: 0 }}>{sk.description}</p>
+                    ) : (
+                      <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>No description available.</p>
+                    )}
+                  </div>
+                </div>
+              </SkillBadgeWithTooltip>
+            );
+          })}
         </div>
       )}
     </div>
@@ -965,17 +1165,19 @@ function PalDetailModal({ pal, onClose }) {
 
             {/* Partner Skill */}
             {pal.partner_skill && (
-              <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                  <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
-                  {pal.partner_skill.unlock_item && (
-                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
+              <SkillBadgeWithTooltip skill={pal.partner_skill} style={{ display: 'block', width: '100%' }}>
+                <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
+                    {pal.partner_skill.unlock_item && (
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
+                    )}
+                  </div>
+                  {pal.partner_skill.description && (
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>
                   )}
                 </div>
-                {pal.partner_skill.description && (
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>
-                )}
-              </div>
+              </SkillBadgeWithTooltip>
             )}
 
             {/* Species Default Active & Passive Skills */}
@@ -986,34 +1188,36 @@ function PalDetailModal({ pal, onClose }) {
                 </h3>
                 <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   {pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').map(sk => (
-                    <div key={sk.id} className="skill-row">
-                      {sk.icon_path ? (
-                        <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
-                      ) : (
-                        <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>⚡</div>
-                      )}
-                      <div style={{ flexGrow: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: 700 }}>{sk.name}</span>
-                            {sk.is_guaranteed === 1 && (
-                              <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: 'var(--accent-gold)', fontSize: '0.7rem' }}>Guaranteed</span>
-                            )}
+                    <SkillBadgeWithTooltip key={sk.id} skill={sk} style={{ display: 'block', width: '100%' }}>
+                      <div className="skill-row" style={{ cursor: 'pointer' }}>
+                        {sk.icon_path ? (
+                          <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
+                        ) : (
+                          <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>⚡</div>
+                        )}
+                        <div style={{ flexGrow: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{ fontWeight: 700 }}>{sk.name}</span>
+                              {sk.is_guaranteed === 1 && (
+                                <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: 'var(--accent-gold)', fontSize: '0.7rem' }}>Guaranteed</span>
+                              )}
+                            </div>
+                            <div className="badge-container">
+                              {sk.element && <span className="badge badge-element">{sk.element}</span>}
+                              <span className="badge" style={{ background: sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: sk.type === 'Passive' ? '#60a5fa' : '#f87171' }}>{sk.type}</span>
+                            </div>
                           </div>
-                          <div className="badge-container">
-                            {sk.element && <span className="badge badge-element">{sk.element}</span>}
-                            <span className="badge" style={{ background: sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: sk.type === 'Passive' ? '#60a5fa' : '#f87171' }}>{sk.type}</span>
+                          {sk.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{sk.description}</p>}
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'flex', gap: '1rem' }}>
+                            {sk.stat_modifier && <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>Modifier: {sk.stat_modifier}</span>}
+                            {sk.power > 0 && <span>Power: <strong style={{color: 'var(--accent-gold)'}}>{sk.power}</strong></span>}
+                            {sk.cooldown > 0 && <span>CD: <strong style={{color: 'var(--text-primary)'}}>{sk.cooldown}s</strong></span>}
+                            <span>Level Learned: <strong>Lv. {sk.level_learned || 1}</strong></span>
                           </div>
-                        </div>
-                        {sk.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{sk.description}</p>}
-                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'flex', gap: '1rem' }}>
-                          {sk.stat_modifier && <span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>Modifier: {sk.stat_modifier}</span>}
-                          {sk.power > 0 && <span>Power: <strong style={{color: 'var(--accent-gold)'}}>{sk.power}</strong></span>}
-                          {sk.cooldown > 0 && <span>CD: <strong style={{color: 'var(--text-primary)'}}>{sk.cooldown}s</strong></span>}
-                          <span>Level Learned: <strong>Lv. {sk.level_learned || 1}</strong></span>
                         </div>
                       </div>
-                    </div>
+                    </SkillBadgeWithTooltip>
                   ))}
                 </div>
               </div>
@@ -1146,13 +1350,34 @@ function App() {
   const [parent1, setParent1] = useState('')
   const [parent2, setParent2] = useState('')
   const [breedResult, setBreedResult] = useState(null)
-  
+  const [breedError, setBreedError] = useState('')
+
   const [reverseChild, setReverseChild] = useState('')
   const [parentCombos, setParentCombos] = useState([])
+  const [reverseLoading, setReverseLoading] = useState(false)
+  const [reverseSearched, setReverseSearched] = useState(false)
+  const [reverseSearchTerm, setReverseSearchTerm] = useState('')
 
   const [ownedPals, setOwnedPals] = useState('')
   const [targetPal, setTargetPal] = useState('')
   const [breedingPath, setBreedingPath] = useState([])
+  const [pathLoading, setPathLoading] = useState(false)
+  const [pathSearched, setPathSearched] = useState(false)
+  const [pathError, setPathError] = useState('')
+  const [useSaveOwned, setUseSaveOwned] = useState(true)
+
+  const [ownedSpecies, setOwnedSpecies] = useState([])
+  const [palSourceMode, setPalSourceMode] = useState('global')
+
+  const availablePalOptions = useMemo(() => {
+    if (palSourceMode === 'caught' && saveLoaded && ownedSpecies.length > 0) {
+      return ownedSpecies
+    }
+    if (pals && pals.length > 0) {
+      return Array.from(new Set(pals.map(p => p.display_name))).sort()
+    }
+    return []
+  }, [palSourceMode, saveLoaded, ownedSpecies, pals])
 
   // Fetch Pals on startup
   useEffect(() => {
@@ -1167,10 +1392,23 @@ function App() {
         if (data.loaded) {
           setSaveLoaded(true)
           setLoadedPath(data.path || 'Previous Session')
+          fetchOwnedSpecies()
         }
       })
       .catch(err => console.error("Error checking save status:", err))
   }, [])
+
+  const fetchOwnedSpecies = async () => {
+    try {
+      const res = await fetch('/api/save/owned-species')
+      const data = await res.json()
+      if (res.ok && Array.isArray(data)) {
+        setOwnedSpecies(data)
+      }
+    } catch (e) {
+      console.error("Error fetching owned species", e)
+    }
+  }
 
   const fetchPals = async () => {
     try {
@@ -1206,6 +1444,7 @@ function App() {
         setSuccessMsg(data.message)
         fetchInstances()
         fetchBases()
+        fetchOwnedSpecies()
       } else {
         setErrorMsg(data.detail || "Failed to load save file.")
       }
@@ -1237,6 +1476,7 @@ function App() {
   useEffect(() => {
     if (saveLoaded) {
       fetchInstances()
+      fetchOwnedSpecies()
     }
   }, [locFilter, specFilter, genderFilter, minLvlFilter, passiveFilter, saveLoaded])
 
@@ -1254,40 +1494,84 @@ function App() {
   // Calculate Breed Result
   const handleCalculateBreed = async () => {
     if (!parent1 || !parent2) return
+    setBreedError('')
     try {
-      const res = await fetch(`/api/breeding/result?parent1=${parent1}&parent2=${parent2}`)
+      const res = await fetch(`/api/breeding/result?parent1=${encodeURIComponent(parent1)}&parent2=${encodeURIComponent(parent2)}`)
       const data = await res.json()
       if (res.ok) {
         setBreedResult(data)
       } else {
         setBreedResult(null)
+        setBreedError(data.detail || "Could not calculate breeding result.")
       }
     } catch (e) {
       console.error("Error calculating breeding result", e)
+      setBreedError("Failed to calculate breeding result.")
     }
   }
 
   // Calculate Reverse Parents
   const handleCalculateReverse = async () => {
     if (!reverseChild) return
+    setReverseLoading(true)
+    setReverseSearched(true)
+    setReverseSearchTerm(reverseChild)
     try {
-      const res = await fetch(`/api/breeding/parents?child=${reverseChild}`)
+      const res = await fetch(`/api/breeding/parents?child=${encodeURIComponent(reverseChild)}`)
       const data = await res.json()
-      setParentCombos(data)
+      if (res.ok) {
+        setParentCombos(data)
+      } else {
+        setParentCombos([])
+      }
     } catch (e) {
       console.error("Error finding parents", e)
+      setParentCombos([])
+    } finally {
+      setReverseLoading(false)
     }
   }
 
+  const [allBreedingPaths, setAllBreedingPaths] = useState([])
+  const [activePathIdx, setActivePathIdx] = useState(0)
+
   // Find Breed Path
   const handleFindPath = async () => {
-    if (!ownedPals || !targetPal) return
+    if (!targetPal) return
+    setPathLoading(true)
+    setPathSearched(true)
+    setPathError('')
+    setActivePathIdx(0)
     try {
-      const res = await fetch(`/api/breeding/path?owned=${ownedPals}&target=${targetPal}`)
+      let url = `/api/breeding/path?target=${encodeURIComponent(targetPal)}`
+      if (useSaveOwned && saveLoaded) {
+        url += '&owned=auto'
+      } else if (ownedPals) {
+        url += `&owned=${encodeURIComponent(ownedPals)}`
+      } else {
+        url += '&owned=auto'
+      }
+      const res = await fetch(url)
       const data = await res.json()
-      setBreedingPath(data)
+      if (res.ok) {
+        const paths = data.paths || []
+        setAllBreedingPaths(paths)
+        if (paths.length > 0) {
+          setBreedingPath(paths[0].steps || [])
+        } else {
+          setBreedingPath([])
+          setPathError(`No multi-generation breeding path found to ${targetPal} with available Pals.`)
+        }
+      } else {
+        setAllBreedingPaths([])
+        setBreedingPath([])
+        setPathError(data.detail || "Error finding breeding path.")
+      }
     } catch (e) {
       console.error("Error finding breeding path", e)
+      setPathError("Failed to communicate with backend.")
+    } finally {
+      setPathLoading(false)
     }
   }
 
@@ -1315,6 +1599,9 @@ function App() {
                 <div className="nav-section-header">GLOBAL GAME DATA</div>
                 <div className={`nav-item ${activeTab === 'paldex' ? 'active' : ''}`} onClick={() => setActiveTab('paldex')}>
                   📚 Master Paldex
+                </div>
+                <div className={`nav-item ${activeTab === 'skills' ? 'active' : ''}`} onClick={() => setActiveTab('skills')}>
+                  ⚡ Skills Catalog
                 </div>
                 <div className={`nav-item ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setActiveTab('items')}>
                   📦 Items & Recipes
@@ -1395,6 +1682,7 @@ function App() {
         <h1>{
             activeTab === 'welcome' ? 'Palopedix Dashboard' :
             activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
+            activeTab === 'skills' ? 'Skills Database Catalog' :
             activeTab === 'items' ? 'Items & Crafting Catalog' :
             activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
             activeTab === 'inventory' ? 'Save Inventory & Chest Storage' :
@@ -1406,6 +1694,7 @@ function App() {
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{
             activeTab === 'welcome' ? 'Welcome overview and active save file statistics.' :
             activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
+            activeTab === 'skills' ? 'Explore 1,152 active combat skills, passive traits, and partner abilities.' :
             activeTab === 'items' ? 'Search 1,891 items, equipment, and crafting recipe ingredients.' :
             activeTab === 'buildings' ? 'Explore 552 base buildings and 839 technology tree unlocks.' :
             activeTab === 'inventory' ? 'Inspect items in your personal inventory, equipped loadouts, and base chests.' :
@@ -1596,6 +1885,9 @@ function App() {
           </div>
         )}
 
+        {/* ⚡ Skills Database Catalog Tab */}
+        {activeTab === 'skills' && <SkillsCatalogView />}
+
         {/* 📦 Items & Recipes Catalog Tab */}
         {activeTab === 'items' && <ItemsCatalogView />}
 
@@ -1694,9 +1986,11 @@ function App() {
                           <td>
                             <div className="badge-container">
                               {pi.passives.map(pass => (
-                                <span key={pass.id} className="badge badge-element" title={pass.description}>
-                                  {pass.name}
-                                </span>
+                                <SkillBadgeWithTooltip key={pass.id} skill={pass}>
+                                  <span className="badge badge-element" style={{ cursor: 'pointer' }}>
+                                    {pass.name}
+                                  </span>
+                                </SkillBadgeWithTooltip>
                               ))}
                               {pi.passives.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>None</span>}
                             </div>
@@ -1751,20 +2045,83 @@ function App() {
         {/* 🐣 Breeding Center Tab */}
         {activeTab === 'breeding' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+            {/* Global vs Caught Source Selector */}
+            <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem 1.75rem' }}>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>📊 Pal Dropdown Options Source</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.2rem', margin: 0 }}>
+                  Choose whether dropdowns show all game Pals or only Pals you have caught in your save.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button 
+                  className={`btn ${palSourceMode === 'global' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.5rem 1.25rem', fontWeight: 600 }}
+                  onClick={() => setPalSourceMode('global')}
+                >
+                  🌐 All Game Pals ({pals ? pals.length : 0})
+                </button>
+                <button 
+                  className={`btn ${palSourceMode === 'caught' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ padding: '0.5rem 1.25rem', fontWeight: 600 }}
+                  onClick={() => {
+                    if (!saveLoaded) {
+                      alert("Please load a save file in Settings first to filter by your caught Pals!")
+                      return
+                    }
+                    setPalSourceMode('caught')
+                  }}
+                >
+                  💼 My Caught Pals ({ownedSpecies.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Datalist for searchable dropdown options */}
+            <datalist id="pal-list-options">
+              {availablePalOptions.map((name, idx) => (
+                <option key={idx} value={name} />
+              ))}
+            </datalist>
+
             {/* 1. Calculator Card */}
             <div className="glass-card">
               <h2 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>🐣 Breeding Calculator</h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '1.5rem', alignItems: 'end' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Parent 1</label>
-                  <input type="text" placeholder="e.g. Relaxaurus" value={parent1} onChange={e => setParent1(e.target.value)} />
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.95rem' }}
+                    value={parent1} 
+                    onChange={e => setParent1(e.target.value)}
+                  >
+                    <option value="">-- Select Parent 1 --</option>
+                    {availablePalOptions.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Parent 2</label>
-                  <input type="text" placeholder="e.g. Sparkit" value={parent2} onChange={e => setParent2(e.target.value)} />
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.95rem' }}
+                    value={parent2} 
+                    onChange={e => setParent2(e.target.value)}
+                  >
+                    <option value="">-- Select Parent 2 --</option>
+                    {availablePalOptions.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
                 </div>
-                <button className="btn btn-primary" onClick={handleCalculateBreed}>Calculate</button>
+                <button className="btn btn-primary" onClick={handleCalculateBreed} disabled={!parent1 || !parent2}>Calculate</button>
               </div>
+
+              {breedError && (
+                <div style={{ marginTop: '1rem', color: '#f87171', padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                  ⚠️ {breedError}
+                </div>
+              )}
 
               {breedResult && (
                 <div className="glass-card" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)' }}>
@@ -1791,65 +2148,180 @@ function App() {
               <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'end', marginBottom: '1.5rem' }}>
                 <div style={{ flexGrow: 1 }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Target Child</label>
-                  <input type="text" placeholder="e.g. Relaxaurus Lux" value={reverseChild} onChange={e => setReverseChild(e.target.value)} />
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.95rem' }}
+                    value={reverseChild} 
+                    onChange={e => setReverseChild(e.target.value)}
+                  >
+                    <option value="">-- Select Target Child Pal --</option>
+                    {availablePalOptions.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
                 </div>
-                <button className="btn btn-primary" onClick={handleCalculateReverse}>Find Combinations</button>
+                <button className="btn btn-primary" onClick={handleCalculateReverse} disabled={!reverseChild || reverseLoading}>
+                  {reverseLoading ? 'Searching...' : 'Find Combinations'}
+                </button>
               </div>
 
-              {parentCombos.length > 0 && (
-                <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Parent 1</th>
-                        <th>Parent 2</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {parentCombos.map((combo, idx) => (
-                        <tr key={idx}>
-                          <td>{combo[0]}</td>
-                          <td>{combo[1]}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              {reverseSearched && !reverseLoading && (
+                parentCombos.length > 0 ? (
+                  <div>
+                    <div style={{ marginBottom: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      Found {parentCombos.length} parent combinations yielding <strong>{reverseSearchTerm}</strong>:
+                    </div>
+                    <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Parent 1</th>
+                            <th>Parent 2</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parentCombos.map((combo, idx) => (
+                            <tr key={idx}>
+                              <td>{combo[0]}</td>
+                              <td>{combo[1]}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--text-secondary)', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', textAlign: 'center' }}>
+                    No breeding combinations found for "{reverseSearchTerm}".
+                  </div>
+                )
               )}
             </div>
 
             {/* 3. Breeding Path Finder Card */}
             <div className="glass-card">
               <h2 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>🧬 BFS Breeding Path Finder</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr auto', gap: '1.5rem', alignItems: 'end', marginBottom: '1.5rem' }}>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Owned Pal Species (comma-separated)</label>
-                  <input type="text" placeholder="e.g. Lamball, Cattiva, Penking" value={ownedPals} onChange={e => setOwnedPals(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Target Pal</label>
-                  <input type="text" placeholder="e.g. Anubis" value={targetPal} onChange={e => setTargetPal(e.target.value)} />
-                </div>
-                <button className="btn btn-primary" onClick={handleFindPath}>Find Path</button>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
+                Finds the shortest multi-step breeding chain to create your target Pal using your available inventory.
+              </p>
+
+              <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 600 }}>
+                  <input 
+                    type="checkbox" 
+                    checked={useSaveOwned} 
+                    onChange={e => setUseSaveOwned(e.target.checked)} 
+                    disabled={!saveLoaded}
+                  />
+                  <span>Automatically use my caught Pals from save file ({saveLoaded ? `${ownedSpecies.length} species owned` : 'No save loaded'})</span>
+                </label>
+
+                {!useSaveOwned && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Custom Owned Species (comma-separated)</label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. Lamball, Cattiva, Penking" 
+                      value={ownedPals} 
+                      onChange={e => setOwnedPals(e.target.value)} 
+                    />
+                  </div>
+                )}
               </div>
 
-              {breedingPath.length > 0 ? (
-                <div className="steps-list">
-                  {breedingPath.map((step, idx) => (
-                    <div key={idx} className="step-card">
-                      <div className="step-num">Step {idx + 1}</div>
-                      <div className="step-details">
-                        <div className="parent-node">{step.parent1}</div>
-                        <div className="arrow-node">+</div>
-                        <div className="parent-node">{step.parent2}</div>
-                        <div className="arrow-node">➔</div>
-                        <div className="child-node">{step.child}</div>
-                      </div>
-                    </div>
-                  ))}
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'end', marginBottom: '1.5rem' }}>
+                <div style={{ flexGrow: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Target Pal to Breed</label>
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.95rem' }}
+                    value={targetPal} 
+                    onChange={e => setTargetPal(e.target.value)}
+                  >
+                    <option value="">-- Select Target Pal --</option>
+                    {availablePalOptions.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                ownedPals && targetPal && <p style={{ color: 'var(--text-secondary)', marginTop: '1rem' }}>No path found yet.</p>
+                <button className="btn btn-primary" onClick={handleFindPath} disabled={!targetPal || pathLoading}>
+                  {pathLoading ? 'Finding Path...' : 'Find Path'}
+                </button>
+              </div>
+
+              {pathError && (
+                <div style={{ marginTop: '1rem', color: '#f87171', padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+                  ⚠️ {pathError}
+                </div>
+              )}
+
+              {pathSearched && !pathLoading && allBreedingPaths.length > 0 && (
+                <div>
+                  {/* Alternative Path Selection Tabs */}
+                  {allBreedingPaths.length > 1 && (
+                    <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.25rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+                      {allBreedingPaths.map((pObj, pIdx) => (
+                        <button
+                          key={pIdx}
+                          className={`btn ${activePathIdx === pIdx ? 'btn-primary' : 'btn-secondary'}`}
+                          style={{ fontSize: '0.85rem', padding: '0.45rem 1rem', whiteSpace: 'nowrap' }}
+                          onClick={() => setActivePathIdx(pIdx)}
+                        >
+                          {pObj.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {(() => {
+                    const currentPathObj = allBreedingPaths[activePathIdx] || allBreedingPaths[0]
+                    const currentSteps = currentPathObj ? currentPathObj.steps : []
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <h4 style={{ fontWeight: 700, color: 'var(--accent-light)', margin: 0 }}>
+                            🎯 {currentPathObj.title} to get {targetPal}:
+                          </h4>
+                          <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                            {currentPathObj.difficulty}
+                          </span>
+                        </div>
+
+                        <div className="steps-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {currentSteps.map((step, idx) => (
+                            <div key={idx} className="step-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <div className="step-num" style={{ background: 'var(--accent-color)', color: 'white', fontWeight: 800, width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  {idx + 1}
+                                </div>
+                                <div className="step-details" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.05rem', fontWeight: 600, flexWrap: 'wrap', flexGrow: 1 }}>
+                                  <span style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {step.parent1}
+                                    {step.parent1_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>♂ Male</span>}
+                                    {step.parent1_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>♀ Female</span>}
+                                  </span>
+                                  <span style={{ color: 'var(--text-secondary)' }}>+</span>
+                                  <span style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    {step.parent2}
+                                    {step.parent2_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>♂ Male</span>}
+                                    {step.parent2_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.1rem 0.4rem', borderRadius: '4px', fontSize: '0.85rem' }}>♀ Female</span>}
+                                  </span>
+                                  <span style={{ color: 'var(--accent-light)' }}>➔</span>
+                                  <span style={{ color: '#34d399', fontWeight: 700 }}>{step.child}</span>
+                                </div>
+                              </div>
+
+                              {step.gender_note && (
+                                <div style={{ marginLeft: '2.75rem', fontSize: '0.82rem', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <span>🎲</span>
+                                  <span><strong>Hatch Odds for {step.child}:</strong> {step.gender_note}</span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
               )}
             </div>
           </div>

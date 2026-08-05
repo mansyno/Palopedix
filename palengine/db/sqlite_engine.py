@@ -743,33 +743,97 @@ class SQLiteEngine:
 
     # ---------- Advanced Breeding Logic APIs ----------
 
+    def get_owned_pal_inventory(self) -> dict[str, set[str]]:
+        """Returns map of owned Pal display names to their available genders in save data.
+        Example: {'Lamball': {'Male', 'Female'}, 'Leezpunk': {'Female'}}
+        """
+        rows = self.conn.execute(
+            """
+            SELECT DISTINCT coalesce(p.display_name, pi.species) as display_name, pi.gender
+            FROM pal_instances pi
+            LEFT JOIN pals p ON LOWER(pi.species) = LOWER(p.internal_name)
+                             OR LOWER(pi.species) = LOWER(p.display_name)
+            WHERE pi.gender IS NOT NULL AND pi.gender != ''
+            """
+        ).fetchall()
+        inv: dict[str, set[str]] = {}
+        for r in rows:
+            name = r["display_name"]
+            gender = r["gender"].capitalize()
+            if name not in inv:
+                inv[name] = set()
+            inv[name].add(gender)
+        return inv
+
+    def get_owned_pal_species(self) -> list[str]:
+        """Returns sorted list of distinct Pal display names currently owned in save data."""
+        rows = self.conn.execute(
+            """
+            SELECT DISTINCT coalesce(p.display_name, pi.species) as display_name
+            FROM pal_instances pi
+            LEFT JOIN pals p ON LOWER(pi.species) = LOWER(p.internal_name)
+                             OR LOWER(pi.species) = LOWER(p.display_name)
+            ORDER BY display_name ASC
+            """
+        ).fetchall()
+        return [r["display_name"] for r in rows if r["display_name"]]
+
     def get_breeding_result(self, parent1: str, parent2: str) -> Optional[dict[str, Any]]:
         """Calculates breeding result child for two parent species."""
-        p1 = parent1.strip().lower()
-        p2 = parent2.strip().lower()
+        p1_in = parent1.strip().lower()
+        p2_in = parent2.strip().lower()
 
-        if p1 == p2:
+        p1_row = self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
+            (p1_in, p1_in),
+        ).fetchone() or self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) LIKE ? OR LOWER(internal_name) LIKE ?",
+            (f"%{p1_in}%", f"%{p1_in}%"),
+        ).fetchone()
+
+        p2_row = self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
+            (p2_in, p2_in),
+        ).fetchone() or self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) LIKE ? OR LOWER(internal_name) LIKE ?",
+            (f"%{p2_in}%", f"%{p2_in}%"),
+        ).fetchone()
+
+        if not p1_row or not p2_row:
+            return None
+
+        p1_names = {p1_in, p1_row["display_name"].lower(), p1_row["internal_name"].lower()}
+        p2_names = {p2_in, p2_row["display_name"].lower(), p2_row["internal_name"].lower()}
+
+        if p1_row["display_name"].lower() == p2_row["display_name"].lower():
             row = self.conn.execute(
                 "SELECT * FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
-                (p1, p1),
+                (p1_row["display_name"].lower(), p1_row["display_name"].lower()),
             ).fetchone()
             if row:
                 res = dict(row)
                 res["icon_path"] = transform_icon_path(res.get("icon_path"))
                 return res
-            return None
 
-        row = self.conn.execute(
-            """
-            SELECT child FROM breeding_combos
-            WHERE (LOWER(parent1) = ? AND LOWER(parent2) = ?)
-               OR (LOWER(parent1) = ? AND LOWER(parent2) = ?)
-        """,
-            (p1, p2, p2, p1),
-        ).fetchone()
+        combo_row = None
+        for n1 in p1_names:
+            for n2 in p2_names:
+                row = self.conn.execute(
+                    """
+                    SELECT child FROM breeding_combos
+                    WHERE (LOWER(parent1) = ? AND LOWER(parent2) = ?)
+                       OR (LOWER(parent1) = ? AND LOWER(parent2) = ?)
+                """,
+                    (n1, n2, n2, n1),
+                ).fetchone()
+                if row:
+                    combo_row = row
+                    break
+            if combo_row:
+                break
 
-        if row:
-            child_name = row["child"]
+        if combo_row:
+            child_name = combo_row["child"]
             child_row = self.conn.execute(
                 "SELECT * FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
                 (child_name.lower(), child_name.lower()),
@@ -778,19 +842,6 @@ class SQLiteEngine:
                 res = dict(child_row)
                 res["icon_path"] = transform_icon_path(res.get("icon_path"))
                 return res
-            return None
-
-        p1_row = self.conn.execute(
-            "SELECT breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
-            (p1, p1),
-        ).fetchone()
-        p2_row = self.conn.execute(
-            "SELECT breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
-            (p2, p2),
-        ).fetchone()
-
-        if not p1_row or not p2_row:
-            return None
 
         p1_power = p1_row["breeding_power"]
         p2_power = p2_row["breeding_power"]
@@ -832,33 +883,69 @@ class SQLiteEngine:
             (c, c),
         ).fetchone()
         if not child_row:
-            return []
+            child_row = self.conn.execute(
+                "SELECT display_name FROM pals WHERE LOWER(display_name) LIKE ? OR LOWER(internal_name) LIKE ?",
+                (f"%{c}%", f"%{c}%"),
+            ).fetchone()
+            if not child_row:
+                return []
+
         child_name = child_row["display_name"]
+        target_child_lower = child_name.lower()
 
         pals_rows = self.conn.execute(
-            "SELECT display_name, breeding_power FROM pals"
+            "SELECT display_name, breeding_power, is_variant, index_order FROM pals"
         ).fetchall()
-        pals = [dict(r) for r in pals_rows]
+        all_pals = [dict(r) for r in pals_rows]
+
+        combos_rows = self.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
+        special_combos: dict[tuple[str, str], str] = {}
+        for r in combos_rows:
+            p1_l = r["parent1"].lower()
+            p2_l = r["parent2"].lower()
+            ch_name = r["child"]
+            special_combos[(p1_l, p2_l)] = ch_name
+            special_combos[(p2_l, p1_l)] = ch_name
+
+        restricted = {
+            "jetragon", "frostallion", "paladius", "necromus",
+            "bellanoir", "chikipi", "xenovader", "xenogard", "xenolord"
+        }
+        candidate_pals = [
+            p for p in all_pals
+            if p["is_variant"] == 0 and p["display_name"].lower() not in restricted
+        ]
+        candidate_pals.sort(key=lambda x: x["index_order"])
+
+        def calc_standard_child(power1: int, power2: int) -> str:
+            target_power = (power1 + power2 + 1) // 2
+            best_pal = min(
+                candidate_pals,
+                key=lambda p: abs(p["breeding_power"] - target_power)
+            )
+            return best_pal["display_name"]
 
         results = set()
+
+        # Same-species breeding gives same species
         results.add((child_name, child_name))
 
-        rows = self.conn.execute(
-            "SELECT parent1, parent2 FROM breeding_combos WHERE LOWER(child) = ?", (c,)
-        ).fetchall()
-        for r in rows:
-            p1, p2 = r["parent1"], r["parent2"]
-            if p1.lower() > p2.lower():
-                p1, p2 = p2, p1
-            results.add((p1, p2))
+        for i in range(len(all_pals)):
+            for j in range(i, len(all_pals)):
+                p1_name = all_pals[i]["display_name"]
+                p2_name = all_pals[j]["display_name"]
+                p1_l, p2_l = p1_name.lower(), p2_name.lower()
 
-        for i in range(len(pals)):
-            for j in range(i + 1, len(pals)):
-                p1_name = pals[i]["display_name"]
-                p2_name = pals[j]["display_name"]
+                if p1_l == p2_l:
+                    result_child = p1_name
+                elif (p1_l, p2_l) in special_combos:
+                    result_child = special_combos[(p1_l, p2_l)]
+                else:
+                    pow1 = all_pals[i]["breeding_power"]
+                    pow2 = all_pals[j]["breeding_power"]
+                    result_child = calc_standard_child(pow1, pow2)
 
-                res = self.get_breeding_result(p1_name, p2_name)
-                if res and res.get("display_name", "").lower() == c:
+                if result_child.lower() == target_child_lower:
                     p1_n, p2_n = p1_name, p2_name
                     if p1_n.lower() > p2_n.lower():
                         p1_n, p2_n = p2_n, p1_n
@@ -866,86 +953,286 @@ class SQLiteEngine:
 
         return sorted(list(results), key=lambda x: (x[0].lower(), x[1].lower()))
 
-    def find_breeding_path(
-        self, owned_species: list[str], target_species: str
-    ) -> list[dict[str, str]]:
-        """Breadth-First Search (BFS) pathfinder to breed the target Pal from owned species."""
-        owned_set = {s.strip().lower() for s in owned_species}
-        target = target_species.strip().lower()
+    def find_all_breeding_paths(
+        self, owned_input: Any, target_species: str
+    ) -> list[dict[str, Any]]:
+        """Breadth-First Search (BFS) pathfinder that returns multiple distinct alternative breeding paths with gender hatch odds."""
+        PAL_GENDER_RATIOS: dict[str, tuple[int, int]] = {
+            "beegarde": (20, 80), "elizabee": (20, 80), "petallia": (20, 80),
+            "lovander": (20, 80), "dazzi": (20, 80), "ribbuny": (20, 80),
+            "flopie": (20, 80), "vixy": (20, 80), "cremis": (20, 80), "cinnamoth": (20, 80),
+            "relaxaurus": (80, 20), "relaxaurus lux": (80, 20), "mozzarina": (80, 20),
+            "eikthyrdeer": (80, 20), "eikthyrdeer terra": (80, 20), "grizzbolt": (80, 20),
+            "warsect": (80, 20), "rayhound": (80, 20), "wumpo": (80, 20), "wumpo botan": (80, 20),
+            "kingpaca": (90, 10), "kingpaca cryst": (90, 10), "lyleen noct": (0, 100),
+        }
 
-        pals_rows = self.conn.execute("SELECT display_name FROM pals").fetchall()
-        cased_names = {r["display_name"].lower(): r["display_name"] for r in pals_rows}
+        def get_hatch_odds(child_species: str, required_gender: str) -> dict[str, str]:
+            sp_l = child_species.strip().lower()
+            m_pct, f_pct = PAL_GENDER_RATIOS.get(sp_l, (50, 50))
+            if required_gender == "Male":
+                pct = m_pct
+            elif required_gender == "Female":
+                pct = f_pct
+            else:
+                pct = 100
 
+            if pct == 0:
+                return {"hatch_chance_pct": "0%", "avg_eggs": "Impossible", "gender_note": f"Impossible to hatch {required_gender}"}
+            avg = round(100.0 / pct, 1)
+            avg_str = "~1 egg" if avg == 1.0 else f"~{avg} eggs"
+            return {
+                "hatch_chance_pct": f"{pct}%",
+                "avg_eggs": avg_str,
+                "gender_note": f"{pct}% {required_gender} hatch chance ({avg_str} avg)",
+            }
+
+        pals_rows = self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power, is_variant, index_order FROM pals"
+        ).fetchall()
+        all_pals = [dict(r) for r in pals_rows]
+        cased_names = {r["display_name"].lower(): r["display_name"] for r in all_pals}
+        power_map = {r["display_name"].lower(): r["breeding_power"] for r in all_pals}
+
+        combos_rows = self.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
+        special_combos: dict[tuple[str, str], str] = {}
+        for r in combos_rows:
+            p1_l = r["parent1"].lower()
+            p2_l = r["parent2"].lower()
+            ch_name = r["child"]
+            special_combos[(p1_l, p2_l)] = ch_name
+            special_combos[(p2_l, p1_l)] = ch_name
+
+        restricted = {
+            "jetragon", "frostallion", "paladius", "necromus",
+            "bellanoir", "chikipi", "xenovader", "xenogard", "xenolord"
+        }
+        candidate_pals = [
+            p for p in all_pals
+            if p["is_variant"] == 0 and p["display_name"].lower() not in restricted
+        ]
+        candidate_pals.sort(key=lambda x: x["index_order"])
+
+        def calc_child_fast(p1_l: str, p2_l: str) -> str:
+            if p1_l == p2_l:
+                return cased_names.get(p1_l, p1_l)
+            if (p1_l, p2_l) in special_combos:
+                return special_combos[(p1_l, p2_l)]
+            if p1_l in power_map and p2_l in power_map:
+                pow1 = power_map[p1_l]
+                pow2 = power_map[p2_l]
+                target_pow = (pow1 + pow2 + 1) // 2
+                best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - target_pow))
+                return best["display_name"]
+            return ""
+
+        target_input = target_species.strip().lower()
+        target = target_input
         if target not in cased_names:
-            return []
+            matched = next((k for k in cased_names if target_input in k), None)
+            if matched:
+                target = matched
+            else:
+                return []
 
-        if target in owned_set:
-            return []
+        reachable_genders: dict[str, set[str]] = {}
 
-        parent_recipes: dict[str, tuple[str, str]] = {}
-        reachable = set(owned_set)
-        queue = list(owned_set)
+        if isinstance(owned_input, dict):
+            for sp_name, genders in owned_input.items():
+                sp_l = sp_name.strip().lower()
+                c_sp = cased_names.get(sp_l, sp_l).lower()
+                if c_sp not in reachable_genders:
+                    reachable_genders[c_sp] = set()
+                for g in genders:
+                    reachable_genders[c_sp].add(g.lower())
+        elif isinstance(owned_input, list):
+            for item in owned_input:
+                item_str = str(item).strip()
+                g_spec = None
+                if "(" in item_str and ")" in item_str:
+                    parts = item_str.split("(", 1)
+                    sp_raw = parts[0].strip()
+                    g_raw = parts[1].replace(")", "").strip().lower()
+                    if "female" in g_raw or "♀" in g_raw:
+                        g_spec = "female"
+                    elif "male" in g_raw or "♂" in g_raw:
+                        g_spec = "male"
+                else:
+                    sp_raw = item_str
 
-        found = False
+                sp_l = sp_raw.lower()
+                matched_sp = next((k for k in cased_names if sp_l in k), sp_l)
+                if matched_sp not in reachable_genders:
+                    reachable_genders[matched_sp] = set()
+                if g_spec:
+                    reachable_genders[matched_sp].add(g_spec)
+                else:
+                    reachable_genders[matched_sp].update({"male", "female"})
+
+        starting_owned = set(reachable_genders.keys())
+
+        def check_breeding_compatibility(p1_l: str, p2_l: str) -> tuple[bool, str, str]:
+            g1 = reachable_genders.get(p1_l, set())
+            g2 = reachable_genders.get(p2_l, set())
+            if p1_l == p2_l:
+                if "male" in g1 and "female" in g1:
+                    return True, "Male", "Female"
+                return False, "", ""
+            if "male" in g1 and "female" in g2:
+                return True, "Male", "Female"
+            if "female" in g1 and "male" in g2:
+                return True, "Female", "Male"
+            return False, "", ""
+
+        # Store multiple candidate parent recipes per child to allow alternative paths
+        # recipes_for_child[child_lower] = list of (p1_lower, g1_req, p2_lower, g2_req)
+        recipes_for_child: dict[str, list[tuple[str, str, str, str]]] = {}
+        reachable = set(starting_owned)
+        queue = list(reachable)
+
         for _generation in range(5):
-            if found:
-                break
-
             next_queue = []
             new_breeds = []
             for parent1 in queue:
                 for parent2 in reachable:
-                    child_pal = self.get_breeding_result(
-                        cased_names.get(parent1, parent1),
-                        cased_names.get(parent2, parent2),
-                    )
-                    if child_pal:
-                        child = child_pal.get("display_name", "").lower()
-                        if child and child not in reachable:
-                            new_breeds.append((child, parent1, parent2))
+                    ok, g1_req, g2_req = check_breeding_compatibility(parent1, parent2)
+                    if ok:
+                        child_name = calc_child_fast(parent1, parent2)
+                        if child_name:
+                            child = child_name.lower()
+                            if child not in starting_owned:
+                                new_breeds.append((child, parent1, g1_req, parent2, g2_req))
 
-            for child, p1, p2 in new_breeds:
+            for child, p1, g1_req, p2, g2_req in new_breeds:
+                # Ignore self-breeding loops (e.g. Splatterina + Splatterina -> Splatterina)
+                if p1 == p2 and child == p1:
+                    continue
+
+                if child not in recipes_for_child:
+                    recipes_for_child[child] = []
+                    next_queue.append(child)
+
+                # Canonicalize parent pair to prevent order swapping duplicates (e.g. A+B vs B+A)
+                pair_key = tuple(sorted([(p1, g1_req), (p2, g2_req)], key=lambda x: x[0]))
+                existing_pairs = [tuple(sorted([(rp1, rg1), (rp2, rg2)], key=lambda x: x[0])) for rp1, rg1, rp2, rg2 in recipes_for_child[child]]
+                if pair_key not in existing_pairs and len(recipes_for_child[child]) < 2:
+                    recipes_for_child[child].append((p1, g1_req, p2, g2_req))
+
                 if child not in reachable:
                     reachable.add(child)
-                    next_queue.append(child)
-                    parent_recipes[child] = (p1, p2)
-                    if child == target:
-                        found = True
-                        break
+                    reachable_genders[child] = {"male", "female"}
 
             queue = next_queue
-            if not queue:
+            if target in recipes_for_child or not queue:
                 break
 
-        if target not in parent_recipes:
+        if target not in recipes_for_child:
             return []
 
-        memo: set[str] = set()
+        # Recursively construct all paths to target
+        def build_paths(species: str, current_memo: set[str]) -> list[list[dict[str, Any]]]:
+            if species not in recipes_for_child:
+                return [[]]
 
-        def collect_steps(species: str) -> list[dict[str, str]]:
-            if species not in parent_recipes:
-                return []
-            p1, p2 = parent_recipes[species]
-            steps = []
-            steps.extend(collect_steps(p1))
-            steps.extend(collect_steps(p2))
+            all_sub_paths = []
+            for p1, g1_req, p2, g2_req in recipes_for_child[species]:
+                pair_key_str = ":".join(sorted([f"{p1}:{g1_req}", f"{p2}:{g2_req}"]))
+                recipe_key = f"{pair_key_str}->{species}"
+                if recipe_key in current_memo:
+                    continue
+                new_memo = set(current_memo)
+                new_memo.add(recipe_key)
 
-            p1_cased = cased_names.get(p1, p1)
-            p2_cased = cased_names.get(p2, p2)
-            child_cased = cased_names.get(species, species)
+                left_paths = build_paths(p1, new_memo)
+                right_paths = build_paths(p2, new_memo)
 
-            if p1_cased.lower() > p2_cased.lower():
-                p1_cased, p2_cased = p2_cased, p1_cased
+                p1_cased = cased_names.get(p1, p1)
+                p2_cased = cased_names.get(p2, p2)
+                child_cased = cased_names.get(species, species)
 
-            recipe_key = f"{p1_cased.lower()}+{p2_cased.lower()}->{child_cased.lower()}"
-            if recipe_key not in memo:
-                memo.add(recipe_key)
-                steps.append(
-                    {"parent1": p1_cased, "parent2": p2_cased, "child": child_cased}
-                )
-            return steps
+                # Determine gender hatch odds for intermediate step
+                hatch_info = {}
+                if species != target:
+                    hatch_info = get_hatch_odds(child_cased, g1_req)
 
-        return collect_steps(target)
+                step = {
+                    "parent1": p1_cased,
+                    "parent1_gender": g1_req,
+                    "parent2": p2_cased,
+                    "parent2_gender": g2_req,
+                    "child": child_cased,
+                    **hatch_info
+                }
+
+                for lp in left_paths:
+                    for rp in right_paths:
+                        combined = lp + rp + [step]
+                        all_sub_paths.append(combined)
+                        if len(all_sub_paths) >= 10:
+                            break
+                    if len(all_sub_paths) >= 10:
+                        break
+                if len(all_sub_paths) >= 10:
+                    break
+
+            return all_sub_paths
+
+        raw_paths = build_paths(target, set())
+
+        # Canonicalize step signature helper
+        def get_step_sig(s: dict[str, Any]) -> str:
+            pair = sorted([f"{s['parent1']}:{s['parent1_gender']}", f"{s['parent2']}:{s['parent2_gender']}"])
+            return f"{pair[0]}+{pair[1]}->{s['child']}"
+
+        # Deduplicate paths and ensure alternative paths use distinct starting parent pairs
+        unique_paths = []
+        path_signatures = set()
+        starting_pairs_seen = set()
+
+        for p in raw_paths:
+            # Filter out paths longer than 3 steps as requested by user
+            if len(p) > 3:
+                continue
+
+            sig = "||".join(get_step_sig(s) for s in p)
+            if sig in path_signatures:
+                continue
+
+            # Check starting parent pair signature (the initial breed step)
+            first_step = p[0]
+            start_pair_sig = f"{get_step_sig(first_step)}"
+            if start_pair_sig in starting_pairs_seen and len(unique_paths) > 0:
+                continue
+
+            path_signatures.add(sig)
+            starting_pairs_seen.add(start_pair_sig)
+            unique_paths.append(p)
+
+        # Format and rank paths
+        formatted_paths = []
+        for idx, p in enumerate(unique_paths[:5]):
+            total_steps = len(p)
+            has_hard_gender = any(s.get("hatch_chance_pct") in ["10%", "20%"] for s in p)
+            difficulty_label = "Challenging (Low Gender Hatch Rate)" if has_hard_gender else "Easy (High Gender Hatch Rate)"
+            
+            title = f"Path {idx + 1} ({total_steps} Step{'s' if total_steps > 1 else ''}{' - Recommended' if idx == 0 else ' - Alternative'})"
+            formatted_paths.append({
+                "path_id": idx + 1,
+                "title": title,
+                "difficulty": difficulty_label,
+                "steps": p
+            })
+
+        return formatted_paths
+
+    def find_breeding_path(
+        self, owned_input: Any, target_species: str
+    ) -> list[dict[str, Any]]:
+        """Breadth-First Search (BFS) pathfinder returning steps of the top recommended path."""
+        all_paths = self.find_all_breeding_paths(owned_input, target_species)
+        if all_paths:
+            return all_paths[0]["steps"]
+        return []
 
     # ---------- Querying APIs ----------
 
@@ -1295,6 +1582,74 @@ class SQLiteEngine:
             results.append(d)
         return results
 
+    def query_skills(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
+        """Queries skills (Active, Passive, Partner) catalog from master DB or legacy tables."""
+        use_palworld_db = (
+            self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
+        )
+
+        results = []
+        if use_palworld_db:
+            query = "SELECT * FROM palworld_master.skills WHERE 1=1"
+            params: list[Any] = []
+
+            if "type" in filters and filters["type"]:
+                query += " AND LOWER(type) = LOWER(?)"
+                params.append(filters["type"])
+
+            if "element" in filters and filters["element"]:
+                el = filters["element"].lower()
+                query += " AND LOWER(element) = LOWER(?)"
+                params.append(el)
+
+            if "category" in filters and filters["category"]:
+                query += " AND LOWER(category) = LOWER(?)"
+                params.append(filters["category"])
+
+            if "search" in filters and filters["search"]:
+                s = f"%{filters['search']}%"
+                query += " AND (LOWER(name) LIKE LOWER(?) OR LOWER(id) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))"
+                params.extend([s, s, s])
+
+            query += " ORDER BY type ASC, name ASC"
+
+            rows = self.conn.execute(query, params).fetchall()
+            for r in rows:
+                d = dict(r)
+                d["cooldown_sec"] = d.get("cooldown")
+                d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                results.append(d)
+        else:
+            query_type = str(filters.get("type", "")).capitalize() if filters.get("type") else ""
+            search_str = str(filters.get("search", "")).lower() if filters.get("search") else ""
+
+            if not query_type or query_type == "Active":
+                act_rows = self.conn.execute("SELECT *, 'Active' as type FROM active_skills").fetchall()
+                for r in act_rows:
+                    d = dict(r)
+                    if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
+                        continue
+                    d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                    results.append(d)
+
+            if not query_type or query_type == "Passive":
+                pas_rows = self.conn.execute("SELECT *, 'Passive' as type FROM passive_skills").fetchall()
+                for r in pas_rows:
+                    d = dict(r)
+                    if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
+                        continue
+                    results.append(d)
+
+            if not query_type or query_type == "Partner":
+                prt_rows = self.conn.execute("SELECT *, 'Partner' as type FROM partner_skills").fetchall()
+                for r in prt_rows:
+                    d = dict(r)
+                    if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
+                        continue
+                    results.append(d)
+
+        return results
+
     def query_instances(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
         """Queries dynamic Pal instances table with multiple filter conditions."""
         query = """
@@ -1356,18 +1711,40 @@ class SQLiteEngine:
         rows = self.conn.execute(query, params).fetchall()
 
         results = []
+        use_palworld_db = (
+            self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
+        )
+
         for r in rows:
             d = dict(r)
             d["icon_path"] = transform_icon_path(d.get("icon_path"))
-            p_rows = self.conn.execute(
-                """
-                SELECT COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id, ps.rank, ps.description
-                FROM pal_instance_passives pip
-                LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
-                WHERE pip.instance_id = ?
-            """,
-                (d["instance_id"],),
-            ).fetchall()
+            if use_palworld_db:
+                p_rows = self.conn.execute(
+                    """
+                    SELECT COALESCE(s.name, pip.passive_id) as name,
+                           pip.passive_id as id,
+                           s.power as rank,
+                           s.description,
+                           s.stat_modifier,
+                           s.category,
+                           'Passive' as type,
+                           s.icon_path
+                    FROM pal_instance_passives pip
+                    LEFT JOIN palworld_master.skills s ON LOWER(pip.passive_id) = LOWER(s.id) OR LOWER(pip.passive_id) = LOWER(s.name)
+                    WHERE pip.instance_id = ?
+                """,
+                    (d["instance_id"],),
+                ).fetchall()
+            else:
+                p_rows = self.conn.execute(
+                    """
+                    SELECT COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id, ps.rank, ps.description, 'Passive' as type
+                    FROM pal_instance_passives pip
+                    LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
+                    WHERE pip.instance_id = ?
+                """,
+                    (d["instance_id"],),
+                ).fetchall()
             d["passives"] = [dict(pr) for pr in p_rows]
             results.append(d)
 

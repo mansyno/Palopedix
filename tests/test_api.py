@@ -37,3 +37,21 @@ def test_api_breeding_result():
         assert response.status_code == 200
         data = response.json()
         assert data["display_name"] == "Relaxaurus Lux"
+
+
+def test_api_owned_species():
+    with patch("palengine.api.main.db_engine.get_owned_pal_species", return_value=["Lamball", "Cattiva"]):
+        response = client.get("/api/save/owned-species")
+        assert response.status_code == 200
+        assert response.json() == ["Lamball", "Cattiva"]
+
+
+def test_api_breeding_path():
+    mock_paths = [{"path_id": 1, "title": "Path 1", "difficulty": "Easy", "steps": [{"parent1": "Lamball", "parent2": "Penking", "child": "Bushi"}]}]
+    with patch("palengine.api.main.db_engine.find_all_breeding_paths", return_value=mock_paths):
+        response = client.get("/api/breeding/path?target=Bushi&owned=auto")
+        assert response.status_code == 200
+        data = response.json()
+        assert "paths" in data
+        assert len(data["paths"]) == 1
+        assert data["paths"][0]["steps"][0]["child"] == "Bushi"

@@ -188,6 +188,12 @@ def get_inventory(container_type: Optional[str] = None) -> list[dict[str, Any]]:
     return db_engine.query_inventory(container_type)
 
 
+@app.get("/api/save/owned-species")
+def get_owned_species() -> list[str]:
+    """Returns list of distinct Pal species owned in the loaded save data."""
+    return db_engine.get_owned_pal_species()
+
+
 @app.get("/api/bases")
 def get_bases() -> list[dict[str, Any]]:
     """Lists all base camps and structure Summaries."""
@@ -230,6 +236,22 @@ def get_breed_result(parent1: str, parent2: str) -> dict[str, Any]:
 def get_breed_parents(child: str) -> list[tuple[str, str]]:
     """Lists all breeding combinations that yield the target child."""
     return db_engine.find_parents_for_child(child)
+
+
+@app.get("/api/breeding/path")
+def get_breeding_path(
+    target: str,
+    owned: Optional[str] = None,
+) -> dict[str, Any]:
+    """Finds shortest multi-generation breeding paths to target Pal with alternative options & gender odds."""
+    if not owned or owned.strip().lower() == "auto":
+        owned_inv = db_engine.get_owned_pal_inventory()
+        paths = db_engine.find_all_breeding_paths(owned_inv, target)
+    else:
+        owned_list = [s.strip() for s in owned.split(",") if s.strip()]
+        paths = db_engine.find_all_breeding_paths(owned_list, target)
+
+    return {"target": target, "paths": paths}
 
 
 @app.get("/api/items")
@@ -292,4 +314,25 @@ def get_tech_tree(
 def get_work_types() -> list[dict[str, Any]]:
     """Lists all 12 official Palworld work suitability types with HUD icon paths."""
     return db_engine.query_work_types()
+
+
+@app.get("/api/skills")
+def get_skills(
+    type: Optional[str] = None,
+    element: Optional[str] = None,
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Queries skills catalog (Active, Passive, Partner)."""
+    filters: dict[str, Any] = {}
+    if type:
+        filters["type"] = type
+    if element:
+        filters["element"] = element
+    if category:
+        filters["category"] = category
+    if search:
+        filters["search"] = search
+    return db_engine.query_skills(filters)
+
 

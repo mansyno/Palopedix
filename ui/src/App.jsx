@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import BaseOptimizerView from './components/BaseOptimizerView'
 
 const WORK_SUITABILITY_MAP = {
   EmitFlame: 'Kindling',
@@ -85,59 +86,63 @@ function ItemsCatalogView() {
   }, [category, search]);
 
   return (
-    <div>
-      <div className="filter-bar glass-card">
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Category</label>
-          <select value={category} onChange={e => setCategory(e.target.value)}>
-            <option value="">All Categories</option>
-            <option value="Weapon">Weapons</option>
-            <option value="Armor">Armor & Clothing</option>
-            <option value="Sphere">Pal Spheres</option>
-            <option value="Accessory">Accessories</option>
-            <option value="Material">Crafting Materials</option>
-            <option value="Food">Consumable Food</option>
-            <option value="Medicine">Medical Supplies</option>
-            <option value="Essential">Key / Essential Items</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
-          <input type="text" placeholder="Search items by name or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+        <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Category</label>
+            <select value={category} onChange={e => setCategory(e.target.value)}>
+              <option value="">All Categories</option>
+              <option value="Weapon">Weapons</option>
+              <option value="Armor">Armor & Clothing</option>
+              <option value="Sphere">Pal Spheres</option>
+              <option value="Accessory">Accessories</option>
+              <option value="Material">Crafting Materials</option>
+              <option value="Food">Consumable Food</option>
+              <option value="Medicine">Medical Supplies</option>
+              <option value="Essential">Key / Essential Items</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+            <input type="text" placeholder="Search items by name or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
-        {items.map(item => (
-          <div key={item.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-                {item.icon_path ? (
-                  <img src={item.icon_path} alt={item.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
-                ) : (
-                  <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+          {items.map(item => (
+            <div key={item.id} className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '1.25rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                  {item.icon_path ? (
+                    <img src={item.icon_path} alt={item.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
+                  )}
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{item.name}</h3>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>{'⭐'.repeat(Math.min(item.rarity || 1, 5))} ({item.category || 'Item'})</span>
+                  </div>
+                </div>
+                {item.description && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.4 }}>{item.description}</p>
                 )}
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{item.name}</h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>{'⭐'.repeat(Math.min(item.rarity || 1, 5))} ({item.category || 'Item'})</span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px' }}>
+                  <div>Price: <strong style={{ color: 'var(--text-primary)' }}>{item.price || 0}g</strong></div>
+                  <div>Weight: <strong style={{ color: 'var(--text-primary)' }}>{item.weight || 0}</strong></div>
+                  <div>Max Stack: <strong style={{ color: 'var(--text-primary)' }}>{item.max_stack || 9999}</strong></div>
+                  {item.defense > 0 && <div>Defense: <strong style={{ color: 'var(--accent-gold)' }}>+{item.defense}</strong></div>}
                 </div>
               </div>
-              {item.description && (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.4 }}>{item.description}</p>
-              )}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px' }}>
-                <div>Price: <strong style={{ color: 'var(--text-primary)' }}>{item.price || 0}g</strong></div>
-                <div>Weight: <strong style={{ color: 'var(--text-primary)' }}>{item.weight || 0}</strong></div>
-                <div>Max Stack: <strong style={{ color: 'var(--text-primary)' }}>{item.max_stack || 9999}</strong></div>
-                {item.defense > 0 && <div>Defense: <strong style={{ color: 'var(--accent-gold)' }}>+{item.defense}</strong></div>}
-              </div>
-            </div>
 
-            <button className="btn btn-primary" style={{ marginTop: '1rem', width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => setSelectedRecipeItem(item.id)}>
-              🛠️ View Crafting Recipe
-            </button>
-          </div>
-        ))}
+              <button className="btn btn-primary" style={{ marginTop: '1rem', width: '100%', fontSize: '0.85rem', padding: '0.5rem' }} onClick={() => setSelectedRecipeItem(item.id)}>
+                🛠️ View Crafting Recipe
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {selectedRecipeItem && (
@@ -166,8 +171,8 @@ function BuildingsTechView() {
   }, [subTab, search]);
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
         <button className={`btn ${subTab === 'buildings' ? 'btn-primary' : ''}`} onClick={() => setSubTab('buildings')}>
           🏗️ Base Buildings ({buildings.length})
         </button>
@@ -176,59 +181,61 @@ function BuildingsTechView() {
         </button>
       </div>
 
-      {subTab === 'buildings' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          {buildings.map(b => (
-            <div key={b.id} className="glass-card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
-                {b.icon_path ? (
-                  <img src={b.icon_path} alt={b.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
-                ) : (
-                  <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>🏰</div>
-                )}
-                <div>
-                  <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{b.name}</h3>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>Tech Level: Lv. {b.tech_level} ({b.category || 'Facility'})</span>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+        {subTab === 'buildings' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.25rem' }}>
+            {buildings.map(b => (
+              <div key={b.id} className="glass-card" style={{ padding: '1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.75rem' }}>
+                  {b.icon_path ? (
+                    <img src={b.icon_path} alt={b.name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>🏰</div>
+                  )}
+                  <div>
+                    <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>{b.name}</h3>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>Tech Level: Lv. {b.tech_level} ({b.category || 'Facility'})</span>
+                  </div>
                 </div>
+                {b.description && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{b.description}</p>
+                )}
               </div>
-              {b.description && (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{b.description}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      {subTab === 'tech' && (
-        <div className="glass-card table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Level</th>
-                <th>Technology Node Name</th>
-                <th>Points Cost</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {techTree.map(t => (
-                <tr key={t.id}>
-                  <td style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>Lv. {t.level}</td>
-                  <td style={{ fontWeight: 600 }}>{t.name}</td>
-                  <td>{t.tech_point_cost} pts</td>
-                  <td>
-                    {t.is_ancient ? (
-                      <span className="badge" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff' }}>⚡ Ancient Technology</span>
-                    ) : (
-                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Standard</span>
-                    )}
-                  </td>
+        {subTab === 'tech' && (
+          <div className="glass-card table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Level</th>
+                  <th>Technology Node Name</th>
+                  <th>Points Cost</th>
+                  <th>Type</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {techTree.map(t => (
+                  <tr key={t.id}>
+                    <td style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>Lv. {t.level}</td>
+                    <td style={{ fontWeight: 600 }}>{t.name}</td>
+                    <td>{t.tech_point_cost} pts</td>
+                    <td>
+                      {t.is_ancient ? (
+                        <span className="badge" style={{ background: 'linear-gradient(135deg, #a855f7, #ec4899)', color: '#fff' }}>⚡ Ancient Technology</span>
+                      ) : (
+                        <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Standard</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -309,10 +316,165 @@ function SkillBadgeWithTooltip({ skill, children, className, style }) {
   );
 }
 
+function PaldexMasterView({ pals, setSelectedPal, elementFilter, setElementFilter, sizeFilter, setSizeFilter, nocturnalFilter, setNocturnalFilter, suitabilityFilter, setSuitabilityFilter }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+        <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
+            <select value={elementFilter} onChange={e => setElementFilter(e.target.value)}>
+              <option value="">All Elements</option>
+              <option value="Neutral">Neutral / Normal</option>
+              <option value="Fire">Fire</option>
+              <option value="Water">Water</option>
+              <option value="Grass">Grass / Leaf</option>
+              <option value="Electric">Electric / Electricity</option>
+              <option value="Ice">Ice</option>
+              <option value="Ground">Ground / Earth</option>
+              <option value="Dark">Dark</option>
+              <option value="Dragon">Dragon</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Size</label>
+            <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}>
+              <option value="">All Sizes</option>
+              <option value="XS">Extra Small (XS)</option>
+              <option value="S">Small (S)</option>
+              <option value="M">Medium (M)</option>
+              <option value="L">Large (L)</option>
+              <option value="XL">Extra Large (XL)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Nocturnal</label>
+            <select value={nocturnalFilter} onChange={e => setNocturnalFilter(e.target.value)}>
+              <option value="">All Habits</option>
+              <option value="true">Nocturnal Only</option>
+              <option value="false">Diurnal Only</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Work Suitability</label>
+            <select value={suitabilityFilter} onChange={e => setSuitabilityFilter(e.target.value)}>
+              <option value="">All Suitabilities</option>
+              <option value="kindling">Kindling</option>
+              <option value="watering">Watering</option>
+              <option value="planting">Planting</option>
+              <option value="generating_electricity">Electricity Generation</option>
+              <option value="handiwork">Handiwork / Handcraft</option>
+              <option value="gathering">Gathering</option>
+              <option value="lumbering">Lumbering</option>
+              <option value="mining">Mining</option>
+              <option value="medicine_production">Medicine Production</option>
+              <option value="cooling">Cooling</option>
+              <option value="transporting">Transporting</option>
+              <option value="farming">Farming / Monster Farm</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+        <div className="pals-grid" style={{ marginTop: 0 }}>
+          {pals.map(p => (
+            <div key={p.internal_name || p.id} className="glass-card pal-card" onClick={() => setSelectedPal(p)}>
+              <div className="pal-card-header">
+                <span className="pal-number">#{String(p.paldex_number || 0).padStart(3, '0')}</span>
+                <div className="badge-container">
+                  {p.element_1 && (
+                    <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <img src={`/assets/elements/${p.element_1}.png`} alt={p.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                      {p.element_1}
+                    </span>
+                  )}
+                  {p.element_2 && (
+                    <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <img src={`/assets/elements/${p.element_2}.png`} alt={p.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                      {p.element_2}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.75rem 0' }}>
+                {p.icon_path ? (
+                  <img src={p.icon_path} alt={p.display_name} className="pal-card-avatar" onError={(e) => { e.target.style.display = 'none'; }} />
+                ) : (
+                  <div className="pal-card-avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem', background: 'var(--primary-gradient)' }}>
+                    {p.display_name ? p.display_name[0] : 'P'}
+                  </div>
+                )}
+                <div>
+                  <h3 className="pal-name" style={{ margin: 0, fontSize: '1.25rem' }}>{p.display_name}</h3>
+                  {p.code && p.code !== p.display_name && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {p.code}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Base Stats Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px', marginBottom: '0.75rem', fontSize: '0.8rem', textAlign: 'center' }}>
+                <div><span style={{color: 'var(--text-secondary)'}}>HP:</span> <strong>{p.hp || 70}</strong></div>
+                <div><span style={{color: 'var(--text-secondary)'}}>ATK:</span> <strong>{p.attack_melee || 70}</strong></div>
+                <div><span style={{color: 'var(--text-secondary)'}}>DEF:</span> <strong>{p.defense || 70}</strong></div>
+              </div>
+
+              {/* Partner Skill preview */}
+              {p.partner_skill && (
+                <div style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '0.3rem 0.5rem', borderRadius: '6px', marginBottom: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span>🤝</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.partner_skill.name}</span>
+                </div>
+              )}
+
+              {/* Work Suitabilities preview with HUD icons */}
+              {p.work_suitability_details && p.work_suitability_details.length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  {p.work_suitability_details.slice(0, 3).map(wsd => (
+                    <span key={wsd.id} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      {wsd.icon_path && (
+                        <img src={wsd.icon_path} alt={wsd.name} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
+                      )}
+                      <span>{wsd.name}</span>
+                      <strong style={{ color: 'var(--accent-gold)' }}>L{wsd.level}</strong>
+                    </span>
+                  ))}
+                  {p.work_suitability_details.length > 3 && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{p.work_suitability_details.length - 3} more</span>
+                  )}
+                </div>
+              ) : (p.work_suitabilities && Object.keys(p.work_suitabilities).length > 0) && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
+                  {Object.entries(p.work_suitabilities).slice(0, 3).map(([work, level]) => (
+                    <span key={work} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
+                      {WORK_SUITABILITY_MAP[work] || work} <strong style={{ color: 'var(--accent-gold)' }}>L{level}</strong>
+                    </span>
+                  ))}
+                  {Object.keys(p.work_suitabilities).length > 3 && (
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{Object.keys(p.work_suitabilities).length - 3} more</span>
+                  )}
+                </div>
+              )}
+
+              <div className="pal-card-footer">
+                <span>Power: {p.breeding_power}</span>
+                <span>Food: 🍖 {p.food_requirement}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkillsCatalogView() {
   const [skills, setSkills] = useState([]);
   const [type, setType] = useState('');
   const [element, setElement] = useState('');
+  const [source, setSource] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -321,63 +483,106 @@ function SkillsCatalogView() {
     let url = '/api/skills?';
     if (type) url += `type=${encodeURIComponent(type)}&`;
     if (element) url += `element=${encodeURIComponent(element)}&`;
+    if (source) url += `source=${encodeURIComponent(source)}&`;
     if (search) url += `search=${encodeURIComponent(search)}&`;
     fetch(url)
       .then(res => res.json())
       .then(data => { setSkills(data); setLoading(false); })
       .catch(err => { console.error("Error fetching skills:", err); setLoading(false); });
-  }, [type, element, search]);
+  }, [type, element, source, search]);
 
   return (
-    <div>
-      <div className="filter-bar glass-card" style={{ marginBottom: '1.5rem' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Skill Type</label>
-          <select value={type} onChange={e => setType(e.target.value)}>
-            <option value="">All Skill Types (Active, Passive, Partner)</option>
-            <option value="Active">⚔️ Active Skills (324)</option>
-            <option value="Passive">🛡️ Passive Skills (420)</option>
-            <option value="Partner">🤝 Partner Skills (408)</option>
-          </select>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      {/* 📌 FIXED TOP HEADER CONTAINER (Filter Bar + Category Pills + Count) */}
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+        <div className="filter-bar glass-card" style={{ marginBottom: '0.75rem', flexWrap: 'wrap' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Skill Type</label>
+            <select value={type} onChange={e => setType(e.target.value)}>
+              <option value="">All Skill Types (Active, Passive, Partner)</option>
+              <option value="Active">⚔️ Active Skills (324)</option>
+              <option value="Passive">🛡️ Passive Skills (420)</option>
+              <option value="Partner">🤝 Partner Skills (408)</option>
+            </select>
+          </div>
+
+          {(!type || type === 'Passive') && (
+            <div>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--accent-gold)', fontWeight: 700 }}>Passive Source</label>
+              <select value={source} onChange={e => setSource(e.target.value)} style={{ borderColor: 'var(--accent-gold)' }}>
+                <option value="">All Passive Sources (420)</option>
+                <option value="Pals">🐾 Pals (181)</option>
+                <option value="Equipment">🛡️ Equipment (59)</option>
+                <option value="World Tree">🌳 World Tree (114)</option>
+                <option value="Mutation">🧬 Mutation (11)</option>
+                <option value="Legendary">👑 Legendary (55)</option>
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
+            <select value={element} onChange={e => setElement(e.target.value)}>
+              <option value="">All Elements</option>
+              <option value="Neutral">Neutral / Normal</option>
+              <option value="Fire">Fire</option>
+              <option value="Water">Water</option>
+              <option value="Grass">Grass / Leaf</option>
+              <option value="Electric">Electric</option>
+              <option value="Ice">Ice</option>
+              <option value="Ground">Ground</option>
+              <option value="Dark">Dark</option>
+              <option value="Dragon">Dragon</option>
+            </select>
+          </div>
+          <div style={{ flexGrow: 1 }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+            <input type="text" placeholder="Search skills by name, description, or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
         </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
-          <select value={element} onChange={e => setElement(e.target.value)}>
-            <option value="">All Elements</option>
-            <option value="Neutral">Neutral / Normal</option>
-            <option value="Fire">Fire</option>
-            <option value="Water">Water</option>
-            <option value="Grass">Grass / Leaf</option>
-            <option value="Electric">Electric</option>
-            <option value="Ice">Ice</option>
-            <option value="Ground">Ground</option>
-            <option value="Dark">Dark</option>
-            <option value="Dragon">Dragon</option>
-          </select>
-        </div>
-        <div style={{ flexGrow: 1 }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
-          <input type="text" placeholder="Search skills by name, description, or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+
+        {(!type || type === 'Passive') && (
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+            <button className={`btn ${!source ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              All Sources (420)
+            </button>
+            <button className={`btn ${source === 'Pals' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Pals')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              🐾 Pals (181)
+            </button>
+            <button className={`btn ${source === 'Equipment' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Equipment')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              🛡️ Equipment (59)
+            </button>
+            <button className={`btn ${source === 'World Tree' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('World Tree')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              🌳 World Tree (114)
+            </button>
+            <button className={`btn ${source === 'Mutation' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Mutation')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              🧬 Mutation (11)
+            </button>
+            <button className={`btn ${source === 'Legendary' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Legendary')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
+              👑 Legendary (55)
+            </button>
+          </div>
+        )}
+
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', fontWeight: 600 }}>
+          Showing <strong style={{ color: '#38bdf8' }}>{skills.length}</strong> matching skills
         </div>
       </div>
 
-      <div style={{ marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        Showing <strong>{skills.length}</strong> matching skills
-      </div>
-
-      {loading ? (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <p style={{ color: 'var(--text-secondary)' }}>Loading skills database...</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-          {skills.map(sk => {
-            const typeColor = sk.type === 'Passive' ? '#60a5fa' : sk.type === 'Partner' ? 'var(--accent-gold)' : '#f87171';
-            const typeBg = sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : sk.type === 'Partner' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)';
-            
-            return (
-              <SkillBadgeWithTooltip key={sk.id} skill={sk} style={{ display: 'block' }}>
-                <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%', cursor: 'pointer' }}>
+      {/* 📜 SCROLLABLE GRID ONLY */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+        {loading ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <p style={{ color: 'var(--text-secondary)' }}>Loading skills database...</p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+            {skills.map(sk => {
+              const typeColor = sk.type === 'Passive' ? '#60a5fa' : sk.type === 'Partner' ? 'var(--accent-gold)' : '#f87171';
+              const typeBg = sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : sk.type === 'Partner' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)';
+              
+              return (
+                <div key={sk.id} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
                       {sk.icon_path ? (
@@ -389,8 +594,39 @@ function SkillsCatalogView() {
                         <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{sk.name}</h3>
                         <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
                           <span className="badge" style={{ background: typeBg, color: typeColor }}>{sk.type || 'Skill'}</span>
-                          {sk.element && <span className="badge badge-element">{sk.element}</span>}
-                          {sk.category && <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>{sk.category}</span>}
+                          {sk.source && (
+                            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 600 }}>
+                              {sk.source === 'Pals' ? '🐾 Pals' : sk.source === 'Equipment' ? '🛡️ Equipment' : sk.source === 'World Tree' ? '🌳 World Tree' : sk.source === 'Mutation' ? '🧬 Mutation' : '👑 Legendary'}
+                            </span>
+                          )}
+                          {sk.type === 'Active' && sk.element && <span className="badge badge-element">{sk.element}</span>}
+                          {sk.aptitude && (
+                            <span 
+                              className="badge" 
+                              style={{
+                                background: 
+                                  sk.aptitude.color === 'red' ? 'rgba(239, 68, 68, 0.25)' :
+                                  sk.aptitude.color === 'gold' ? 'rgba(245, 158, 11, 0.25)' :
+                                  sk.aptitude.color === 'legend' ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(236, 72, 153, 0.4))' :
+                                  'rgba(255, 255, 255, 0.12)',
+                                color: 
+                                  sk.aptitude.color === 'red' ? '#ef4444' :
+                                  sk.aptitude.color === 'gold' ? '#fbbf24' :
+                                  sk.aptitude.color === 'legend' ? '#f472b6' :
+                                  '#f8fafc',
+                                border: 
+                                  sk.aptitude.color === 'red' ? '1px solid rgba(239, 68, 68, 0.4)' :
+                                  sk.aptitude.color === 'gold' ? '1px solid rgba(245, 158, 11, 0.4)' :
+                                  sk.aptitude.color === 'legend' ? '1px solid rgba(236, 72, 153, 0.5)' :
+                                  '1px solid rgba(255, 255, 255, 0.2)',
+                                fontWeight: 800,
+                                fontSize: '0.78rem',
+                                letterSpacing: '1px'
+                              }}
+                            >
+                              {sk.aptitude.label}
+                            </span>
+                          )}
                           {sk.rank !== undefined && sk.rank !== null && sk.rank !== 0 && (
                             <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent-gold)' }}>Rank {sk.rank}</span>
                           )}
@@ -405,7 +641,7 @@ function SkillsCatalogView() {
                       </div>
                     )}
 
-                    {sk.stat_modifier && (
+                    {sk.stat_modifier && sk.stat_modifier !== sk.description && (
                       <p style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600, marginBottom: '0.5rem' }}>
                         ✨ {sk.stat_modifier}
                       </p>
@@ -424,11 +660,11 @@ function SkillsCatalogView() {
                     )}
                   </div>
                 </div>
-              </SkillBadgeWithTooltip>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -599,56 +835,60 @@ function InventoryView() {
   }, {});
 
   return (
-    <div>
-      <div className="filter-bar glass-card" style={{ marginBottom: '1.5rem' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Container Type</label>
-          <select value={filterType} onChange={e => setFilterType(e.target.value)}>
-            <option value="">All Storage / Inventories</option>
-            <option value="Inventory">Personal Inventory</option>
-            <option value="Key Items">Key Items</option>
-            <option value="Weapon Loadout">Weapon Loadout</option>
-            <option value="Equipped Armor">Equipped Armor</option>
-            <option value="Food Equip">Food Equip</option>
-            <option value="Base Chest">Base Chests</option>
-          </select>
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
-          <input type="text" placeholder="Search items in save file..." value={search} onChange={e => setSearch(e.target.value)} />
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+        <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem' }}>
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Container Type</label>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="">All Storage / Inventories</option>
+              <option value="Inventory">Personal Inventory</option>
+              <option value="Key Items">Key Items</option>
+              <option value="Weapon Loadout">Weapon Loadout</option>
+              <option value="Equipped Armor">Equipped Armor</option>
+              <option value="Food Equip">Food Equip</option>
+              <option value="Base Chest">Base Chests</option>
+            </select>
+          </div>
+          <div style={{ flexGrow: 1 }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
+            <input type="text" placeholder="Search items in save file..." value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
         </div>
       </div>
 
-      {Object.keys(grouped).length === 0 ? (
-        <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>No inventory items found. Make sure a save game is loaded.</p>
-      ) : (
-        Object.entries(grouped).map(([type, items]) => (
-          <div key={type} className="glass-card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-              📦 {type} ({items.length} stack{items.length !== 1 ? 's' : ''})
-            </h3>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
-              {items.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
-                  {item.icon_path ? (
-                    <img src={item.icon_path} alt={item.display_name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
-                  ) : (
-                    <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.display_name}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                      <span>Slot {item.slot_index + 1}</span>
-                      <strong style={{ color: 'var(--accent-gold)' }}>x{item.count.toLocaleString()}</strong>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+        {Object.keys(grouped).length === 0 ? (
+          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', padding: '2rem' }}>No inventory items found. Make sure a save game is loaded.</p>
+        ) : (
+          Object.entries(grouped).map(([type, items]) => (
+            <div key={type} className="glass-card" style={{ marginBottom: '1.5rem', padding: '1.25rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                📦 {type} ({items.length} stack{items.length !== 1 ? 's' : ''})
+              </h3>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
+                {items.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                    {item.icon_path ? (
+                      <img src={item.icon_path} alt={item.display_name} className="item-icon-thumb" onError={(e) => { e.target.style.display = 'none'; }} />
+                    ) : (
+                      <div className="item-icon-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>📦</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.display_name}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                        <span>Slot {item.slot_index + 1}</span>
+                        <strong style={{ color: 'var(--accent-gold)' }}>x{item.count.toLocaleString()}</strong>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        ))
-      )}
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -750,35 +990,34 @@ function WelcomeView({ onNavigate, currentWorld, instancesCount, basesCount, inv
 
 function HomepageView({ onSelectMode, currentWorld, instancesCount, basesCount, inventoryCount }) {
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '3rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '3rem' }}>
-      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
-        <div className="logo-icon" style={{ width: '64px', height: '64px', fontSize: '2rem', borderRadius: '18px' }}>P</div>
-        <h1 style={{ fontSize: '3.2rem', fontWeight: 800, background: 'var(--primary-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+    <div style={{ width: '100%', maxWidth: '1200px', margin: '0 auto', padding: '0.25rem 1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+        <h1 style={{ fontSize: '2.5rem', fontWeight: 800, background: 'var(--primary-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
           Palopedix
         </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '1.2rem', maxWidth: '600px' }}>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '600px', margin: 0 }}>
           Palworld Master Database & Save Game Analytics
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
         {/* Card 1: Global Data */}
         <div 
           className="glass-card table-row-hover" 
           onClick={() => onSelectMode('global', 'paldex')}
-          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid var(--border-color-hover)' }}
+          style={{ padding: '1.5rem', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '280px', border: '1px solid var(--border-color-hover)' }}
         >
           <div>
-            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', marginBottom: '1rem', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
               🌐
             </div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Global Game Data</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>Global Game Data</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1rem' }}>
               Explore master Pal specifications, item recipes, technology trees, and breeding combinations directly from game files.
             </p>
           </div>
           <div>
-            <button className="primary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}>
+            <button className="primary-btn" style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}>
               Explore Global Data →
             </button>
           </div>
@@ -788,25 +1027,34 @@ function HomepageView({ onSelectMode, currentWorld, instancesCount, basesCount, 
         <div 
           className="glass-card table-row-hover" 
           onClick={() => onSelectMode('world', 'world_overview')}
-          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+          style={{ padding: '1.5rem', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '280px', border: '1px solid rgba(56, 189, 248, 0.3)' }}
         >
           <div>
-            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', marginBottom: '1rem', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
               🌍
             </div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Active World Data</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>Active World Data</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1rem' }}>
               Inspect live save file analytics for your selected active world. Audit captured Pals & IVs, personal inventory, storage chests, and condenser candidates.
             </p>
           </div>
           <div>
-            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '1.25rem', border: '1px solid var(--border-color)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Selected Active World:</div>
-              <strong style={{ color: '#38bdf8', fontSize: '0.95rem' }}>{currentWorld ? currentWorld.display_name : 'No World Loaded'}</strong>
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '0.5rem 0.75rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Selected Active World:</div>
+              <strong style={{ color: '#38bdf8', fontSize: '0.85rem' }}>{currentWorld ? currentWorld.display_name : 'No World Loaded'}</strong>
             </div>
-            <button className="primary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem', background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)' }}>
-              Explore World Data →
-            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+              <button className="primary-btn" style={{ padding: '0.75rem 0.5rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)' }}>
+                World Data →
+              </button>
+              <button 
+                className="btn btn-secondary" 
+                onClick={(e) => { e.stopPropagation(); onSelectMode('world', 'base_optimizer'); }}
+                style={{ padding: '0.75rem 0.5rem', fontSize: '0.85rem', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.4)', fontWeight: 700 }}
+              >
+                ⚡ Optimizer →
+              </button>
+            </div>
           </div>
         </div>
 
@@ -814,19 +1062,19 @@ function HomepageView({ onSelectMode, currentWorld, instancesCount, basesCount, 
         <div 
           className="glass-card table-row-hover" 
           onClick={() => onSelectMode('settings', 'settings')}
-          style={{ padding: '2rem', borderRadius: '18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '340px', border: '1px solid var(--border-color)' }}
+          style={{ padding: '1.5rem', borderRadius: '16px', cursor: 'pointer', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '280px', border: '1px solid var(--border-color)' }}
         >
           <div>
-            <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(148, 163, 184, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1.25rem', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'rgba(148, 163, 184, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.75rem', marginBottom: '1rem', border: '1px solid rgba(148, 163, 184, 0.3)' }}>
               ⚙️
             </div>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '0.5rem' }}>Settings & System</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', lineHeight: 1.6, marginBottom: '1.5rem' }}>
-              Configure manual Level.sav file paths, scan local Steam save directories, and select database sources for PalEngine.
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>Settings & System</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1rem' }}>
+              Configure manual Level.sav file paths and manage system save file loading for PalEngine.
             </p>
           </div>
           <div>
-            <button className="secondary-btn" style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}>
+            <button className="secondary-btn" style={{ width: '100%', padding: '0.75rem', fontSize: '0.9rem' }}>
               Open Settings →
             </button>
           </div>
@@ -848,7 +1096,7 @@ function WorldOverviewView({ currentWorld, instancesCount, basesCount, inventory
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
         <div className="glass-card table-row-hover" onClick={() => onNavigate('save_game')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🐾</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Captured Pals</div>
@@ -870,6 +1118,13 @@ function WorldOverviewView({ currentWorld, instancesCount, basesCount, inventory
           <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>Audit Bases →</div>
         </div>
 
+        <div className="glass-card table-row-hover" onClick={() => onNavigate('base_optimizer')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⚡</div>
+          <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Pal Base Optimizer</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800, color: '#fbbf24' }}>Auto-Match</div>
+          <div style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginTop: '0.5rem' }}>Optimize Base Pals →</div>
+        </div>
+
         <div className="glass-card table-row-hover" onClick={() => onNavigate('condenser')} style={{ padding: '1.5rem', borderRadius: '12px', cursor: 'pointer' }}>
           <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⭐</div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Condenser Candidates</div>
@@ -883,8 +1138,6 @@ function WorldOverviewView({ currentWorld, instancesCount, basesCount, inventory
 
 
 function SettingsView({ savePath, setSavePath, handleLoadSave, loading, errorMsg, successMsg }) {
-  const [staticSource, setStaticSource] = useState('palworld_db');
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '800px' }}>
       {/* Save Loader Box */}
@@ -925,29 +1178,6 @@ function SettingsView({ savePath, setSavePath, handleLoadSave, loading, errorMsg
           </div>
         )}
       </div>
-
-      {/* Static Engine Source Box */}
-      <div className="glass-card" style={{ padding: '1.75rem' }}>
-        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          ⚙️ Static Database Source
-        </h3>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-          Choose the data source used for master Pal specs, skill data, and item definitions.
-        </p>
-
-        <div style={{ display: 'flex', gap: '1.5rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input
-              type="radio"
-              name="staticSource"
-              value="palworld_db"
-              checked={staticSource === 'palworld_db'}
-              onChange={(e) => setStaticSource(e.target.value)}
-            />
-            <span><strong>Master SQLite Database (Recommended)</strong> — palworld.db (1.0+ Game Data)</span>
-          </label>
-        </div>
-      </div>
     </div>
   );
 }
@@ -968,65 +1198,69 @@ function CondenserView() {
   if (!candidates || candidates.length === 0) return <p style={{ color: 'var(--text-secondary)' }}>No save file loaded or no duplicate Pals found.</p>;
 
   return (
-    <div style={{ display: 'grid', gap: '1.5rem' }}>
-      <h2 style={{ marginBottom: '0.5rem', fontWeight: 800 }}>⭐ Condenser Recommendations</h2>
-      <p style={{ color: 'var(--text-secondary)', marginBottom: '1rem' }}>Based on duplicates, passives, and IVs. The max rank is calculated based on exactly 5, 13, 25, or 49 total Pals needed.</p>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+        <h2 style={{ marginBottom: '0.25rem', fontWeight: 800 }}>⭐ Condenser Recommendations</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>Based on duplicates, passives, and IVs. The max rank is calculated based on exactly 5, 13, 25, or 49 total Pals needed.</p>
+      </div>
       
-      {candidates.map((c, i) => (
-        <div key={i} className="glass-card" style={{ display: 'flex', gap: '2rem', padding: '1.5rem' }}>
-          <div style={{ flex: '0 0 120px', textAlign: 'center' }}>
-            {c.icon_path ? (
-              <img src={c.icon_path} alt={c.species} style={{ width: '100px', height: '100px', borderRadius: '15px', objectFit: 'cover' }} />
-            ) : (
-              <div style={{ width: '100px', height: '100px', borderRadius: '15px', background: 'var(--primary-gradient)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800 }}>{c.species[0]}</div>
-            )}
-            <h3 style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>{c.species}</h3>
-            <div style={{ color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1.2rem', marginTop: '0.2rem' }}>
-              {c.attainable_stars > 0 ? '⭐'.repeat(c.attainable_stars) : '0 ⭐'}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        {candidates.map((c, i) => (
+          <div key={i} className="glass-card" style={{ display: 'flex', gap: '2rem', padding: '1.5rem' }}>
+            <div style={{ flex: '0 0 120px', textAlign: 'center' }}>
+              {c.icon_path ? (
+                <img src={c.icon_path} alt={c.species} style={{ width: '100px', height: '100px', borderRadius: '15px', objectFit: 'cover' }} />
+              ) : (
+                <div style={{ width: '100px', height: '100px', borderRadius: '15px', background: 'var(--primary-gradient)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800 }}>{c.species[0]}</div>
+              )}
+              <h3 style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>{c.species}</h3>
+              <div style={{ color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1.2rem', marginTop: '0.2rem' }}>
+                {c.attainable_stars > 0 ? '⭐'.repeat(c.attainable_stars) : '0 ⭐'}
+              </div>
             </div>
-          </div>
-          
-          <div style={{ flex: 1 }}>
-            <h4 style={{ fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-              Total Owned: {c.total_owned} (1 Base + {c.sacrifices_available} Sacrifices)
-            </h4>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Best Base Level</p>
-                <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>Lv. {c.base_level}</p>
-                
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>Passives</p>
-                <div className="badge-container" style={{ marginTop: '0.25rem' }}>
-                  {c.passives && c.passives.length > 0 ? c.passives.map((p, idx) => (
-                    <span key={idx} className="badge badge-element">{p}</span>
-                  )) : <span style={{ color: 'var(--text-secondary)' }}>None</span>}
-                </div>
-              </div>
+            <div style={{ flex: 1 }}>
+              <h4 style={{ fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                Total Owned: {c.total_owned} (1 Base + {c.sacrifices_available} Sacrifices)
+              </h4>
               
-              <div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>HP</div>
-                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.hp}</div>
-                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_hp}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Best Base Level</p>
+                  <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>Lv. {c.base_level}</p>
+                  
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>Passives</p>
+                  <div className="badge-container" style={{ marginTop: '0.25rem' }}>
+                    {c.passives && c.passives.length > 0 ? c.passives.map((p, idx) => (
+                      <span key={idx} className="badge badge-element">{p}</span>
+                    )) : <span style={{ color: 'var(--text-secondary)' }}>None</span>}
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Attack</div>
-                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.attack}</div>
-                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_attack}</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Defense</div>
-                    <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.defense}</div>
-                    <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_defense}</div>
+                </div>
+                
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>HP</div>
+                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.hp}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_hp}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Attack</div>
+                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.attack}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_attack}</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Defense</div>
+                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.defense}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_defense}</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
@@ -1264,6 +1498,10 @@ function App() {
       setWorlds(data.worlds || [])
       if (data.current_world_id) {
         setSelectedWorldId(data.current_world_id)
+        setSaveLoaded(true)
+        fetchInstances()
+        fetchBases()
+        fetchOwnedSpecies()
       }
     } catch (e) {
       console.error("Error fetching worlds", e)
@@ -1360,6 +1598,7 @@ function App() {
 
   const [ownedPals, setOwnedPals] = useState('')
   const [targetPal, setTargetPal] = useState('')
+  const [targetSkills, setTargetSkills] = useState('')
   const [breedingPath, setBreedingPath] = useState([])
   const [pathLoading, setPathLoading] = useState(false)
   const [pathSearched, setPathSearched] = useState(false)
@@ -1368,16 +1607,27 @@ function App() {
 
   const [ownedSpecies, setOwnedSpecies] = useState([])
   const [palSourceMode, setPalSourceMode] = useState('global')
+  const [allMasterPals, setAllMasterPals] = useState([])
+
+  // Fetch full un-filtered master Paldex list on mount for breeding target dropdowns
+  useEffect(() => {
+    fetch('/api/pals')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setAllMasterPals(data)
+        }
+      })
+      .catch(e => console.error("Error fetching master pals list", e))
+  }, [])
 
   const availablePalOptions = useMemo(() => {
-    if (palSourceMode === 'caught' && saveLoaded && ownedSpecies.length > 0) {
-      return ownedSpecies
-    }
-    if (pals && pals.length > 0) {
-      return Array.from(new Set(pals.map(p => p.display_name))).sort()
+    const palList = (allMasterPals && allMasterPals.length > 0) ? allMasterPals : pals
+    if (palList && palList.length > 0) {
+      return Array.from(new Set(palList.map(p => p.display_name))).sort()
     }
     return []
-  }, [palSourceMode, saveLoaded, ownedSpecies, pals])
+  }, [allMasterPals, pals])
 
   // Fetch Pals on startup
   useEffect(() => {
@@ -1551,6 +1801,9 @@ function App() {
       } else {
         url += '&owned=auto'
       }
+      if (targetSkills) {
+        url += `&target_skills=${encodeURIComponent(targetSkills)}`
+      }
       const res = await fetch(url)
       const data = await res.json()
       if (res.ok) {
@@ -1576,7 +1829,7 @@ function App() {
   }
 
   return (
-    <div className="dashboard-container" style={{ paddingLeft: mode === 'home' ? 0 : '280px' }}>
+    <div className="dashboard-container">
       {/* Sidebar navigation */}
       {mode !== 'home' && (
         <aside className="sidebar">
@@ -1608,9 +1861,6 @@ function App() {
                 </div>
                 <div className={`nav-item ${activeTab === 'buildings' ? 'active' : ''}`} onClick={() => setActiveTab('buildings')}>
                   🏗️ Facilities & Tech
-                </div>
-                <div className={`nav-item ${activeTab === 'breeding' ? 'active' : ''}`} onClick={() => setActiveTab('breeding')}>
-                  🐣 Breeding Center
                 </div>
               </>
             )}
@@ -1659,8 +1909,14 @@ function App() {
                 <div className={`nav-item ${activeTab === 'bases' ? 'active' : ''}`} onClick={() => setActiveTab('bases')}>
                   🏰 Base Camps
                 </div>
+                <div className={`nav-item ${activeTab === 'base_optimizer' ? 'active' : ''}`} onClick={() => setActiveTab('base_optimizer')}>
+                  🏰 Base Optimizer
+                </div>
                 <div className={`nav-item ${activeTab === 'condenser' ? 'active' : ''}`} onClick={() => setActiveTab('condenser')}>
                   ⭐ Condenser
+                </div>
+                <div className={`nav-item ${activeTab === 'breeding' ? 'active' : ''}`} onClick={() => setActiveTab('breeding')}>
+                  🐣 Breeding Center
                 </div>
               </>
             )}
@@ -1678,32 +1934,38 @@ function App() {
       )}
 
       {/* Main Panel */}
-      <main className="main-content">
-        <h1>{
-            activeTab === 'welcome' ? 'Palopedix Dashboard' :
-            activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
-            activeTab === 'skills' ? 'Skills Database Catalog' :
-            activeTab === 'items' ? 'Items & Crafting Catalog' :
-            activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
-            activeTab === 'inventory' ? 'Save Inventory & Chest Storage' :
-            activeTab === 'save_game' ? 'World Pals Explorer' :
-            activeTab === 'bases' ? 'Base Camp Overview' :
-            activeTab === 'condenser' ? 'Condenser Recommendations' :
-            activeTab === 'settings' ? 'System Settings' : 'Breeding Center'
-          }</h1>
-          <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{
-            activeTab === 'welcome' ? 'Welcome overview and active save file statistics.' :
-            activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
-            activeTab === 'skills' ? 'Explore 1,152 active combat skills, passive traits, and partner abilities.' :
-            activeTab === 'items' ? 'Search 1,891 items, equipment, and crafting recipe ingredients.' :
-            activeTab === 'buildings' ? 'Explore 552 base buildings and 839 technology tree unlocks.' :
-            activeTab === 'inventory' ? 'Inspect items in your personal inventory, equipped loadouts, and base chests.' :
-            activeTab === 'save_game' ? 'Click any captured Pal to view its full Paldex bio, element, skills, and stats.' :
-            activeTab === 'bases' ? 'Audit placed infrastructure and active base camp workers.' :
-            activeTab === 'condenser' ? 'View the absolute best Pals to condense based on your duplicates, IVs, and passives.' :
-            activeTab === 'settings' ? 'Manage save file loading and database source settings.' :
-            'Calculate offspring results or find parent breeding pairs for any Pal.'
-          }</p>
+      <main className={`main-content ${mode === 'home' ? 'main-home' : ''}`}>
+        {mode !== 'home' && (
+          <header>
+            <h1>{
+              activeTab === 'welcome' ? 'Palopedix Dashboard' :
+              activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
+              activeTab === 'skills' ? 'Skills Database Catalog' :
+              activeTab === 'items' ? 'Items & Crafting Catalog' :
+              activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
+              activeTab === 'inventory' ? 'Save Inventory & Chest Storage' :
+              activeTab === 'save_game' ? 'World Pals Explorer' :
+              activeTab === 'bases' ? 'Base Camp Overview' :
+              activeTab === 'base_optimizer' ? 'Base Camp Pal Recommendation & Optimizer Engine' :
+              activeTab === 'condenser' ? 'Condenser Recommendations' :
+              activeTab === 'settings' ? 'System Settings' : 'Breeding Center'
+            }</h1>
+            <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{
+              activeTab === 'welcome' ? 'Welcome overview and active save file statistics.' :
+              activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
+              activeTab === 'skills' ? 'Explore 1,152 active combat skills, passive traits, and partner abilities.' :
+              activeTab === 'items' ? 'Search 1,891 items, equipment, and crafting recipe ingredients.' :
+              activeTab === 'buildings' ? 'Explore 552 base buildings and 839 technology tree unlocks.' :
+              activeTab === 'inventory' ? 'Inspect items in your personal inventory, equipped loadouts, and base chests.' :
+              activeTab === 'save_game' ? 'Click any captured Pal to view its full Paldex bio, element, skills, and stats.' :
+              activeTab === 'bases' ? 'Audit placed infrastructure and active base camp workers.' :
+              activeTab === 'base_optimizer' ? 'Automated work suitability demand matching, nocturnal 24/7 duty cycle bonuses, and food satiety balance.' :
+              activeTab === 'condenser' ? 'View the absolute best Pals to condense based on your duplicates, IVs, and passives.' :
+              activeTab === 'settings' ? 'Manage save file loading and database source settings.' :
+              'Calculate offspring results or find parent breeding pairs for any Pal.'
+            }</p>
+          </header>
+        )}
 
                         {/* 🏠 Homepage Landing */}
         {mode === 'home' && (
@@ -1716,7 +1978,10 @@ function App() {
           />
         )}
 
-        {/* 📊 World Overview Tab */}
+        {/* All Section Views (Only when mode !== 'home') */}
+        {mode !== 'home' && (
+          <>
+            {/* 📊 World Overview Tab */}
         {mode === 'world' && activeTab === 'world_overview' && (
           <WorldOverviewView
             currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
@@ -1738,151 +2003,18 @@ function App() {
 
         {/* 📚 Paldex Tab */}
         {activeTab === 'paldex' && (
-          <div>
-            <div className="filter-bar glass-card">
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
-                <select value={elementFilter} onChange={e => setElementFilter(e.target.value)}>
-                  <option value="">All Elements</option>
-                  <option value="Neutral">Neutral / Normal</option>
-                  <option value="Fire">Fire</option>
-                  <option value="Water">Water</option>
-                  <option value="Grass">Grass / Leaf</option>
-                  <option value="Electric">Electric / Electricity</option>
-                  <option value="Ice">Ice</option>
-                  <option value="Ground">Ground / Earth</option>
-                  <option value="Dark">Dark</option>
-                  <option value="Dragon">Dragon</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Size</label>
-                <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}>
-                  <option value="">All Sizes</option>
-                  <option value="XS">Extra Small (XS)</option>
-                  <option value="S">Small (S)</option>
-                  <option value="M">Medium (M)</option>
-                  <option value="L">Large (L)</option>
-                  <option value="XL">Extra Large (XL)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Nocturnal</label>
-                <select value={nocturnalFilter} onChange={e => setNocturnalFilter(e.target.value)}>
-                  <option value="">All Habits</option>
-                  <option value="true">Nocturnal Only</option>
-                  <option value="false">Diurnal Only</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Work Suitability</label>
-                <select value={suitabilityFilter} onChange={e => setSuitabilityFilter(e.target.value)}>
-                  <option value="">All Suitabilities</option>
-                  <option value="kindling">Kindling</option>
-                  <option value="watering">Watering</option>
-                  <option value="planting">Planting</option>
-                  <option value="generating_electricity">Electricity Generation</option>
-                  <option value="handiwork">Handiwork / Handcraft</option>
-                  <option value="gathering">Gathering</option>
-                  <option value="lumbering">Lumbering</option>
-                  <option value="mining">Mining</option>
-                  <option value="medicine_production">Medicine Production</option>
-                  <option value="cooling">Cooling</option>
-                  <option value="transporting">Transporting</option>
-                  <option value="farming">Farming / Monster Farm</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="pals-grid">
-              {pals.map(p => (
-                <div key={p.internal_name || p.id} className="glass-card pal-card" onClick={() => setSelectedPal(p)}>
-                  <div className="pal-card-header">
-                    <span className="pal-number">#{String(p.paldex_number || 0).padStart(3, '0')}</span>
-                    <div className="badge-container">
-                      {p.element_1 && (
-                        <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                          <img src={`/assets/elements/${p.element_1}.png`} alt={p.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
-                          {p.element_1}
-                        </span>
-                      )}
-                      {p.element_2 && (
-                        <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                          <img src={`/assets/elements/${p.element_2}.png`} alt={p.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
-                          {p.element_2}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '0.75rem 0' }}>
-                    {p.icon_path ? (
-                      <img src={p.icon_path} alt={p.display_name} className="pal-card-avatar" onError={(e) => { e.target.style.display = 'none'; }} />
-                    ) : (
-                      <div className="pal-card-avatar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem', background: 'var(--primary-gradient)' }}>
-                        {p.display_name ? p.display_name[0] : 'P'}
-                      </div>
-                    )}
-                    <div>
-                      <h3 className="pal-name" style={{ margin: 0, fontSize: '1.25rem' }}>{p.display_name}</h3>
-                      {p.code && p.code !== p.display_name && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>ID: {p.code}</span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Base Stats Summary */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.5rem', borderRadius: '8px', marginBottom: '0.75rem', fontSize: '0.8rem', textAlign: 'center' }}>
-                    <div><span style={{color: 'var(--text-secondary)'}}>HP:</span> <strong>{p.hp || 70}</strong></div>
-                    <div><span style={{color: 'var(--text-secondary)'}}>ATK:</span> <strong>{p.attack_melee || 70}</strong></div>
-                    <div><span style={{color: 'var(--text-secondary)'}}>DEF:</span> <strong>{p.defense || 70}</strong></div>
-                  </div>
-
-                  {/* Partner Skill preview */}
-                  {p.partner_skill && (
-                    <div style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', background: 'rgba(234, 179, 8, 0.1)', border: '1px solid rgba(234, 179, 8, 0.25)', padding: '0.3rem 0.5rem', borderRadius: '6px', marginBottom: '0.75rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span>🤝</span>
-                      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.partner_skill.name}</span>
-                    </div>
-                  )}
-
-                  {/* Work Suitabilities preview with HUD icons */}
-                  {p.work_suitability_details && p.work_suitability_details.length > 0 ? (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {p.work_suitability_details.slice(0, 3).map(wsd => (
-                        <span key={wsd.id} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                          {wsd.icon_path && (
-                            <img src={wsd.icon_path} alt={wsd.name} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
-                          )}
-                          <span>{wsd.name}</span>
-                          <strong style={{ color: 'var(--accent-gold)' }}>L{wsd.level}</strong>
-                        </span>
-                      ))}
-                      {p.work_suitability_details.length > 3 && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{p.work_suitability_details.length - 3} more</span>
-                      )}
-                    </div>
-                  ) : (p.work_suitabilities && Object.keys(p.work_suitabilities).length > 0) && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem' }}>
-                      {Object.entries(p.work_suitabilities).slice(0, 3).map(([work, level]) => (
-                        <span key={work} className="suitability-pill" style={{ fontSize: '0.75rem', padding: '0.15rem 0.4rem' }}>
-                          {WORK_SUITABILITY_MAP[work] || work} <strong style={{ color: 'var(--accent-gold)' }}>L{level}</strong>
-                        </span>
-                      ))}
-                      {Object.keys(p.work_suitabilities).length > 3 && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', alignSelf: 'center' }}>+{Object.keys(p.work_suitabilities).length - 3} more</span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="pal-card-footer">
-                    <span>Power: {p.breeding_power}</span>
-                    <span>Food: 🍖 {p.food_requirement}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <PaldexMasterView
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+            elementFilter={elementFilter}
+            setElementFilter={setElementFilter}
+            sizeFilter={sizeFilter}
+            setSizeFilter={setSizeFilter}
+            nocturnalFilter={nocturnalFilter}
+            setNocturnalFilter={setNocturnalFilter}
+            suitabilityFilter={suitabilityFilter}
+            setSuitabilityFilter={setSuitabilityFilter}
+          />
         )}
 
         {/* ⚡ Skills Database Catalog Tab */}
@@ -1904,31 +2036,22 @@ function App() {
 
         {/* 💾 Save Game Explorer Tab */}
         {activeTab === 'save_game' && (
-          <div>
-            {/* Load Save Section */}
-            <div className="glass-card" style={{ marginBottom: '2.5rem' }}>
-              <h2 style={{ marginBottom: '1rem', fontWeight: 700 }}>Load Save File (Level.sav)</h2>
-              <div style={{ display: 'flex', gap: '1rem' }}>
-                <input 
-                  type="text" 
-                  placeholder="Leave empty to auto-discover local save game path..." 
-                  value={savePath} 
-                  onChange={e => setSavePath(e.target.value)} 
-                />
-                <button className="btn btn-primary" onClick={handleLoadSave} disabled={loading}>
-                  {loading ? 'Parsing...' : 'Load & Parse'}
-                </button>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+            {/* Load Save Section & Filter Bar */}
+            <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
+              <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>📂 Save File: <span style={{ color: 'var(--text-secondary)', fontWeight: 400, fontSize: '0.8rem' }}>{loadedPath || 'Auto-discovered'}</span></div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <button className="btn btn-secondary" style={{ padding: '0.3rem 0.75rem', fontSize: '0.78rem' }} onClick={handleLoadSave} disabled={loading}>
+                    {loading ? 'Parsing...' : '🔄 Reload Save'}
+                  </button>
+                </div>
               </div>
-              {errorMsg && <p style={{ color: 'var(--accent-red)', marginTop: '1rem', fontWeight: 500 }}>⚠️ {errorMsg}</p>}
-              {successMsg && <p style={{ color: 'var(--accent-green)', marginTop: '1rem', fontWeight: 500 }}>✅ {successMsg}</p>}
-              {saveLoaded && <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem', fontSize: '0.875rem' }}>Active save path: {loadedPath}</p>}
-            </div>
 
-            {saveLoaded ? (
-              <div>
-                <div className="filter-bar glass-card" style={{ marginBottom: '2rem' }}>
+              {saveLoaded && (
+                <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem' }}>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Location</label>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Location</label>
                     <select value={locFilter} onChange={e => setLocFilter(e.target.value)}>
                       <option value="">All Locations</option>
                       <option value="party">Player Party</option>
@@ -1937,11 +2060,11 @@ function App() {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Species</label>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Species</label>
                     <input type="text" placeholder="Filter by species..." value={specFilter} onChange={e => setSpecFilter(e.target.value)} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Gender</label>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Gender</label>
                     <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}>
                       <option value="">All Genders</option>
                       <option value="Male">Male</option>
@@ -1949,11 +2072,16 @@ function App() {
                     </select>
                   </div>
                   <div>
-                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Min Level</label>
+                    <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Min Level</label>
                     <input type="text" placeholder="Min level..." value={minLvlFilter} onChange={e => setMinLvlFilter(e.target.value)} />
                   </div>
                 </div>
+              )}
+            </div>
 
+            {/* Scrollable Table Area */}
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+              {saveLoaded ? (
                 <div className="glass-card table-container">
                   <table>
                     <thead>
@@ -2000,32 +2128,37 @@ function App() {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ) : (
-              <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please click "Load & Parse" to view save game details.</p>
-              </div>
-            )}
+              ) : (
+                <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please click "Load & Parse" to view save game details.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* 🏰 Base Camps Tab */}
         {activeTab === 'bases' && (
-          <div>
-            {!saveLoaded ? (
-              <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please load a save file in the Save Game tab first.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                {bases.map(base => (
-                  <BaseCampCard key={base.base_camp_id} base={base} />
-                ))}
-                {bases.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>No base camps found in save file.</p>}
-              </div>
-            )}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+              {!saveLoaded ? (
+                <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please load a save file in the Save Game tab first.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                  {bases.map(base => (
+                    <BaseCampCard key={base.base_camp_id} base={base} />
+                  ))}
+                  {bases.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>No base camps found in save file.</p>}
+                </div>
+              )}
+            </div>
           </div>
         )}
+
+        {/* ⚡ Base Pal Optimizer Tab */}
+        {activeTab === 'base_optimizer' && <BaseOptimizerView />}
 
         {/* ⭐ Condenser Tab */}
         {activeTab === 'condenser' && <CondenserView />}
@@ -2201,7 +2334,7 @@ function App() {
             <div className="glass-card">
               <h2 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>🧬 BFS Breeding Path Finder</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
-                Finds the shortest multi-step breeding chain to create your target Pal using your available inventory.
+                Finds the shortest multi-step breeding chain to create your target Pal using your available inventory, evaluating and prioritizing high-skilled parent candidates.
               </p>
 
               <div style={{ marginBottom: '1.5rem', background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
@@ -2228,6 +2361,18 @@ function App() {
                 )}
               </div>
 
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  ✨ Prioritize Target Traits / Passives (optional)
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Artisan, Swift, Ferocious, Legend" 
+                  value={targetSkills} 
+                  onChange={e => setTargetSkills(e.target.value)} 
+                />
+              </div>
+
               <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'end', marginBottom: '1.5rem' }}>
                 <div style={{ flexGrow: 1 }}>
                   <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Target Pal to Breed</label>
@@ -2250,6 +2395,12 @@ function App() {
               {pathError && (
                 <div style={{ marginTop: '1rem', color: '#f87171', padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
                   ⚠️ {pathError}
+                </div>
+              )}
+
+              {pathSearched && !pathLoading && allBreedingPaths.length === 0 && !pathError && (
+                <div style={{ marginTop: '1rem', padding: '1rem', background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                  <p style={{ color: 'var(--text-secondary)', margin: 0 }}>No breeding path found to <strong>{targetPal}</strong> with available Pals.</p>
                 </div>
               )}
 
@@ -2280,14 +2431,21 @@ function App() {
                           <h4 style={{ fontWeight: 700, color: 'var(--accent-light)', margin: 0 }}>
                             🎯 {currentPathObj.title} to get {targetPal}:
                           </h4>
-                          <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
-                            {currentPathObj.difficulty}
-                          </span>
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            {currentPathObj.total_quality_score !== undefined && (
+                              <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.3)', fontWeight: 700 }}>
+                                ⭐ Quality Score: {currentPathObj.total_quality_score > 0 ? `+${currentPathObj.total_quality_score}` : currentPathObj.total_quality_score}
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.8rem', padding: '0.25rem 0.65rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                              {currentPathObj.difficulty}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="steps-list" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                           {currentSteps.map((step, idx) => (
-                            <div key={idx} className="step-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                            <div key={idx} className="step-card" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem 1.25rem', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                 <div className="step-num" style={{ background: 'var(--accent-color)', color: 'white', fontWeight: 800, width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   {idx + 1}
@@ -2309,6 +2467,70 @@ function App() {
                                 </div>
                               </div>
 
+                              {/* Recommended Starting Parent Instances Breakdown */}
+                              {(step.parent1_score !== undefined || step.parent2_score !== undefined) && (
+                                <div style={{ marginLeft: '2.75rem', background: 'rgba(0,0,0,0.25)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                  <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span>⭐ Recommended Save Parent Candidates:</span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', fontSize: '0.85rem' }}>
+                                    {/* Parent 1 Instance Details */}
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>{step.parent1} ({step.parent1_gender || 'Parent'})</span>
+                                        {step.parent1_score !== undefined && (
+                                          <span className={`badge ${step.parent1_score >= 0 ? 'badge-score-positive' : 'badge-score-negative'}`}>
+                                            Score: {step.parent1_score > 0 ? `+${step.parent1_score}` : step.parent1_score}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {step.parent1_passives && step.parent1_passives.length > 0 ? (
+                                        <div className="badge-container">
+                                          {step.parent1_passives.map((pName, pIdx) => {
+                                            const isMatched = step.parent1_matched_passives && step.parent1_matched_passives.includes(pName);
+                                            const isNeg = ["Coward", "Clumsy", "Glutton", "Slacker", "Downtrodden", "Pacifist", "Brittle", "Destructive"].includes(pName);
+                                            return (
+                                              <span key={pIdx} className={`badge ${isMatched ? 'badge-matched' : isNeg ? 'badge-negative' : 'badge-element'}`}>
+                                                {isMatched ? `✨ ${pName}` : isNeg ? `⛔ ${pName}` : pName}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No passives recorded</span>
+                                      )}
+                                    </div>
+
+                                    {/* Parent 2 Instance Details */}
+                                    <div>
+                                      <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '0.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>{step.parent2} ({step.parent2_gender || 'Parent'})</span>
+                                        {step.parent2_score !== undefined && (
+                                          <span className={`badge ${step.parent2_score >= 0 ? 'badge-score-positive' : 'badge-score-negative'}`}>
+                                            Score: {step.parent2_score > 0 ? `+${step.parent2_score}` : step.parent2_score}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {step.parent2_passives && step.parent2_passives.length > 0 ? (
+                                        <div className="badge-container">
+                                          {step.parent2_passives.map((pName, pIdx) => {
+                                            const isMatched = step.parent2_matched_passives && step.parent2_matched_passives.includes(pName);
+                                            const isNeg = ["Coward", "Clumsy", "Glutton", "Slacker", "Downtrodden", "Pacifist", "Brittle", "Destructive"].includes(pName);
+                                            return (
+                                              <span key={pIdx} className={`badge ${isMatched ? 'badge-matched' : isNeg ? 'badge-negative' : 'badge-element'}`}>
+                                                {isMatched ? `✨ ${pName}` : isNeg ? `⛔ ${pName}` : pName}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No passives recorded</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
                               {step.gender_note && (
                                 <div style={{ marginLeft: '2.75rem', fontSize: '0.82rem', color: '#cbd5e1', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                   <span>🎲</span>
@@ -2325,6 +2547,8 @@ function App() {
               )}
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
     </div>

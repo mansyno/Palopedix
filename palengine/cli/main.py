@@ -324,5 +324,65 @@ def breed_path(ctx: click.Context, owned: str, target: str) -> None:
     click.echo(format_output(display_results, ctx.obj["format"]))
 
 
+@cli.command()
+@click.option("--id", "base_id", required=False, help="Target Base Camp ID.")
+@click.option("--recommend", is_flag=True, help="Generates optimal Pal recommendations for base camp.")
+@click.option("--max-team", type=int, default=None, help="Maximum recommended team size.")
+@click.pass_context
+def base(ctx: click.Context, base_id: Optional[str], recommend: bool, max_team: Optional[int]) -> None:
+    """Manages base camp analytics and optimal Pal team recommendations."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    from palengine.analytics.pal_recommender import PalRecommender
+
+    if not base_id:
+        camps = engine.get_base_camps()
+        if not camps:
+            click.echo("No active base camps found in save data.")
+            return
+        if ctx.obj["format"] == "json":
+            click.echo(json.dumps(camps, indent=2))
+        else:
+            click.echo(tabulate(camps, headers="keys", tablefmt="github"))
+        return
+
+    if recommend:
+        recommender = PalRecommender(engine)
+        result = recommender.recommend_pals_for_base(base_id, max_team_size=max_team)
+
+        if ctx.obj["format"] == "json":
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        click.echo(f"=== Base Camp Optimization & Recommended Pals [{result['base_category']} Base] ===")
+        click.echo(f"Base Camp ID: {base_id} | Team Capacity: {result['team_size']}/{result['max_capacity']}\n")
+
+        team_display = []
+        for idx, pal in enumerate(result["recommended_team"], 1):
+            roles_str = ", ".join([f"{r['work_type']} Lv{r['level']}" for r in pal["matching_roles"]])
+            passives_str = ", ".join(pal["passives"]) if pal["passives"] else "None"
+            nocturnal_str = "Yes (24/7)" if pal["nocturnal"] else "No"
+            team_display.append({
+                "#": idx,
+                "Species": pal["display_name"],
+                "Level": pal["level"],
+                "Nocturnal": nocturnal_str,
+                "Passives": passives_str,
+                "Work Roles": roles_str,
+                "Score": pal["total_score"],
+            })
+
+        click.echo(tabulate(team_display, headers="keys", tablefmt="github"))
+        
+        fs = result["food_and_san_summary"]
+        click.echo(f"\n--- Food & SAN Balance ---")
+        click.echo(f"Hourly Satiety Drain: {fs['total_hourly_satiety_drain']} | Average SAN Decay Mult: {fs['average_san_decay_multiplier']} | SAN Status: {fs['san_stability_status']}")
+        
+        if result["uncovered_suitabilities"]:
+            click.echo(f"\nWarning: Uncovered Work Suitabilities: {', '.join(result['uncovered_suitabilities'])}")
+    else:
+        summary = engine.get_base_camp_structures(base_id)
+        click.echo(format_output(summary, ctx.obj["format"]))
+
+
 if __name__ == "__main__":
     cli()

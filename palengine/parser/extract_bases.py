@@ -1,5 +1,6 @@
 """Module to extract Base Camp structures from Level.sav."""
 
+import re
 from typing import Any, cast
 
 from palengine.parser.extract_pals import load_gvas_from_sav
@@ -42,7 +43,7 @@ def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
                 "structures": {},
             }
 
-    # 2. Parse map objects to count structures per base camp
+    # 2. Parse map objects to count structures & natural resource nodes per base camp
     map_object_save_data = cast(
         dict[str, Any],
         world_save_data.get("MapObjectSaveData", {}).get("value", {}),
@@ -67,6 +68,19 @@ def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
             if belong_base_id_str == "00000000-0000-0000-0000-000000000000":
                 continue
 
+            # Check if this object is a natural resource node
+            cm = cast(dict[str, Any], obj.get("ConcreteModel", {}).get("value", {}))
+            cm_raw = cm.get("RawData", {}).get("value")
+            node_key = object_id
+
+            if isinstance(cm_raw, dict):
+                vals = cm_raw.get("values", ())
+                b = bytes(vals)
+                matches = re.findall(b"CopperOre|Coal|Sulfur|Quartz|Stone|Wood_Fine|Wood", b)
+                if matches:
+                    raw_sub = matches[0].decode("ascii")
+                    node_key = f"Natural_{raw_sub}"
+
             # Ensure the base camp entry exists
             if belong_base_id_str not in base_camps:
                 base_camps[belong_base_id_str] = {
@@ -77,6 +91,6 @@ def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
             base_structures = cast(
                 dict[str, int], base_camps[belong_base_id_str]["structures"]
             )
-            base_structures[object_id] = base_structures.get(object_id, 0) + 1
+            base_structures[node_key] = base_structures.get(node_key, 0) + 1
 
     return base_camps

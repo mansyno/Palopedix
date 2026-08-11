@@ -34,6 +34,7 @@ def test_sqlite_engine_initialization():
 
 def test_save_refresh_capability():
     engine = SQLiteEngine()
+    engine.clear_instance_data()
 
     # Verify dynamic tables are empty initially
     cursor = engine.conn.cursor()
@@ -63,7 +64,8 @@ def test_save_refresh_capability():
     }
 
     with patch("palengine.db.sqlite_engine.extract_pals", return_value=mock_pals), \
-         patch("palengine.db.sqlite_engine.extract_bases", return_value=mock_bases):
+         patch("palengine.db.sqlite_engine.extract_bases", return_value=mock_bases), \
+         patch("palengine.db.sqlite_engine.extract_items", return_value=[]):
         
         engine.load_save_data("dummy.sav")
 
@@ -225,11 +227,74 @@ def test_gender_aware_breeding_path():
     engine = SQLiteEngine()
     # Two same-gender species (both Male) cannot breed
     two_males = {"Daedream": {"Male"}, "Foxparks": {"Male"}}
-    assert engine.find_breeding_path(two_males, "Celaray") == []
+    assert engine.find_breeding_path(two_males, "Fuddler") == []
 
     # Opposite gender species (Male + Female) can breed
     male_female = {"Daedream": {"Male"}, "Leezpunk": {"Female"}}
-    path = engine.find_breeding_path(male_female, "Celaray")
+    path = engine.find_breeding_path(male_female, "Fuddler")
     assert len(path) > 0
     assert path[0]["parent1_gender"] != path[0]["parent2_gender"]
+
+
+def test_instance_skill_quality_scorer():
+    engine = SQLiteEngine()
+
+    # 1. High-tier positive passives
+    pos_inst = {
+        "instance_id": "inst-pos",
+        "species": "Anubis",
+        "passives": ["Legend", "Ferocious", "Artisan", "Swift"],
+    }
+    pos_res = engine.score_pal_instance(pos_inst)
+    assert pos_res["skill_score"] >= 65.0
+    assert pos_res["has_red_passive"] is False
+
+    # 2. Red / harmful passives
+    neg_inst = {
+        "instance_id": "inst-neg",
+        "species": "Anubis",
+        "passives": ["Coward", "Clumsy", "Glutton", "Slacker"],
+    }
+    neg_res = engine.score_pal_instance(neg_inst)
+    assert neg_res["skill_score"] < 0
+    assert neg_res["has_red_passive"] is True
+
+    # 3. Target skills bonus
+    target_res = engine.score_pal_instance(pos_inst, target_skills=["Artisan", "Swift"])
+    assert target_res["skill_score"] == pos_res["skill_score"] + 40.0
+    assert "Artisan" in target_res["matched_passives"]
+    assert "Swift" in target_res["matched_passives"]
+
+
+def test_skill_aware_breeding_path_prioritization():
+    engine = SQLiteEngine()
+
+    # Clear instances & setup test data
+    engine.clear_instance_data()
+    cursor = engine.conn.cursor()
+
+    # Insert two male Lamballs into pal_instances: one junk/red, one high-quality
+    cursor.execute("""
+        INSERT INTO pal_instances (instance_id, species, level, gender, rank, location)
+        VALUES ('lamball-junk', 'Lamball', 5, 'Male', 1, 'palbox')
+    """)
+    cursor.execute("""
+        INSERT INTO pal_instance_passives (instance_id, passive_id)
+        VALUES ('lamball-junk', 'Coward'), ('lamball-junk', 'Glutton')
+    """)
+
+    cursor.execute("""
+        INSERT INTO pal_instances (instance_id, species, level, gender, rank, location)
+        VALUES ('lamball-good', 'Lamball', 20, 'Male', 1, 'palbox')
+    """)
+    cursor.execute("""
+        INSERT INTO pal_instance_passives (instance_id, passive_id)
+        VALUES ('lamball-good', 'Artisan'), ('lamball-good', 'Swift')
+    """)
+
+    best_male = engine.get_best_parent_instances("Lamball", "Male")
+    assert len(best_male) == 2
+    assert best_male[0]["instance_id"] == "lamball-good"
+    assert best_male[0]["skill_score"] > best_male[1]["skill_score"]
+
 

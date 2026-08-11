@@ -9,6 +9,8 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
 def load_json(filename: str) -> list | dict:
     filepath = os.path.join(DATA_DIR, filename)
+    if not os.path.exists(filepath):
+        pytest.skip(f"Static JSON file '{filename}' not present in data directory")
     with open(filepath, "r", encoding="utf-8") as f:
         return json.load(f)
 

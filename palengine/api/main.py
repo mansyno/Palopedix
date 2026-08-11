@@ -242,16 +242,17 @@ def get_breed_parents(child: str) -> list[tuple[str, str]]:
 def get_breeding_path(
     target: str,
     owned: Optional[str] = None,
+    target_skills: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Finds shortest multi-generation breeding paths to target Pal with alternative options & gender odds."""
+    """Finds shortest multi-generation breeding paths to target Pal with skill-aware parent instance quality & gender odds."""
     if not owned or owned.strip().lower() == "auto":
         owned_inv = db_engine.get_owned_pal_inventory()
-        paths = db_engine.find_all_breeding_paths(owned_inv, target)
+        paths = db_engine.find_all_breeding_paths(owned_inv, target, target_skills)
     else:
         owned_list = [s.strip() for s in owned.split(",") if s.strip()]
-        paths = db_engine.find_all_breeding_paths(owned_list, target)
+        paths = db_engine.find_all_breeding_paths(owned_list, target, target_skills)
 
-    return {"target": target, "paths": paths}
+    return {"target": target, "target_skills": target_skills, "paths": paths}
 
 
 @app.get("/api/items")
@@ -321,6 +322,7 @@ def get_skills(
     type: Optional[str] = None,
     element: Optional[str] = None,
     category: Optional[str] = None,
+    source: Optional[str] = None,
     search: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries skills catalog (Active, Passive, Partner)."""
@@ -331,8 +333,34 @@ def get_skills(
         filters["element"] = element
     if category:
         filters["category"] = category
+    if source:
+        filters["source"] = source
     if search:
         filters["search"] = search
     return db_engine.query_skills(filters)
+
+
+@app.get("/api/base_camps")
+def get_base_camps() -> list[dict[str, Any]]:
+    """Returns list of active base camps in user save data."""
+    return db_engine.get_base_camps()
+
+
+@app.get("/api/base_camps/{base_camp_id}/structures")
+def get_base_camp_structures(base_camp_id: str) -> list[dict[str, Any]]:
+    """Returns structures built in a base camp with work suitability requirements."""
+    return db_engine.get_base_camp_structures(base_camp_id)
+
+
+@app.get("/api/base_camps/{base_camp_id}/recommendations")
+def get_base_camp_recommendations(
+    base_camp_id: str,
+    max_team_size: Optional[int] = Query(None, description="Optional max team size capacity override"),
+) -> dict[str, Any]:
+    """Generates optimal recommended Pal team for a given base camp."""
+    from palengine.analytics.pal_recommender import PalRecommender
+    recommender = PalRecommender(db_engine)
+    return recommender.recommend_pals_for_base(base_camp_id, max_team_size=max_team_size)
+
 
 

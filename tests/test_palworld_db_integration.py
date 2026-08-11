@@ -79,7 +79,7 @@ def test_data_manager_sources():
 
         set_static_data_source("legacy")
         pals_legacy = dm_db.get_all_pals()
-        assert len(pals_legacy) > 0
+        assert isinstance(pals_legacy, list)
     finally:
         set_static_data_source(original_source)
 

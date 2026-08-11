@@ -7,6 +7,27 @@ from typing import Any, Optional
 from palengine.config import get_data_dir
 
 
+def extract_world_name_from_meta(level_meta_path: str) -> Optional[str]:
+    """Extracts actual world name string (e.g. 'Palpagos Islands 1') from LevelMeta.sav."""
+    if not os.path.exists(level_meta_path):
+        return None
+    try:
+        data = open(level_meta_path, "rb").read()
+        idx = data.find(b"WorldName\x00")
+        if idx != -1:
+            str_idx = data.find(b"StrProperty\x00", idx)
+            if str_idx != -1:
+                val_start = str_idx + len(b"StrProperty\x00") + 2
+                end_idx = data.find(b"\x00", val_start)
+                if end_idx != -1:
+                    parsed_name = data[val_start:end_idx].decode("utf-8", "ignore").strip()
+                    if parsed_name and len(parsed_name) < 100:
+                        return parsed_name
+    except Exception:
+        pass
+    return None
+
+
 def discover_worlds() -> list[dict[str, Any]]:
     """Scans Steam save directories for active Palworld save folders.
 
@@ -18,7 +39,7 @@ def discover_worlds() -> list[dict[str, Any]]:
             - steam_id: str (Player's SteamID folder name)
             - sav_path: str (Absolute path to Level.sav)
             - db_path: str (Absolute path to corresponding per-world .db file)
-            - display_name: str (Human readable label, e.g. "World 1110C68E (823 KB)")
+            - display_name: str (Human readable label, e.g. "Palpagos Islands 1 [6ED60B4B]")
             - size_bytes: int (File size of Level.sav)
             - last_modified: str (ISO timestamp string)
     """
@@ -63,7 +84,13 @@ def discover_worlds() -> list[dict[str, Any]]:
 
                 size_kb = round(size_bytes / 1024, 1)
                 short_id = world_id[:8].upper()
-                display_name = f"World {short_id} ({size_kb} KB)"
+
+                level_meta = os.path.join(world_dir, "LevelMeta.sav")
+                custom_name = extract_world_name_from_meta(level_meta)
+                if custom_name:
+                    display_name = f"{custom_name} [{short_id}]"
+                else:
+                    display_name = f"World {short_id} ({size_kb} KB)"
 
                 # Per-world DB path inside data/
                 db_filename = f"world_{world_id}.db"

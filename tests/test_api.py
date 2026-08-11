@@ -55,3 +55,29 @@ def test_api_breeding_path():
         assert "paths" in data
         assert len(data["paths"]) == 1
         assert data["paths"][0]["steps"][0]["child"] == "Bushi"
+
+
+def test_api_breeding_path_with_target_skills():
+    mock_paths = [{
+        "path_id": 1,
+        "title": "Path 1",
+        "difficulty": "Easy",
+        "total_quality_score": 55.0,
+        "matched_skills_count": 2,
+        "steps": [{
+            "parent1": "Lamball",
+            "parent1_score": 35.0,
+            "parent1_passives": ["Artisan", "Swift"],
+            "parent1_matched_passives": ["Artisan"],
+            "parent2": "Penking",
+            "child": "Bushi"
+        }]
+    }]
+    with patch("palengine.api.main.db_engine.find_all_breeding_paths", return_value=mock_paths) as mock_fn:
+        response = client.get("/api/breeding/path?target=Bushi&owned=auto&target_skills=Artisan,Swift")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["target_skills"] == "Artisan,Swift"
+        assert len(data["paths"]) == 1
+        mock_fn.assert_called_once_with(mock_fn.call_args[0][0], "Bushi", "Artisan,Swift")
+

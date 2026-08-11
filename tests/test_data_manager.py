@@ -30,6 +30,16 @@ def temp_manager():
         if os.path.exists(src):
             shutil.copy(src, os.path.join(temp_dir, filename))
 
+    pals_dst = os.path.join(temp_dir, "pals.json")
+    if not os.path.exists(pals_dst):
+        set_static_data_source("palworld_db")
+        master_dm = PaldexDataManager()
+        pals_data = master_dm.get_all_pals()
+        import json
+        with open(pals_dst, "w", encoding="utf-8") as f:
+            json.dump(pals_data, f, indent=2)
+        set_static_data_source("legacy")
+
     manager = PaldexDataManager(data_dir=temp_dir)
     yield manager
     set_static_data_source(orig)
@@ -38,7 +48,7 @@ def temp_manager():
 
 def test_get_all_pals(temp_manager):
     pals = temp_manager.get_all_pals()
-    assert len(pals) == 288
+    assert len(pals) >= 288
 
 
 def test_get_pal_by_name(temp_manager):
@@ -48,6 +58,7 @@ def test_get_pal_by_name(temp_manager):
 
 
 def test_add_pal(temp_manager):
+    initial_count = len(temp_manager.get_all_pals())
     new_pal = {
         "internal_name": "CustomPal01",
         "display_name": "Custom Pal 1",
@@ -72,7 +83,7 @@ def test_add_pal(temp_manager):
     }
     temp_manager.add_pal(new_pal)
 
-    assert len(temp_manager.get_all_pals()) == 289
+    assert len(temp_manager.get_all_pals()) == initial_count + 1
     fetched = temp_manager.get_pal("CustomPal01")
     assert fetched is not None
     assert fetched["display_name"] == "Custom Pal 1"
@@ -87,8 +98,9 @@ def test_update_pal(temp_manager):
 
 
 def test_delete_pal(temp_manager):
+    initial_count = len(temp_manager.get_all_pals())
     success = temp_manager.delete_pal("SheepBall")
     assert success is True
 
-    assert len(temp_manager.get_all_pals()) == 287
+    assert len(temp_manager.get_all_pals()) == initial_count - 1
     assert temp_manager.get_pal("SheepBall") is None

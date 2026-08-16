@@ -24,3 +24,6 @@ The CLI tool can be run using the `palengine/cli/main.py` entry point. It suppor
 
 - **`base`**: Manages base camp analytics and optimal Pal team recommendations.
   - Can list active base camps, generate optimal Pal recommendations for a base camp (`--recommend`), and show base camp structures.
+
+- **`export_pals`**: Exports all caught Pals with full stats to a JSON file.
+  - Requires or auto-discovers a save file. Options include specifying an output file path (`--output`).

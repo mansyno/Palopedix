@@ -384,5 +384,60 @@ def base(ctx: click.Context, base_id: Optional[str], recommend: bool, max_team: 
         click.echo(format_output(summary, ctx.obj["format"]))
 
 
+@cli.command()
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.option("--output", "-o", default="caught_pals_full.json", help="Output file path.")
+@click.pass_context
+def export_pals(
+    ctx: click.Context,
+    save_path: Optional[str],
+    output: str,
+) -> None:
+    """Exports all caught Pals with full stats to a JSON file."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    resolved_path = get_resolved_save_path(save_path)
+    
+    click.echo(f"Loading save data from {resolved_path}...")
+    engine.load_save_data(resolved_path)
+    
+    instances = engine.query_instances({})
+    
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(instances, f, indent=2)
+        
+    click.echo(f"Successfully exported {len(instances)} Pals to {output}")
+
+
+@cli.command()
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.option("--output", "-o", default="analysis_results.md", help="Output markdown report path.")
+@click.option("--top", "-t", type=int, default=7, help="Number of top candidates per category.")
+@click.pass_context
+def recommend(
+    ctx: click.Context,
+    save_path: Optional[str],
+    output: str,
+    top: int,
+) -> None:
+    """Generates optimal investment recommendations (Combat, Mounts, Resource Allocation) into a markdown report."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    resolved_path = get_resolved_save_path(save_path)
+    
+    click.echo(f"Loading save data from {resolved_path}...")
+    engine.load_save_data(resolved_path)
+    
+    from palengine.analytics.investment_recommender import InvestmentRecommender
+    recommender = InvestmentRecommender(engine)
+    
+    click.echo("Scoring Pals and calculating resource allocations...")
+    report_md = recommender.generate_report_markdown(top_n=top)
+    
+    with open(output, "w", encoding="utf-8") as f:
+        f.write(report_md)
+        
+    click.echo(f"Successfully generated investment report: {output}")
+
+
 if __name__ == "__main__":
-    cli()
+    cli(obj={})
+

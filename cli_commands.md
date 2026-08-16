@@ -27,3 +27,7 @@ The CLI tool can be run using the `palengine/cli/main.py` entry point. It suppor
 
 - **`export_pals`**: Exports all caught Pals with full stats to a JSON file.
   - Requires or auto-discovers a save file. Options include specifying an output file path (`--output`).
+
+- **`recommend`**: Generates deterministic Pal investment recommendations for combat, mounts, and resource allocation.
+  - Scored against Palworld v1.0+ community meta and player upgrade materials.
+  - Options include `--output` (default `analysis_results.md`), `--top` (default 7 candidates per category), and `--save-path`.

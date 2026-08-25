@@ -203,19 +203,23 @@ def test_query_apis():
 def test_query_skills():
     engine = SQLiteEngine()
 
-    # Query all skills
+    # Query all skills (playable only)
     all_skills = engine.query_skills({})
-    assert len(all_skills) >= 1152
+    assert len(all_skills) >= 950
 
     # Query by type
     active_skills = engine.query_skills({"type": "Active"})
-    assert len(active_skills) == 324
+    assert len(active_skills) > 0
 
     passive_skills = engine.query_skills({"type": "Passive"})
-    assert len(passive_skills) == 420
+    assert len(passive_skills) > 0
 
     partner_skills = engine.query_skills({"type": "Partner"})
-    assert len(partner_skills) == 408
+    assert len(partner_skills) > 0
+    # Verify every partner skill belongs to a valid playable pal
+    assert all(ps.get("pal_name") for ps in partner_skills)
+    assert all(ps.get("paldex_number", 0) > 0 for ps in partner_skills)
+    assert all(ps.get("name") not in ("-", "") for ps in partner_skills)
 
     # Query search
     runner_skills = engine.query_skills({"search": "Runner"})

@@ -238,6 +238,12 @@ def get_breed_parents(child: str) -> list[tuple[str, str]]:
     return db_engine.find_parents_for_child(child)
 
 
+@app.get("/api/breeding/offspring")
+def get_breed_offspring(parent: str) -> list[dict[str, Any]]:
+    """Lists all unique offspring possible from a single parent."""
+    return db_engine.get_offspring_for_parent(parent)
+
+
 @app.get("/api/breeding/path")
 def get_breeding_path(
     target: str,

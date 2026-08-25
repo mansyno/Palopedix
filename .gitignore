@@ -35,5 +35,7 @@ desktop.ini
 *.db
 *.sqlite
 *.log
+caught_pals*.json
 
 data/
+scratch/

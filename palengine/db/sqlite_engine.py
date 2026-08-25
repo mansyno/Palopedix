@@ -19,6 +19,7 @@ from palengine.config import (
 from palengine.parser.extract_bases import extract_bases
 from palengine.parser.extract_pals import extract_pals
 from palengine.parser.extract_items import extract_items
+from palengine.parser.extract_players import extract_players
 
 
 STRUCTURE_ALIAS_MAP = {
@@ -76,6 +77,7 @@ def transform_icon_path(path: Optional[str]) -> Optional[str]:
         if not rel_path.startswith("/"):
             rel_path = "/" + rel_path
         return f"/assets{rel_path}"
+    return normalized if (normalized.startswith("/") or normalized.startswith("http")) else None
 PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
     "artisan": "Work Speed +50%",
     "serious": "Work Speed +20%",
@@ -84,7 +86,7 @@ PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
     "slacker": "Work Speed -30%",
     "ferocious": "Attack +20%",
     "musclehead": "Attack +30%, Work Speed -50%",
-    "aggressive": "Attack +10%, Work Speed -20%",
+    "aggressive": "Attack +10%, Defense -20%",
     "coward": "Attack -10%",
     "pacifist": "Attack -20%",
     "sadist": "Attack +15%, Defense -15%",
@@ -97,6 +99,7 @@ PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
     "runner": "Movement Speed +20%",
     "nimble": "Movement Speed +10%",
     "ace swimmer": "Swimming Speed +15%",
+    "king of the waves": "Swimming Speed +30%",
     "vanguard": "Player Attack +10%",
     "stronghold strategist": "Player Defense +10%",
     "motivational leader": "Player Work Speed +25%",
@@ -108,6 +111,31 @@ PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
     "efficient worker": "Hunger decreases 20% slower",
     "legend": "Attack +20%, Defense +20%, Movement Speed +15%",
     "lucky": "Work Speed +15%, Attack +15%",
+    "conceited": "Work Speed +10%, Defense -10%",
+    "masochist": "Defense +15%, Attack -15%",
+    "glutton": "Hunger drops +10% faster",
+    "bottomless stomach": "Hunger drops +15% faster",
+    "destructive": "SAN drops +15% faster",
+    "destabilized": "SAN drops +10% faster",
+    "zen mindset": "SAN drops +15% slower",
+    "serenity": "Active Skill Cooldown -30%, Attack +10%",
+    "impatient": "Active Skill Cooldown -15%",
+    "noble": "Trading price sell +5%, buy -5%",
+    "fine coat": "Trading price sell +10%, buy -10%",
+    "philanthropist": "Egg incubation time -100%",
+    "healing coach": "Player HP recovery speed +25%",
+    "wellness watcher": "Player Stamina recovery +25%",
+    "reload master": "Player Reload speed +25%",
+    "whopper": "Pal Size +15%",
+    "easygoing": "Defense -10%, Work Speed +10%",
+    "sloppy": "SAN drops +10% faster",
+    "shabby": "Max HP -10%",
+    "sickly": "SAN drops +15% faster",
+    "unstable": "SAN drops +20% faster",
+    "hooligan": "Attack +15%, Work Speed -10%",
+    "pal_rude": "Attack +15%, Work Speed -10%",
+    "blood is fuel": "Absorbs 10% of damage dealt as HP",
+    "savior": "Revives fallen player with 50% HP once per battle",
     "abnormal": "10.0% decrease in incoming Neutral damage.",
     "cheery": "10.0% decrease in incoming Dark damage.",
     "dragonkiller": "10.0% increase in Dragon damage.",
@@ -118,83 +146,211 @@ PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
     "earth organ": "10.0% increase in Ground damage.",
     "coldproof": "10.0% decrease in incoming Ice damage.",
     "heatproof": "10.0% decrease in incoming Fire damage.",
+    "sunbath lover": "10.0% decrease in incoming Fire damage.",
+    "suntan lover": "10.0% decrease in incoming Fire damage.",
     "celestial emperor": "20.0% increase in Neutral damage.",
     "flame emperor": "20.0% increase in Fire damage.",
     "lord of waves": "20.0% increase in Water damage.",
+    "lord of the sea": "20.0% increase in Water damage.",
     "spirit emperor": "20.0% increase in Grass damage.",
     "lord of lightning": "20.0% increase in Electric damage.",
+    "lord of the underworld": "20.0% increase in Dark damage.",
     "ice emperor": "20.0% increase in Ice damage.",
     "earth emperor": "20.0% increase in Ground damage.",
     "siren of the void": "20.0% increase in Dark damage.",
     "divine dragon": "20.0% increase in Dragon damage.",
     "eternal flame": "20.0% increase in Fire & Dark damage.",
+    "invader": "20.0% increase in Dragon & Dark damage.",
+    "demon god": "20.0% increase in Dark & Normal damage.",
+    "remarkable craftsmanship": "Work Speed +50%",
 }
 
 
-def clean_skill_text(raw_text: Optional[str]) -> Optional[str]:
-    if not raw_text:
+
+PARTNER_SKILL_OVERRIDES = {
+    "sheepball": {
+        "name": "Fluffy Shield",
+        "description": "When activated, equips to the player and becomes a shield. Sometimes drops Wool when assigned to a Ranch.",
+        "unlock_item": "Lamball's Harness",
+    },
+    "chickenpal": {
+        "name": "Egg Layer",
+        "description": "Sometimes lays an Egg when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "cutefox": {
+        "name": "Dig Here!",
+        "description": "Sometimes digs up Pal Spheres and items from the ground when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "woolfox": {
+        "name": "Fluffy Wool",
+        "description": "While in party, increases Attack of Neutral Pals. Sometimes drops Wool when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "alpaca": {
+        "name": "Pacapaca Wool",
+        "description": "Can be ridden. While in party, increases Melpaca's Defense and Movement Speed. Sometimes drops Wool when assigned to a Ranch.",
+        "unlock_item": "Melpaca Saddle",
+    },
+    "lavagirl": {
+        "name": "Magma Tears",
+        "description": "While in party, recovers Health of the player and Party Pals. Sometimes produces Flame Organs when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "bastet": {
+        "name": "Gold Digger",
+        "description": "Sometimes digs up Gold Coins when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "bastet_ice": {
+        "name": "Icy Whispers",
+        "description": "Sometimes produces Sapphires when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "berrygoat": {
+        "name": "Berry Picker",
+        "description": "While in party, restores hunger to hungry Pals. Sometimes drops Red Berries when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "berrygoat_dark": {
+        "name": "Venom Picker",
+        "description": "While in party, restores hunger to hungry Pals. Sometimes drops Venom Glands when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "sweetssheep": {
+        "name": "Candy Pop",
+        "description": "While at a base, reduces SAN depletion rate. Sometimes produces Cotton Candy when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "sweetssheep_ground": {
+        "name": "Bitter Pop",
+        "description": "While at a base, reduces SAN depletion rate. Sometimes produces High Quality Pal Oil when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "cowpal": {
+        "name": "Milk Maker",
+        "description": "Sometimes produces Milk when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "soldierbee": {
+        "name": "Worker Bee",
+        "description": "While in party, increases Beegarde's Attack. Sometimes produces Honey when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "whitemoth": {
+        "name": "Silk Shroud",
+        "description": "When activated, attacks targeted enemy with Blizzard Spike. Sometimes produces High Quality Cloth when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "whitemoth_neutral": {
+        "name": "Gilded Shroud",
+        "description": "While in party, increases Defense of Neutral Pals. Sometimes produces High Quality Cloth when assigned to a Ranch.",
+        "unlock_item": None,
+    },
+    "plantslime": {
+        "name": "Logging Assistance",
+        "description": "While in party, improves efficiency of cutting trees.",
+        "unlock_item": None,
+    },
+    "plantslime_flower": {
+        "name": "Logging Assistance",
+        "description": "While in party, improves efficiency of cutting trees.",
+        "unlock_item": None,
+    },
+    "windchimes": {
+        "name": "Flying Trapeze",
+        "description": "While in party, can be summoned and used in place of a glider. Can carry the player high into the air while gliding.",
+        "unlock_item": "Hangyu's Gloves",
+    },
+    "windchimes_ice": {
+        "name": "Winter Trapeze",
+        "description": "While in party, can be summoned and used in place of a glider. Can carry the player high into the air while gliding.",
+        "unlock_item": "Hangyu Cryst's Gloves",
+    },
+}
+
+
+def clean_skill_text(text: Optional[str]) -> Optional[str]:
+    """Cleans up internal Unreal Engine string tokens and placeholders from skill text."""
+    if not text:
         return None
-    cleaned = re.sub(r"<[^>]+>", "", str(raw_text)).strip()
+    cleaned = str(text)
+    
+    # 1. Remove HTML/XML markup tags like <NumBlue_13>...</> or <color>...</color>
+    cleaned = re.sub(r'<[^>]+>', '', cleaned)
+
+    # 2. Remove Unreal reference tokens like {ReferenceMsgId_...} or {ActiveSkillMainValueByRank}
+    cleaned = re.sub(r'\{ReferenceMsgId_[^}]+\}', '', cleaned)
+    cleaned = re.sub(r'\{[A-Za-z0-9_]+\}', '', cleaned)
+    
+    # 3. Resolve missing token extractions in game sentences
+    cleaned = cleaned.replace("Sometimes lays an when assigned to .", "Sometimes lays an Egg when assigned to a Ranch.")
+    cleaned = cleaned.replace("lays an when assigned to .", "lays an Egg when assigned to a Ranch.")
+    cleaned = cleaned.replace("Sometimes makes when assigned to .", "Sometimes produces High Quality Cloth when assigned to a Ranch.")
+    cleaned = cleaned.replace("Sometimes digs up when assigned to .", "Sometimes digs up Gold Coins when assigned to a Ranch.")
+    cleaned = cleaned.replace("Sometimes drops from its back when assigned to .", "Sometimes drops Red Berries when assigned to a Ranch.")
+    cleaned = cleaned.replace("Sometimes drops or when assigned to .", "Sometimes drops Mushrooms when assigned to a Ranch.")
+    cleaned = cleaned.replace("Sometimes drops when assigned to .", "Sometimes produces items when assigned to a Ranch.")
+    cleaned = cleaned.replace("drops when assigned to .", "drops items when assigned to a Ranch.")
+    cleaned = cleaned.replace("assigned to by 50%", "assigned to a Breeding Farm by 50%")
+    cleaned = cleaned.replace("afflicted with .", "afflicted with status conditions.")
+    cleaned = cleaned.replace("immune to .", "immune to temperature effects.")
+    cleaned = cleaned.replace("attacks targeted enemy with .", "attacks targeted enemy.")
+    cleaned = cleaned.replace("forged from .", "forged from ice.")
+    cleaned = cleaned.replace("player's attack type to and", "player's attack type to Electric and")
+    cleaned = cleaned.replace("When this Pal uses , it has a", "When this Pal uses its skill, it has a")
+    cleaned = cleaned.replace("when assigned to .", "when assigned to a Ranch.")
+    cleaned = cleaned.replace("(: )", "").replace("(:)", "")
+
+    # 4. Fix broken sentence fragments from ranch/assignment extractions
+    cleaned = re.sub(r'^\s*when assigned to a Ranch\.\s*$', 'Sometimes produces items when assigned to a Ranch.', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'^\s*when assigned to a Ranch\s*', 'Sometimes produces items when assigned to a Ranch. ', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\.\s*when assigned to a Ranch\.', '. Sometimes produces items when assigned to a Ranch.', cleaned, flags=re.IGNORECASE)
+
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
     return cleaned if cleaned and cleaned.lower() != "none" else None
 
 
-RED_TIER3 = {"slacker", "pacifist"}
-RED_TIER2 = {"downtrodden", "brittle", "bottomless stomach", "destructive", "sadist"}
-RED_TIER1 = {"clumsy", "coward", "glutton", "unstable", "shabby", "sickly", "easygoing", "sloppy", "distracted", "dehydrated", "mentally unstable"}
 
-GOLD_TIER3 = {"artisan", "ferocious", "musclehead", "lucky", "work slave", "ace swimmer", "remarkable"}
-LEGEND_TIER4 = {"legend", "celestial emperor", "flame emperor", "lord of waves", "spirit emperor", "lord of lightning", "ice emperor", "earth emperor", "siren of the void", "divine dragon", "eternal flame", "blood is fuel", "demon god"}
+def calculate_aptitude(name: str, p_id: str, category: Optional[str]) -> Optional[dict[str, str]]:
+    """Determines Palworld in-game passive skill aptitude degree and color."""
+    name_l = name.lower()
+    id_l = p_id.lower()
+    cat_l = (category or "").lower()
 
+    # Tier 4 / Legend
+    if "tier4" in cat_l or "legend" in name_l or "siren of the void" in name_l or "eternal flame" in name_l:
+        return {"label": "LEGEND", "color": "legend", "rank": 4}
 
-def calculate_aptitude(name: str, p_id: str, cat: Optional[str]) -> dict[str, Any]:
-    nl = name.lower().strip()
-    pidl = p_id.lower().strip()
-    c = str(cat or "")
+    # Negative / Red tiers (-1, -2, -3)
+    if "tier-3" in cat_l or any(k in name_l for k in ["slacker", "bottomless stomach", "destructive", "pacifist", "brittle"]):
+        return {"label": "▼▼▼", "color": "red", "rank": -3}
+    if "tier-2" in cat_l or any(k in name_l for k in ["clumsy", "work slave", "sadist", "downtrodden", "glutton", "destabilized"]):
+        return {"label": "▼▼", "color": "red", "rank": -2}
+    if "tier-1" in cat_l or any(k in name_l for k in ["coward", "masochist"]):
+        return {"label": "▼", "color": "red", "rank": -1}
 
-    # Red negative passives
-    if nl in RED_TIER3 or pidl in RED_TIER3 or "down_3" in pidl or "down3" in pidl:
-        return {"color": "red", "symbol": "▼", "count": 3, "label": "▼▼▼"}
-    if nl in RED_TIER2 or pidl in RED_TIER2 or "down_2" in pidl or "down2" in pidl:
-        return {"color": "red", "symbol": "▼", "count": 2, "label": "▼▼"}
-    if nl in RED_TIER1 or pidl in RED_TIER1 or "down_1" in pidl or "down1" in pidl or "down" in pidl or "down" in nl:
-        return {"color": "red", "symbol": "▼", "count": 1, "label": "▼"}
+    # Positive / Gold tiers (+1, +2, +3)
+    if "tier3" in cat_l or any(k in name_l for k in ["artisan", "ferocious", "burly body", "swift", "runner", "vanguard", "stronghold strategist", "lucky"]):
+        return {"label": "▲▲▲", "color": "gold", "rank": 3}
+    if "tier2" in cat_l or any(k in name_l for k in ["serious", "musclehead", "hard skin", "brave", "nimble", "workaholic", "positive thinker", "diet lover", "efficient worker", "zen mindset", "serenity"]):
+        return {"label": "▲▲", "color": "gold", "rank": 2}
+    if "tier1" in cat_l or any(k in name_l for k in ["aggressive", "conceited", "abnormal", "cheery", "dragonkiller", "pyromaniac", "hydromaniac", "botanist", "capacitor", "earth organ", "coldproof", "heatproof", "sunbath lover", "suntan lover"]):
+        return {"label": "▲", "color": "white", "rank": 1}
 
-    # Gold Legend Tier 4
-    if "PassiveTier4" in c or "PassiveTier-4" in c or nl in LEGEND_TIER4 or pidl in LEGEND_TIER4:
-        return {"color": "legend", "symbol": "★", "count": 4, "label": "★ LEGEND"}
-
-    # Gold Tier 3
-    if "PassiveTier3" in c or "PassiveTier-3" in c or nl in GOLD_TIER3 or pidl in GOLD_TIER3:
-        return {"color": "gold", "symbol": "▲", "count": 3, "label": "▲▲▲"}
-
-    # White Tier 2
-    if "PassiveTier2" in c or "PassiveTier-2" in c or "up2" in pidl or "_2" in pidl or "_3" in pidl:
-        return {"color": "white", "symbol": "▲", "count": 2, "label": "▲▲"}
-
-    # White Tier 1
-    return {"color": "white", "symbol": "▲", "count": 1, "label": "▲"}
+    return {"label": "▲", "color": "white", "rank": 1}
 
 
-MUTATION_SKILLS = {"mininushi", "nushi", "yakushima", "mutationpal", "idiosyncratic", "babysitter", "heavily armored", "immortality", "lunker", "whopper"}
-WORLD_TREE_SKILLS = {"worldtree", "gym_name", "bossdefeatreward", "holy blade", "god of destruction", "seedbed", "sage", "commander", "founder", "moonflowers", "jarl", "pyre soul"}
-EQUIPMENT_KEYWORDS = ["equip", "armor", "acc", "accessory", "otomo_only"]
-LEGENDARY_SKILLS = {"legend", "celestial emperor", "flame emperor", "lord of waves", "spirit emperor", "lord of lightning", "ice emperor", "earth emperor", "siren of the void", "divine dragon", "eternal flame", "blood is fuel", "demon god", "savior", "invader"}
-
-
-def categorize_passive_source(name: str, p_id: str, cat: Optional[str]) -> str:
-    nl = name.lower().strip()
-    pidl = p_id.lower().strip()
-    c = str(cat or "")
-
-    if any(k in pidl or k in nl for k in WORLD_TREE_SKILLS):
-        return "World Tree"
-    if any(k in pidl or k in nl for k in MUTATION_SKILLS):
-        return "Mutation"
-    if "passivetier4" in c.lower() or nl in LEGENDARY_SKILLS or pidl in LEGENDARY_SKILLS:
-        return "Legendary"
-    if any(k in pidl for k in EQUIPMENT_KEYWORDS):
-        return "Equipment"
-    return "Pals"
+def categorize_passive_source(name: str, p_id: str, category: Optional[str]) -> str:
+    """Categorizes passive skills into Pal, Player, or Base effects."""
+    n_l = name.lower()
+    id_l = p_id.lower()
+    if any(k in n_l for k in ["vanguard", "stronghold strategist", "motivational leader", "mine foreman", "logging foreman", "healing coach", "wellness watcher", "reload master"]):
+        return "Player Boost"
+    if any(k in n_l for k in ["artisan", "serious", "work slave", "clumsy", "slacker", "conceited", "diet lover", "efficient worker", "workaholic"]):
+        return "Work / Base"
+    return "Pal Combat"
 
 
 def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
@@ -212,72 +368,54 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     desc = clean_skill_text(skill_dict.get("description"))
     mod = clean_skill_text(skill_dict.get("stat_modifier"))
 
-    if not desc:
+    if not mod or not desc:
         n_lower = name.lower()
         pid_lower = p_id.lower()
         if n_lower in PASSIVE_DESCRIPTIONS_MAP:
-            desc = PASSIVE_DESCRIPTIONS_MAP[n_lower]
+            mod = PASSIVE_DESCRIPTIONS_MAP[n_lower]
         elif pid_lower in PASSIVE_DESCRIPTIONS_MAP:
-            desc = PASSIVE_DESCRIPTIONS_MAP[pid_lower]
+            mod = PASSIVE_DESCRIPTIONS_MAP[pid_lower]
         else:
             m_res = re.search(r"elementresist_([a-z]+)_?(\d+)?", pid_lower)
             if m_res:
                 elem = m_res.group(1).capitalize()
                 lvl = m_res.group(2) or "1"
-                desc = f"Decreases incoming {elem} damage (Lv. {lvl})."
+                mod = f"Decreases incoming {elem} damage (Lv. {lvl})."
 
             m_bst = re.search(r"elementboost_([a-z]+)_?(\d+)?", pid_lower)
-            if not desc and m_bst:
+            if not mod and m_bst:
                 elem = m_bst.group(1).capitalize()
                 lvl = m_bst.group(2) or "1"
-                desc = f"Increases {elem} attack damage (Lv. {lvl})."
+                mod = f"Increases {elem} attack damage (Lv. {lvl})."
 
             m_hp = re.search(r"hp_acc_up(\d+)", pid_lower)
-            if not desc and m_hp:
-                desc = f"Increases Max HP (+{int(m_hp.group(1))*5}%)."
+            if not mod and m_hp:
+                mod = f"Max HP +{int(m_hp.group(1))*5}%"
 
             m_atk = re.search(r"attack_acc_up(\d+)", pid_lower)
-            if not desc and m_atk:
-                desc = f"Increases Attack (+{int(m_atk.group(1))*5}%)."
+            if not mod and m_atk:
+                mod = f"Attack +{int(m_atk.group(1))*5}%"
 
             m_def = re.search(r"def(e|n)ce_acc_up(\d+)", pid_lower)
-            if not desc and m_def:
-                desc = f"Increases Defense (+{int(m_def.group(2))*5}%)."
+            if not mod and m_def:
+                mod = f"Defense +{int(m_def.group(2))*5}%"
 
             m_wrk = re.search(r"workspeed_acc_up(\d+)", pid_lower)
-            if not desc and m_wrk:
-                desc = f"Increases Work Speed (+{int(m_wrk.group(1))*10}%)."
+            if not mod and m_wrk:
+                mod = f"Work Speed +{int(m_wrk.group(1))*10}%"
 
             m_exp = re.search(r"palexp_increase_(\d+)", pid_lower)
-            if not desc and m_exp:
-                desc = f"Increases earned EXP (+{int(m_exp.group(1))*10}%)."
+            if not mod and m_exp:
+                mod = f"Pal EXP +{int(m_exp.group(1))*10}%"
 
             m_temp = re.search(r"temperatureresist_([a-z0-9]+)", pid_lower)
-            if not desc and m_temp:
-                desc = f"Grants environment temperature protection ({m_temp.group(1)})."
+            if not mod and m_temp:
+                mod = f"Grants temperature protection ({m_temp.group(1)})"
 
-            if not desc:
-                if "attack_acc_up1_armor" in pid_lower:
-                    desc = "Attack +5%"
-                elif "attack_acc_up2_armor" in pid_lower:
-                    desc = "Attack +10%"
-                elif "attack_acc_up3_armor" in pid_lower:
-                    desc = "Attack +15%"
-                elif "attack_acc_up4_armor" in pid_lower:
-                    desc = "Attack +20%"
-                elif "maxinventoryweight" in pid_lower:
-                    desc = "Increases Max Carrying Capacity."
-                elif "bossdefeatreward" in pid_lower or "gym_name" in pid_lower:
-                    desc = "Special faction/boss reward passive effect."
-                elif "aerial" in n_lower or "airdash" in pid_lower:
-                    desc = "Grants extra aerial mobility charges."
-                elif "hallowed" in n_lower:
-                    desc = "Grants divine elemental protection & attack bonus."
-                else:
-                    desc = f"Grants passive attribute bonuses for {name}."
-
-    if desc and mod and desc.strip() == mod.strip():
-        mod = None
+    if not mod and desc:
+        mod = desc
+    if not desc and mod:
+        desc = mod
 
     skill_dict["description"] = desc
     skill_dict["stat_modifier"] = mod
@@ -374,6 +512,7 @@ class SQLiteEngine:
                 owner_uid TEXT,
                 species TEXT,
                 level INTEGER,
+                exp INTEGER,
                 gender TEXT,
                 iv_hp INTEGER,
                 iv_melee INTEGER,
@@ -395,6 +534,84 @@ class SQLiteEngine:
                 passive_id TEXT,
                 PRIMARY KEY (instance_id, passive_id),
                 FOREIGN KEY (instance_id) REFERENCES pal_instances (instance_id)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pal_instance_waza (
+                instance_id TEXT,
+                waza_id TEXT,
+                is_equipped INTEGER,
+                PRIMARY KEY (instance_id, waza_id),
+                FOREIGN KEY (instance_id) REFERENCES pal_instances (instance_id)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pal_instance_status_points (
+                instance_id TEXT,
+                stat_name TEXT,
+                points INTEGER,
+                type TEXT,
+                PRIMARY KEY (instance_id, stat_name, type),
+                FOREIGN KEY (instance_id) REFERENCES pal_instances (instance_id)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS players (
+                player_uid TEXT PRIMARY KEY,
+                nickname TEXT,
+                level INTEGER,
+                exp INTEGER,
+                hp_current INTEGER,
+                hp_max INTEGER,
+                shield_current INTEGER,
+                shield_max INTEGER,
+                tech_points INTEGER,
+                boss_tech_points INTEGER,
+                inventory_container_id TEXT
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS player_unlocked_techs (
+                player_uid TEXT,
+                tech_name TEXT,
+                PRIMARY KEY (player_uid, tech_name),
+                FOREIGN KEY (player_uid) REFERENCES players (player_uid)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS player_paldeck_captures (
+                player_uid TEXT,
+                species TEXT,
+                capture_count INTEGER,
+                PRIMARY KEY (player_uid, species),
+                FOREIGN KEY (player_uid) REFERENCES players (player_uid)
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS player_status_points (
+                player_uid TEXT,
+                stat_name TEXT,
+                points INTEGER,
+                PRIMARY KEY (player_uid, stat_name),
+                FOREIGN KEY (player_uid) REFERENCES players (player_uid)
             )
         """
         )
@@ -949,6 +1166,12 @@ class SQLiteEngine:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM pal_instances")
         cursor.execute("DELETE FROM pal_instance_passives")
+        cursor.execute("DELETE FROM pal_instance_waza")
+        cursor.execute("DELETE FROM pal_instance_status_points")
+        cursor.execute("DELETE FROM players")
+        cursor.execute("DELETE FROM player_unlocked_techs")
+        cursor.execute("DELETE FROM player_paldeck_captures")
+        cursor.execute("DELETE FROM player_status_points")
         cursor.execute("DELETE FROM base_camps")
         cursor.execute("DELETE FROM base_structures_instances")
         cursor.execute("DELETE FROM item_container_slots")
@@ -963,8 +1186,44 @@ class SQLiteEngine:
         pals = extract_pals(sav_path)
         bases = extract_bases(sav_path)
         items_data = extract_items(sav_path)
+        players = extract_players(sav_path)
 
         cursor = self.conn.cursor()
+        
+        for p in players:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO players (
+                    player_uid, nickname, level, exp, hp_current, hp_max,
+                    shield_current, shield_max, tech_points, boss_tech_points,
+                    inventory_container_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    p["player_uid"], p["nickname"], p["level"], p["exp"],
+                    p["hp_current"], p["hp_max"], p["shield_current"], p["shield_max"],
+                    p["tech_points"], p["boss_tech_points"], p["inventory_container_id"]
+                )
+            )
+            
+            for tech in p.get("unlocked_techs", []):
+                cursor.execute(
+                    "INSERT OR REPLACE INTO player_unlocked_techs (player_uid, tech_name) VALUES (?, ?)",
+                    (p["player_uid"], tech)
+                )
+                
+            for sp_name, count in p.get("paldeck_captures", {}).items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO player_paldeck_captures (player_uid, species, capture_count) VALUES (?, ?, ?)",
+                    (p["player_uid"], sp_name, count)
+                )
+                
+            for stat_name, pts in p.get("status_points", {}).items():
+                cursor.execute(
+                    "INSERT OR REPLACE INTO player_status_points (player_uid, stat_name, points) VALUES (?, ?, ?)",
+                    (p["player_uid"], stat_name, pts)
+                )
+
         for container in items_data:
             cursor.execute("""
                 INSERT OR REPLACE INTO item_containers (container_id, container_type, slot_count)
@@ -1008,17 +1267,18 @@ class SQLiteEngine:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO pal_instances (
-                    instance_id, owner_uid, species, level, gender,
+                    instance_id, owner_uid, species, level, exp, gender,
                     iv_hp, iv_melee, iv_shot, iv_defense, rank, location,
                     location_details_player_uid, location_details_base_camp_id,
                     location_details_base_camp_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     pal.get("instance_id"),
                     pal.get("owner_uid"),
                     pal.get("species"),
                     pal.get("level"),
+                    pal.get("exp"),
                     pal.get("gender"),
                     pal.get("ivs", {}).get("hp"),
                     pal.get("ivs", {}).get("melee"),
@@ -1039,6 +1299,46 @@ class SQLiteEngine:
                     VALUES (?, ?)
                 """,
                     (pal.get("instance_id"), p_id),
+                )
+
+            for waza in pal.get("equip_waza", []):
+                if waza:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO pal_instance_waza (instance_id, waza_id, is_equipped)
+                        VALUES (?, ?, 1)
+                    """,
+                        (pal.get("instance_id"), waza),
+                    )
+
+            for waza in pal.get("mastered_waza", []):
+                if waza:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO pal_instance_waza (instance_id, waza_id, is_equipped)
+                        VALUES (?, ?, 0)
+                    """,
+                        (pal.get("instance_id"), waza),
+                    )
+
+            soul_points = pal.get("soul_points", {})
+            for stat_name, pts in soul_points.items():
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO pal_instance_status_points (instance_id, stat_name, points, type)
+                    VALUES (?, ?, ?, 'soul')
+                """,
+                    (pal.get("instance_id"), stat_name, pts),
+                )
+
+            elixir_points = pal.get("elixir_points", {})
+            for stat_name, pts in elixir_points.items():
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO pal_instance_status_points (instance_id, stat_name, points, type)
+                    VALUES (?, ?, ?, 'elixir')
+                """,
+                    (pal.get("instance_id"), stat_name, pts),
                 )
 
         if sav_path and os.path.exists(sav_path):
@@ -1346,6 +1646,34 @@ class SQLiteEngine:
             res["icon_path"] = transform_icon_path(res.get("icon_path"))
             return res
         return None
+
+    def get_offspring_for_parent(self, parent: str) -> list[dict[str, Any]]:
+        """Finds all unique offspring possible from the given parent."""
+        p_row = self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
+            (parent.lower(), parent.lower()),
+        ).fetchone() or self.conn.execute(
+            "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) LIKE ? OR LOWER(internal_name) LIKE ?",
+            (f"%{parent.lower()}%", f"%{parent.lower()}%"),
+        ).fetchone()
+
+        if not p_row:
+            return []
+            
+        all_pals = self.conn.execute("SELECT display_name, internal_name, breeding_power FROM pals").fetchall()
+        
+        offspring_set = set()
+        offspring_results = []
+        
+        for other in all_pals:
+            res = self.get_breeding_result(p_row["display_name"], other["display_name"])
+            if res:
+                c_name = res["display_name"]
+                if c_name not in offspring_set:
+                    offspring_set.add(c_name)
+                    offspring_results.append(res)
+                    
+        return offspring_results
 
     def find_parents_for_child(self, child: str) -> list[tuple[str, str]]:
         """Returns all breeding combinations (Parent 1, Parent 2) that yield target child."""
@@ -1838,6 +2166,7 @@ class SQLiteEngine:
 
             if use_palworld_db:
                 pal_id = pal_dict.get("internal_name") or pal_dict.get("id")
+                pal_key = str(pal_dict.get("internal_name") or pal_dict.get("id") or "").lower().strip()
                 # Attach skills from palworld_master
                 try:
                     s_rows = self.conn.execute(
@@ -1852,26 +2181,44 @@ class SQLiteEngine:
                     """,
                         (pal_id, pal_id),
                     ).fetchall()
-                    pal_dict["skills"] = [
-                        {
-                            "id": dict(sr).get("id"),
-                            "name": dict(sr).get("name"),
-                            "element": dict(sr).get("element"),
-                            "type": dict(sr).get("type"),
-                            "category": dict(sr).get("category"),
-                            "power": dict(sr).get("power"),
-                            "cooldown": dict(sr).get("cooldown"),
-                            "min_range": dict(sr).get("min_range"),
-                            "max_range": dict(sr).get("max_range"),
-                            "stat_modifier": dict(sr).get("stat_modifier"),
-                            "unlock_item": dict(sr).get("unlock_item"),
-                            "description": dict(sr).get("description"),
-                            "icon_path": transform_icon_path(dict(sr).get("icon_path")),
-                            "level_learned": dict(sr).get("level_learned"),
-                            "is_guaranteed": dict(sr).get("is_guaranteed", 0),
-                        }
-                        for sr in s_rows
-                    ]
+                    pal_skills_list = []
+                    for sr in s_rows:
+                        s_dict = dict(sr)
+                        s_name = s_dict.get("name")
+                        s_type = s_dict.get("type")
+                        s_cat = s_dict.get("category")
+                        s_desc = clean_skill_text(s_dict.get("description"))
+                        s_item = s_dict.get("unlock_item")
+
+                        # Apply official partner skill overrides if applicable
+                        if (s_type == "Partner" or s_cat == "Partner") and pal_key in PARTNER_SKILL_OVERRIDES:
+                            ov = PARTNER_SKILL_OVERRIDES[pal_key]
+                            if "name" in ov:
+                                s_name = ov["name"]
+                            if "description" in ov:
+                                s_desc = ov["description"]
+                            if "unlock_item" in ov:
+                                s_item = ov["unlock_item"]
+
+                        pal_skills_list.append({
+                            "id": s_dict.get("id"),
+                            "name": s_name,
+                            "element": s_dict.get("element"),
+                            "type": s_type,
+                            "category": s_cat,
+                            "power": s_dict.get("power"),
+                            "cooldown": s_dict.get("cooldown"),
+                            "min_range": s_dict.get("min_range"),
+                            "max_range": s_dict.get("max_range"),
+                            "stat_modifier": clean_skill_text(s_dict.get("stat_modifier")),
+                            "unlock_item": s_item,
+                            "description": s_desc,
+                            "icon_path": transform_icon_path(s_dict.get("icon_path")),
+                            "level_learned": s_dict.get("level_learned"),
+                            "is_guaranteed": s_dict.get("is_guaranteed", 0),
+                        })
+
+                    pal_dict["skills"] = pal_skills_list
                     partner_skills = [sk for sk in pal_dict["skills"] if (sk.get("type") == "Partner" or sk.get("category") == "Partner")]
                     pal_dict["partner_skill"] = partner_skills[0] if partner_skills else None
                 except Exception as e:
@@ -2119,53 +2466,156 @@ class SQLiteEngine:
             self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
         )
 
+        SYNONYMS_MAP = {
+            "farm": ["farm", "farming", "ranch", "ranching", "crop", "crops", "breeding farm"],
+            "farming": ["farm", "farming", "ranch", "ranching", "crop", "crops", "breeding farm"],
+            "ranch": ["ranch", "ranching", "farm", "farming"],
+            "ranching": ["ranch", "ranching", "farm", "farming"],
+            "egg": ["egg", "eggs", "incubat", "hatch", "breeding"],
+            "eggs": ["egg", "eggs", "incubat", "hatch", "breeding"],
+            "breed": ["breed", "breeding", "egg", "eggs", "offspring"],
+            "breeding": ["breed", "breeding", "egg", "eggs", "offspring"],
+        }
+
+        def skill_matches_search(skill: dict, search_str: str) -> bool:
+            if not search_str:
+                return True
+            s_clean = search_str.lower().strip()
+            terms = SYNONYMS_MAP.get(s_clean, [s_clean])
+            haystack = " ".join([
+                str(skill.get("name") or ""),
+                str(skill.get("pal_name") or ""),
+                str(skill.get("description") or ""),
+                str(skill.get("stat_modifier") or ""),
+                str(skill.get("unlock_item") or ""),
+                str(skill.get("category") or ""),
+                str(skill.get("element") or ""),
+                str(skill.get("type") or ""),
+                " ".join(skill.get("learned_by_pals") or [])
+            ]).lower()
+            return any(t in haystack for t in terms)
+
         results = []
         if use_palworld_db:
-            query = "SELECT * FROM palworld_master.skills WHERE 1=1"
-            params: list[Any] = []
+            q_type = str(filters.get("type", "")).strip().capitalize() if filters.get("type") else ""
+            el_filter = str(filters.get("element", "")).strip().lower() if filters.get("element") else ""
+            cat_filter = str(filters.get("category", "")).strip().lower() if filters.get("category") else ""
+            search_str = str(filters.get("search", "")).strip().lower() if filters.get("search") else ""
 
-            if "type" in filters and filters["type"]:
-                query += " AND LOWER(type) = LOWER(?)"
-                params.append(filters["type"])
+            # 1. Partner Skills (Playable Pals only)
+            if not q_type or q_type == "Partner":
+                prt_query = """
+                    SELECT 
+                        s.id, s.name, s.element, s.type, s.power, s.cooldown, s.description,
+                        s.category, s.stat_modifier, s.unlock_item,
+                        p.id as pal_id,
+                        p.name as pal_name,
+                        p.paldex_number,
+                        p.icon_path as pal_icon,
+                        coalesce(s.icon_path, p.icon_path) as icon_path
+                    FROM palworld_master.skills s
+                    JOIN palworld_master.pal_skills ps ON s.id = ps.skill_id
+                    JOIN palworld_master.pals p ON ps.pal_id = p.id
+                    WHERE s.type = 'Partner'
+                      AND p.paldex_number > 0
+                      AND s.name != '-' AND s.name != ''
+                      AND s.id NOT LIKE 'CollectItem_%'
+                """
+                prt_params: list[Any] = []
+                if el_filter:
+                    prt_query += " AND (LOWER(s.element) = ? OR LOWER(p.element1) = ? OR LOWER(coalesce(p.element2, '')) = ?)"
+                    prt_params.extend([el_filter, el_filter, el_filter])
+                if cat_filter:
+                    prt_query += " AND LOWER(s.category) = ?"
+                    prt_params.append(cat_filter)
+                prt_query += " ORDER BY p.paldex_number ASC, p.name ASC"
 
-            if "element" in filters and filters["element"]:
-                el = filters["element"].lower()
-                query += " AND LOWER(element) = LOWER(?)"
-                params.append(el)
-
-            if "category" in filters and filters["category"]:
-                query += " AND LOWER(category) = LOWER(?)"
-                params.append(filters["category"])
-
-            if "search" in filters and filters["search"]:
-                s = f"%{filters['search']}%"
-                query += " AND (LOWER(name) LIKE LOWER(?) OR LOWER(id) LIKE LOWER(?) OR LOWER(description) LIKE LOWER(?))"
-                params.extend([s, s, s])
-
-            query += " ORDER BY type ASC, name ASC"
-
-            rows = self.conn.execute(query, params).fetchall()
-            for r in rows:
-                d = dict(r)
-                d["cooldown_sec"] = d.get("cooldown")
-                d["icon_path"] = transform_icon_path(d.get("icon_path"))
-                
-                # Enrich passive skills descriptions & format categories
-                if d.get("type") == "Passive":
-                    d = enrich_passive_skill(d)
-                else:
+                for r in self.conn.execute(prt_query, prt_params).fetchall():
+                    d = dict(r)
+                    pal_key = str(d.get("pal_id") or "").lower().strip()
+                    if pal_key in PARTNER_SKILL_OVERRIDES:
+                        ov = PARTNER_SKILL_OVERRIDES[pal_key]
+                        if "name" in ov:
+                            d["name"] = ov["name"]
+                        if "description" in ov:
+                            d["description"] = ov["description"]
+                        if "unlock_item" in ov:
+                            d["unlock_item"] = ov["unlock_item"]
+                    d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                    d["pal_icon"] = transform_icon_path(d.get("pal_icon"))
                     d["description"] = clean_skill_text(d.get("description"))
                     d["stat_modifier"] = clean_skill_text(d.get("stat_modifier"))
-                    if d.get("description") and d.get("stat_modifier") and d["description"] == d["stat_modifier"]:
-                        d["stat_modifier"] = None
+                    if skill_matches_search(d, search_str):
+                        results.append(d)
 
-                results.append(d)
+            # 2. Active Combat Skills (Playable Pals only)
+            if not q_type or q_type == "Active":
+                act_query = """
+                    SELECT 
+                        s.id, s.name, s.element, s.type, s.power, s.cooldown, s.description,
+                        s.category, s.stat_modifier, s.unlock_item, s.icon_path,
+                        GROUP_CONCAT(DISTINCT p.name) as learned_by_pals
+                    FROM palworld_master.skills s
+                    JOIN palworld_master.pal_skills ps ON s.id = ps.skill_id
+                    JOIN palworld_master.pals p ON ps.pal_id = p.id
+                    WHERE s.type = 'Active'
+                      AND p.paldex_number > 0
+                      AND s.name != '-' AND s.name != ''
+                      AND s.id NOT LIKE 'CollectItem_%'
+                """
+                act_params: list[Any] = []
+                if el_filter:
+                    act_query += " AND LOWER(s.element) = ?"
+                    act_params.append(el_filter)
+                if cat_filter:
+                    act_query += " AND LOWER(s.category) = ?"
+                    act_params.append(cat_filter)
+                act_query += " GROUP BY s.id ORDER BY s.name ASC"
+
+                for r in self.conn.execute(act_query, act_params).fetchall():
+                    d = dict(r)
+                    d["cooldown_sec"] = d.get("cooldown")
+                    d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                    d["description"] = clean_skill_text(d.get("description"))
+                    d["stat_modifier"] = clean_skill_text(d.get("stat_modifier"))
+                    if d.get("learned_by_pals"):
+                        d["learned_by_pals"] = [p.strip() for p in d["learned_by_pals"].split(",") if p.strip()]
+                    if skill_matches_search(d, search_str):
+                        results.append(d)
+
+            # 3. Passive Skills (Filter dummy entries)
+            if not q_type or q_type == "Passive":
+                pas_query = """
+                    SELECT 
+                        s.id, s.name, s.element, s.type, s.power, s.cooldown, s.description,
+                        s.category, s.stat_modifier, s.unlock_item, s.icon_path
+                    FROM palworld_master.skills s
+                    WHERE s.type = 'Passive'
+                      AND s.name != '-' AND s.name != ''
+                      AND s.id NOT LIKE 'CollectItem_%'
+                """
+                pas_params: list[Any] = []
+                if el_filter:
+                    pas_query += " AND LOWER(s.element) = ?"
+                    pas_params.append(el_filter)
+                if cat_filter:
+                    pas_query += " AND LOWER(s.category) = ?"
+                    pas_params.append(cat_filter)
+                pas_query += " ORDER BY s.name ASC"
+
+                for r in self.conn.execute(pas_query, pas_params).fetchall():
+                    d = dict(r)
+                    d["icon_path"] = transform_icon_path(d.get("icon_path"))
+                    d = enrich_passive_skill(d)
+                    if skill_matches_search(d, search_str):
+                        results.append(d)
+
         else:
             query_type = str(filters.get("type", "")).capitalize() if filters.get("type") else ""
             search_str = str(filters.get("search", "")).lower() if filters.get("search") else ""
 
             if not query_type or query_type == "Active":
-                act_rows = self.conn.execute("SELECT *, 'Active' as type FROM active_skills").fetchall()
+                act_rows = self.conn.execute("SELECT *, 'Active' as type FROM active_skills WHERE name != '-' AND name != ''").fetchall()
                 for r in act_rows:
                     d = dict(r)
                     if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
@@ -2174,7 +2624,7 @@ class SQLiteEngine:
                     results.append(d)
 
             if not query_type or query_type == "Passive":
-                pas_rows = self.conn.execute("SELECT *, 'Passive' as type FROM passive_skills").fetchall()
+                pas_rows = self.conn.execute("SELECT *, 'Passive' as type FROM passive_skills WHERE name != '-' AND name != ''").fetchall()
                 for r in pas_rows:
                     d = dict(r)
                     if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
@@ -2182,11 +2632,13 @@ class SQLiteEngine:
                     results.append(d)
 
             if not query_type or query_type == "Partner":
-                prt_rows = self.conn.execute("SELECT *, 'Partner' as type FROM partner_skills").fetchall()
+                prt_rows = self.conn.execute("SELECT *, 'Partner' as type FROM partner_skills WHERE name != '-' AND name != ''").fetchall()
                 for r in prt_rows:
                     d = dict(r)
                     if search_str and search_str not in d.get("name", "").lower() and search_str not in d.get("id", "").lower() and search_str not in str(d.get("description", "")).lower():
                         continue
+                    results.append(d)
+
         if "source" in filters and filters["source"]:
             src_val = str(filters["source"]).strip().lower()
             results = [s for s in results if str(s.get("source", "")).strip().lower() == src_val]
@@ -2298,7 +2750,67 @@ class SQLiteEngine:
                 """,
                     (d["instance_id"],),
                 ).fetchall()
-            d["passives"] = [dict(pr) for pr in p_rows]
+            
+            passives_list = []
+            for pr in p_rows:
+                pd = dict(pr)
+                pd["icon_path"] = transform_icon_path(pd.get("icon_path"))
+                pd = enrich_passive_skill(pd)
+                passives_list.append(pd)
+            d["passives"] = passives_list
+            
+            # Fetch Waza (Attacks) with full metadata
+            if use_palworld_db:
+                w_rows = self.conn.execute(
+                    """
+                    SELECT piw.waza_id as id,
+                           piw.is_equipped,
+                           COALESCE(s.name, REPLACE(piw.waza_id, 'EPalWazaID::', '')) as name,
+                           s.element,
+                           s.power,
+                           s.cooldown,
+                           s.icon_path,
+                           s.description,
+                           'Active' as type
+                    FROM pal_instance_waza piw
+                    LEFT JOIN palworld_master.skills s 
+                           ON LOWER(piw.waza_id) = LOWER(s.id) 
+                           OR LOWER(piw.waza_id) = LOWER(REPLACE(s.id, 'EPalWazaID::', ''))
+                           OR LOWER(piw.waza_id) = LOWER(s.name)
+                    WHERE piw.instance_id = ?
+                    ORDER BY piw.is_equipped DESC, s.power DESC
+                    """,
+                    (d["instance_id"],)
+                ).fetchall()
+            else:
+                w_rows = self.conn.execute(
+                    "SELECT waza_id as id, is_equipped, waza_id as name, 'Active' as type FROM pal_instance_waza WHERE instance_id = ?",
+                    (d["instance_id"],)
+                ).fetchall()
+
+            equipped_waza = []
+            mastered_waza = []
+            for wr in w_rows:
+                wd = dict(wr)
+                wd["cooldown_sec"] = wd.get("cooldown")
+                wd["icon_path"] = transform_icon_path(wd.get("icon_path"))
+                wd["description"] = clean_skill_text(wd.get("description"))
+                if wd.get("is_equipped") == 1:
+                    equipped_waza.append(wd)
+                else:
+                    mastered_waza.append(wd)
+
+            d["equip_waza"] = equipped_waza
+            d["mastered_waza"] = mastered_waza
+            
+            # Fetch Status Points
+            sp_rows = self.conn.execute(
+                "SELECT stat_name, points, type FROM pal_instance_status_points WHERE instance_id = ?",
+                (d["instance_id"],)
+            ).fetchall()
+            d["soul_points"] = {r["stat_name"]: r["points"] for r in sp_rows if r["type"] == "soul"}
+            d["elixir_points"] = {r["stat_name"]: r["points"] for r in sp_rows if r["type"] == "elixir"}
+            
             results.append(d)
 
         return results
@@ -2401,16 +2913,33 @@ class SQLiteEngine:
             return []
 
         pal_metadata = {}
-        for row in self.conn.execute("SELECT id, code, name, hp, attack, defense FROM palworld_master.pals"):
+        for row in self.conn.execute("SELECT id, code, name, hp, attack, defense, icon_path FROM palworld_master.pals"):
             data = {
                 "name": row["name"],
                 "hp": row["hp"],
                 "attack": row["attack"],
-                "defense": row["defense"]
+                "defense": row["defense"],
+                "icon_path": row["icon_path"],
             }
-            pal_metadata[row["id"].lower()] = data
+            if row["id"]:
+                pal_metadata[row["id"].lower()] = data
             if row["code"]:
                 pal_metadata[row["code"].lower()] = data
+
+        for row in self.conn.execute("SELECT id, code, internal_name, display_name, hp, attack_melee, defense, icon_path FROM pals"):
+            data = {
+                "name": row["display_name"] or row["internal_name"] or row["id"],
+                "hp": row["hp"],
+                "attack": row["attack_melee"],
+                "defense": row["defense"],
+                "icon_path": row["icon_path"],
+            }
+            if row["id"]:
+                pal_metadata[row["id"].lower()] = data
+            if row["code"]:
+                pal_metadata[row["code"].lower()] = data
+            if row["internal_name"]:
+                pal_metadata[row["internal_name"].lower()] = data
 
         skill_metadata = {}
         for row in self.conn.execute("SELECT id, name, CAST(rank AS TEXT) as category FROM passive_skills"):
@@ -2420,7 +2949,7 @@ class SQLiteEngine:
             }
 
         cursor.execute("""
-            SELECT i.species, i.level, i.iv_hp, i.iv_melee, i.iv_defense,
+            SELECT i.instance_id, i.species, i.level, i.rank, i.iv_hp, i.iv_melee, i.iv_defense,
                    GROUP_CONCAT(p.passive_id, ',') as passives
             FROM pal_instances i
             LEFT JOIN pal_instance_passives p ON i.instance_id = p.instance_id
@@ -2431,28 +2960,38 @@ class SQLiteEngine:
         species_groups = defaultdict(list)
         for inst in instances:
             raw_species = inst.get('species')
-            if raw_species:
-                meta = pal_metadata.get(raw_species.lower())
-                display_species = meta['name'] if meta else raw_species
-                inst['display_species'] = display_species
-                inst['base_stats'] = meta if meta else {"hp": 100, "attack": 100, "defense": 100}
-                
-                raw_passives = (inst.get('passives') or '').split(',')
-                display_passives = []
-                passive_score = 0
-                for p in raw_passives:
-                    p = p.strip()
-                    if p and p != 'None':
-                        s_meta = skill_metadata.get(p.lower())
-                        if s_meta:
-                            display_passives.append(s_meta["name"])
-                            passive_score += 50
-                        else:
-                            display_passives.append(p)
-                            
-                inst['display_passives'] = display_passives
-                inst['passive_score'] = passive_score
-                species_groups[display_species].append(inst)
+            if not raw_species:
+                continue
+
+            clean_species = raw_species.lower()
+            if clean_species.startswith("boss_"):
+                clean_species = clean_species[5:]
+
+            meta = pal_metadata.get(clean_species) or pal_metadata.get(raw_species.lower())
+            if not meta:
+                # Skip unmapped non-Pals (human NPCs / enemies)
+                continue
+
+            display_species = meta['name']
+            inst['display_species'] = display_species
+            inst['base_stats'] = meta
+            
+            raw_passives = (inst.get('passives') or '').split(',')
+            display_passives = []
+            passive_score = 0
+            for p in raw_passives:
+                p = p.strip()
+                if p and p != 'None':
+                    s_meta = skill_metadata.get(p.lower())
+                    if s_meta:
+                        display_passives.append(s_meta["name"])
+                        passive_score += 50
+                    else:
+                        display_passives.append(p)
+                        
+            inst['display_passives'] = display_passives
+            inst['passive_score'] = passive_score
+            species_groups[display_species].append(inst)
 
         candidates = []
         for display_species, pals in species_groups.items():
@@ -2465,7 +3004,8 @@ class SQLiteEngine:
                 iv_def = p.get('iv_defense') or 0
                 iv_sum = iv_hp + iv_atk + iv_def
                 p_score = p.get('passive_score', 0)
-                return (p_score * 1000) + p.get('level', 0) * 100 + iv_sum
+                curr_rank = p.get('rank', 0) or 0
+                return (curr_rank * 5000) + (p_score * 1000) + (p.get('level', 0) or 0) * 100 + iv_sum
 
             pals.sort(key=get_score, reverse=True)
             best_pal = pals[0]
@@ -2486,17 +3026,19 @@ class SQLiteEngine:
             sacrifices = total_owned - 1
             best = c['best_pal']
             
-            lvl = best.get('level')
+            lvl = best.get('level') or 1
+            curr_rank = best.get('rank', 0) or 0
             iv_hp = best.get('iv_hp') or 0
             iv_atk = best.get('iv_melee') or 0
             iv_def = best.get('iv_defense') or 0
             passives_list = best.get('display_passives', [])
             
-            attainable_stars = 0
-            if total_owned >= 49: attainable_stars = 4
-            elif total_owned >= 25: attainable_stars = 3
-            elif total_owned >= 13: attainable_stars = 2
-            elif total_owned >= 5: attainable_stars = 1
+            needed_per_rank = {0: 4, 1: 16, 2: 32, 3: 64}
+            rem_sacrifices = sacrifices
+            attainable_stars = curr_rank
+            while attainable_stars < 4 and rem_sacrifices >= needed_per_rank.get(attainable_stars, 9999):
+                rem_sacrifices -= needed_per_rank[attainable_stars]
+                attainable_stars += 1
 
             sp_base = best['base_stats']
             
@@ -2525,17 +3067,15 @@ class SQLiteEngine:
                 if 'hooligan' in passives_lower: mult -= 0.10
                 return int(val * mult)
 
-            est_hp = calc_hp(sp_base["hp"], lvl, iv_hp)
-            est_atk = calc_atk(sp_base["attack"], lvl, iv_atk, passives_list)
-            est_def = calc_def(sp_base["defense"], lvl, iv_def, passives_list)
+            est_hp = calc_hp(sp_base.get("hp", 100), lvl, iv_hp)
+            est_atk = calc_atk(sp_base.get("attack", 100), lvl, iv_atk, passives_list)
+            est_def = calc_def(sp_base.get("defense", 100), lvl, iv_def, passives_list)
             
             icon_path = None
-            try:
-                row = self.conn.execute("SELECT icon_path FROM palworld_master.pals WHERE name=?", (species,)).fetchone()
-                if row and row["icon_path"]:
-                    parts = row["icon_path"].split("/")
-                    icon_path = "/assets/" + parts[-2] + "/" + parts[-1]
-            except: pass
+            raw_icon = sp_base.get('icon_path')
+            if raw_icon:
+                parts = raw_icon.replace('\\', '/').split('/')
+                icon_path = "/assets/" + parts[-2] + "/" + parts[-1]
 
             results.append({
                 'species': species,

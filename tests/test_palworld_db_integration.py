@@ -52,7 +52,7 @@ def test_sqlite_engine_palworld_db_mode():
     lamball = [p for p in pals if p["display_name"] == "Lamball"]
     assert len(lamball) > 0
     assert lamball[0]["element_1"] in ("Normal", "Neutral")
-    assert lamball[0]["icon_path"] == "/assets/pals/SheepBall.png"
+    assert lamball[0]["icon_path"] is not None and "SheepBall" in lamball[0]["icon_path"]
     assert "skills" in lamball[0]
     assert "work_suitabilities" in lamball[0]
     assert "drops" in lamball[0]

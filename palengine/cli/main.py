@@ -26,15 +26,20 @@ def discover_save_path() -> Optional[str]:
     # Search recursively for Level.sav files
     search_pattern = os.path.join(save_games_dir, "**", "Level.sav")
     level_sav_files = glob.glob(search_pattern, recursive=True)
+    valid_files = [f for f in level_sav_files if os.path.isfile(f) and "bak" not in f.lower() and "backup" not in f.lower()]
 
-    if not level_sav_files:
+    if not valid_files:
+        valid_files = [f for f in level_sav_files if os.path.isfile(f)]
+
+    if not valid_files:
         return None
 
     # Return the file with the latest modification time
     try:
-        return max(level_sav_files, key=os.path.getmtime)
+        return max(valid_files, key=os.path.getmtime)
     except Exception:
         return None
+
 
 
 def get_resolved_save_path(save_path: Optional[str]) -> str:
@@ -438,6 +443,118 @@ def recommend(
     click.echo(f"Successfully generated investment report: {output}")
 
 
+@cli.command()
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.pass_context
+def condense(ctx: click.Context, save_path: Optional[str]) -> None:
+    """Calculates top Pal condensing candidates from the save game."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    resolved_path = get_resolved_save_path(save_path)
+    engine.load_save_data(resolved_path)
+    candidates = engine.get_condense_candidates()
+
+    if ctx.obj["format"] == "json":
+        click.echo(json.dumps(candidates, indent=2))
+        return
+
+    if not candidates:
+        click.echo("No condensing candidates found.")
+        return
+
+    display_rows = []
+    for c in candidates:
+        keeper = c.get("keeper", {})
+        passives_str = ", ".join(keeper.get("passives", [])) if keeper.get("passives") else "None"
+        display_rows.append({
+            "Species": c.get("species"),
+            "Duplicates": c.get("duplicate_count"),
+            "Target Rank": f"{c.get('target_rank')} Star",
+            "Keeper Lv": keeper.get("level"),
+            "Keeper IVs": f"{keeper.get('iv_hp')}/{keeper.get('iv_melee')}/{keeper.get('iv_defense')}",
+            "Keeper Passives": passives_str,
+            "Fodder Count": len(c.get("fodder_instances", [])),
+        })
+    click.echo(tabulate(display_rows, headers="keys", tablefmt="github"))
+
+
+@cli.command("boss-party")
+@click.argument("boss_name")
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.pass_context
+def boss_party(
+    ctx: click.Context,
+    boss_name: str,
+    save_path: Optional[str],
+) -> None:
+    """Generates optimal 5-Pal counter party recommendations for a specific boss encounter."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    resolved_path = None
+    if save_path:
+        resolved_path = get_resolved_save_path(save_path)
+    else:
+        try:
+            if hasattr(engine, "conn") and engine.conn:
+                if not engine.query_instances({}):
+                    resolved_path = get_resolved_save_path(None)
+            else:
+                resolved_path = get_resolved_save_path(None)
+        except Exception:
+            pass
+
+    from palengine.analytics.boss_recommender import BossPartyRecommender
+    recommender = BossPartyRecommender(engine)
+
+    result = recommender.recommend_party_for_boss(boss_name, save_path=resolved_path)
+
+    if ctx.obj["format"] == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+        
+    boss = result["boss_profile"]
+    click.echo(f"\n=======================================================")
+    click.echo(f"  BOSS PROFILE: {boss['canonical_name']}")
+    click.echo(f"=======================================================")
+    click.echo(f"Location: {boss['location']}")
+    click.echo(f"Level: {boss['level']} | Estimated HP: {boss['hp']:,}")
+    click.echo(f"Elements: {'/'.join(boss['elements'])} | Weaknesses: {', '.join(boss['weaknesses'])}")
+    click.echo(f"Dangerous Attacks: {', '.join(boss.get('dangerous_moves', []))}")
+    click.echo(f"Tactics: {boss.get('tactics', '')}\n")
+
+    def _render_team_table(team: list[dict[str, Any]], title: str):
+        click.echo(f"--- {title} ---")
+        rows = []
+        for idx, p in enumerate(team, 1):
+            rows.append({
+                "#": idx,
+                "Pal": f"{p['species']} {p['gender']}",
+                "Level": f"Lv.{p['level']} ({p['rank']})",
+                "Element": p["element"],
+                "Location": p["location"],
+                "Passives": ", ".join(p["passives"]),
+                "IVs (HP/Atk/Def)": p["ivs"],
+            })
+        click.echo(tabulate(rows, headers="keys", tablefmt="github"))
+        click.echo("")
+
+    _render_team_table(result["team_a_pal_dps"], "Option A: Pure Pal Elemental DPS (Direct Counters)")
+    _render_team_table(result["team_b_mounted_player_dps"], "Option B: Mounted Player-DPS Build (Infusion + Gobfin Stack)")
+    _render_team_table(result["team_c_balanced_hybrid"], "Option C: Balanced Hybrid & Survival Team")
+
+    if result.get("recommended_waza"):
+        click.echo("--- Recommended Counter Active Skills (Waza) ---")
+        waza_rows = [{"Skill": w["name"], "Element": w["element"], "Power": w["power"], "Cooldown": w["ct"]} for w in result["recommended_waza"]]
+        click.echo(tabulate(waza_rows, headers="keys", tablefmt="github"))
+        click.echo("")
+
+    if result.get("breeding_projects"):
+        click.echo("--- Tier 3: Breeding Projects (If Missing High-Level Counters) ---")
+        for proj in result["breeding_projects"]:
+            steps = " -> ".join([f"{s['parent1']} + {s['parent2']} = {s['child']}" for s in proj["path"]])
+            click.echo(f"Target: {proj['target_pal']} ({proj['element']}) | {proj['warning']}")
+            click.echo(f"  Breeding Path: {steps}\n")
+
+
 if __name__ == "__main__":
     cli(obj={})
+
 

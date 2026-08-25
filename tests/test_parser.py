@@ -354,3 +354,34 @@ def test_extract_bases(mock_world_save_data):
         assert bases[base2_id]["structures"] == {
             "breeding_farm": 1
         }
+
+
+def test_set_property_parsing():
+    import io
+    from palworld_save_tools.archive import FArchiveReader
+    # Import extract_pals to ensure monkey-patches are applied
+    import palengine.parser.extract_pals  # noqa: F401
+
+    # Construct minimal SetProperty binary payload:
+    # set_type: "Guid" (FString: length 5, "Guid\0")
+    # optional_guid: 0 (1 byte False)
+    # dummy: 0 (u32)
+    # count: 1 (u32)
+    # 1 Guid: 16 bytes
+    test_guid_bytes = bytes.fromhex("11223344556677889900aabbccddeeff")
+    set_type_str = b"Guid\x00"
+    payload = (
+        len(set_type_str).to_bytes(4, "little")
+        + set_type_str
+        + b"\x00"  # optional_guid flag False
+        + (0).to_bytes(4, "little")  # dummy
+        + (1).to_bytes(4, "little")  # count
+        + test_guid_bytes
+    )
+
+    reader = FArchiveReader(payload)
+    parsed = reader.property("SetProperty", len(payload), ".worldSaveData.TestSet")
+    assert parsed["type"] == "SetProperty"
+    assert parsed["set_type"] == "Guid"
+    assert len(parsed["value"]) == 1
+    assert str(parsed["value"][0]) == "44332211-8877-6655-bbaa-0099ffeeddcc"

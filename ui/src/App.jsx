@@ -271,10 +271,33 @@ function SkillBadgeWithTooltip({ skill, children, className, style }) {
             )}
             <div style={{ textAlign: 'left' }}>
               <strong style={{ fontSize: '0.95rem', color: 'var(--text-primary)', display: 'block', lineHeight: 1.2 }}>{skill.name}</strong>
-              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
-                <span className="badge" style={{ background: typeBg, color: typeColor, fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.type || 'Skill'}</span>
+              <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.25rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {skill.aptitude && (
+                  <span 
+                    className="badge" 
+                    style={{
+                      background: 
+                        skill.aptitude.color === 'red' ? 'rgba(239, 68, 68, 0.25)' :
+                        skill.aptitude.color === 'gold' ? 'rgba(245, 158, 11, 0.25)' :
+                        skill.aptitude.color === 'legend' ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(236, 72, 153, 0.4))' :
+                        'rgba(255, 255, 255, 0.12)',
+                      color: 
+                        skill.aptitude.color === 'red' ? '#ef4444' :
+                        skill.aptitude.color === 'gold' ? '#fbbf24' :
+                        skill.aptitude.color === 'legend' ? '#f472b6' :
+                        '#f8fafc',
+                      fontWeight: 800,
+                      fontSize: '0.68rem',
+                      padding: '0.1rem 0.35rem'
+                    }}
+                  >
+                    {skill.aptitude.label}
+                  </span>
+                )}
                 {skill.element && <span className="badge badge-element" style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.element}</span>}
-                {skill.category && <span className="badge" style={{ background: 'rgba(255,255,255,0.1)', fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.category}</span>}
+                {skill.type && skill.type !== 'Passive' && (
+                  <span className="badge" style={{ background: typeBg, color: typeColor, fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>{skill.type}</span>
+                )}
                 {skill.rank !== undefined && skill.rank !== null && skill.rank !== 0 && (
                   <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.15)', color: 'var(--accent-gold)', fontSize: '0.68rem', padding: '0.1rem 0.35rem' }}>Rank {skill.rank}</span>
                 )}
@@ -289,25 +312,23 @@ function SkillBadgeWithTooltip({ skill, children, className, style }) {
             </div>
           )}
 
-          {skill.stat_modifier && (
+          {skill.stat_modifier ? (
             <p style={{ fontSize: '0.8rem', color: 'var(--accent-green)', fontWeight: 600, margin: '0 0 0.4rem 0', textAlign: 'left' }}>
               ✨ {skill.stat_modifier}
             </p>
-          )}
-
-          {skill.unlock_item && (
-            <p style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', margin: '0 0 0.4rem 0', textAlign: 'left' }}>
-              🔑 Requires: {skill.unlock_item}
-            </p>
-          )}
-
-          {skill.description ? (
+          ) : skill.description ? (
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.35, textAlign: 'left' }}>
               {skill.description}
             </p>
           ) : (
             <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0, textAlign: 'left' }}>
               No detailed description available.
+            </p>
+          )}
+
+          {skill.unlock_item && (
+            <p style={{ fontSize: '0.78rem', color: 'var(--accent-gold)', margin: '0.4rem 0 0 0', textAlign: 'left' }}>
+              🔑 Requires: {skill.unlock_item}
             </p>
           )}
         </div>
@@ -500,9 +521,9 @@ function SkillsCatalogView() {
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Skill Type</label>
             <select value={type} onChange={e => setType(e.target.value)}>
               <option value="">All Skill Types (Active, Passive, Partner)</option>
-              <option value="Active">⚔️ Active Skills (324)</option>
-              <option value="Passive">🛡️ Passive Skills (420)</option>
-              <option value="Partner">🤝 Partner Skills (408)</option>
+              <option value="Active">⚔️ Active Skills</option>
+              <option value="Passive">🛡️ Passive Skills</option>
+              <option value="Partner">🤝 Partner Skills</option>
             </select>
           </div>
 
@@ -510,12 +531,12 @@ function SkillsCatalogView() {
             <div>
               <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--accent-gold)', fontWeight: 700 }}>Passive Source</label>
               <select value={source} onChange={e => setSource(e.target.value)} style={{ borderColor: 'var(--accent-gold)' }}>
-                <option value="">All Passive Sources (420)</option>
-                <option value="Pals">🐾 Pals (181)</option>
-                <option value="Equipment">🛡️ Equipment (59)</option>
-                <option value="World Tree">🌳 World Tree (114)</option>
-                <option value="Mutation">🧬 Mutation (11)</option>
-                <option value="Legendary">👑 Legendary (55)</option>
+                <option value="">All Passive Sources</option>
+                <option value="Pals">🐾 Pals</option>
+                <option value="Equipment">🛡️ Equipment</option>
+                <option value="World Tree">🌳 World Tree</option>
+                <option value="Mutation">🧬 Mutation</option>
+                <option value="Legendary">👑 Legendary</option>
               </select>
             </div>
           )}
@@ -537,29 +558,29 @@ function SkillsCatalogView() {
           </div>
           <div style={{ flexGrow: 1 }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Search</label>
-            <input type="text" placeholder="Search skills by name, description, or ID..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input type="text" placeholder="Search skills by name, Pal name, description, or unlock item..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
         </div>
 
         {(!type || type === 'Passive') && (
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
             <button className={`btn ${!source ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              All Sources (420)
+              All Sources
             </button>
             <button className={`btn ${source === 'Pals' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Pals')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              🐾 Pals (181)
+              🐾 Pals
             </button>
             <button className={`btn ${source === 'Equipment' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Equipment')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              🛡️ Equipment (59)
+              🛡️ Equipment
             </button>
             <button className={`btn ${source === 'World Tree' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('World Tree')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              🌳 World Tree (114)
+              🌳 World Tree
             </button>
             <button className={`btn ${source === 'Mutation' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Mutation')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              🧬 Mutation (11)
+              🧬 Mutation
             </button>
             <button className={`btn ${source === 'Legendary' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSource('Legendary')} style={{ padding: '0.25rem 0.65rem', fontSize: '0.75rem', borderRadius: '6px' }}>
-              👑 Legendary (55)
+              👑 Legendary
             </button>
           </div>
         )}
@@ -577,22 +598,32 @@ function SkillsCatalogView() {
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
-            {skills.map(sk => {
+            {skills.map((sk, idx) => {
               const typeColor = sk.type === 'Passive' ? '#60a5fa' : sk.type === 'Partner' ? 'var(--accent-gold)' : '#f87171';
               const typeBg = sk.type === 'Passive' ? 'rgba(59, 130, 246, 0.2)' : sk.type === 'Partner' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)';
               
               return (
-                <div key={sk.id} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
+                <div key={`${sk.id}-${sk.pal_id || idx}`} className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', height: '100%' }}>
                   <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
-                      {sk.icon_path ? (
-                        <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', marginBottom: '0.75rem' }}>
+                      {sk.pal_icon || sk.icon_path ? (
+                        <img src={sk.pal_icon || sk.icon_path} alt={sk.pal_name || sk.name} className="skill-icon-large" style={{ borderRadius: '10px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
                       ) : (
-                        <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: 'rgba(255,255,255,0.1)' }}>⚡</div>
+                        <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, background: 'rgba(255,255,255,0.1)', borderRadius: '10px' }}>⚡</div>
                       )}
-                      <div>
-                        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>{sk.name}</h3>
-                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.3rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)', wordBreak: 'break-word' }}>{sk.name}</h3>
+                        
+                        {/* Owning Pal Tag for Partner Skills */}
+                        {sk.pal_name && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.25rem', marginBottom: '0.25rem', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', borderRadius: '6px', padding: '0.15rem 0.45rem' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#38bdf8' }}>
+                              🐾 {sk.pal_name} {sk.paldex_number ? `(#${String(sk.paldex_number).padStart(3, '0')})` : ''}
+                            </span>
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', gap: '0.35rem', marginTop: '0.2rem', flexWrap: 'wrap' }}>
                           <span className="badge" style={{ background: typeBg, color: typeColor }}>{sk.type || 'Skill'}</span>
                           {sk.source && (
                             <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)', fontWeight: 600 }}>
@@ -641,6 +672,17 @@ function SkillsCatalogView() {
                       </div>
                     )}
 
+                    {/* Learned by Pals list for Active skills */}
+                    {sk.learned_by_pals && sk.learned_by_pals.length > 0 && (
+                      <div style={{ marginTop: '0.35rem', marginBottom: '0.6rem', fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)', padding: '0.35rem 0.6rem', borderRadius: '6px' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>🐾 Learned by ({sk.learned_by_pals.length}): </span>
+                        <span style={{ color: 'var(--text-primary)' }}>
+                          {sk.learned_by_pals.slice(0, 4).join(', ')}
+                          {sk.learned_by_pals.length > 4 ? ` +${sk.learned_by_pals.length - 4} more` : ''}
+                        </span>
+                      </div>
+                    )}
+
                     {sk.stat_modifier && sk.stat_modifier !== sk.description && (
                       <p style={{ fontSize: '0.85rem', color: 'var(--accent-green)', fontWeight: 600, marginBottom: '0.5rem' }}>
                         ✨ {sk.stat_modifier}
@@ -648,7 +690,7 @@ function SkillsCatalogView() {
                     )}
 
                     {sk.unlock_item && (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginBottom: '0.5rem' }}>
+                      <p style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginBottom: '0.5rem', fontWeight: 600 }}>
                         🔑 Requires: {sk.unlock_item}
                       </p>
                     )}
@@ -1199,60 +1241,64 @@ function CondenserView() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
-        <h2 style={{ marginBottom: '0.25rem', fontWeight: 800 }}>⭐ Condenser Recommendations</h2>
-        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.85rem' }}>Based on duplicates, passives, and IVs. The max rank is calculated based on exactly 5, 13, 25, or 49 total Pals needed.</p>
+      <div style={{ flexShrink: 0, marginBottom: '0.6rem' }}>
+        <h2 style={{ marginBottom: '0.2rem', fontWeight: 800, fontSize: '1.4rem' }}>⭐ Condenser Recommendations</h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: '0.82rem' }}>Based on duplicates, passives, and IVs. Max rank calculates exact fodder threshold (5, 13, 25, or 49 total Pals).</p>
       </div>
       
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
         {candidates.map((c, i) => (
-          <div key={i} className="glass-card" style={{ display: 'flex', gap: '2rem', padding: '1.5rem' }}>
-            <div style={{ flex: '0 0 120px', textAlign: 'center' }}>
+          <div key={i} className="glass-card" style={{ display: 'flex', gap: '1rem', padding: '0.75rem 1.1rem', alignItems: 'center' }}>
+            <div style={{ flex: '0 0 76px', textAlign: 'center' }}>
               {c.icon_path ? (
-                <img src={c.icon_path} alt={c.species} style={{ width: '100px', height: '100px', borderRadius: '15px', objectFit: 'cover' }} />
+                <img src={c.icon_path} alt={c.species} style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover' }} />
               ) : (
-                <div style={{ width: '100px', height: '100px', borderRadius: '15px', background: 'var(--primary-gradient)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: 800 }}>{c.species[0]}</div>
+                <div style={{ width: '56px', height: '56px', borderRadius: '10px', background: 'var(--primary-gradient)', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.4rem', fontWeight: 800 }}>{c.species[0]}</div>
               )}
-              <h3 style={{ marginTop: '0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>{c.species}</h3>
-              <div style={{ color: 'var(--accent-gold)', fontWeight: 800, fontSize: '1.2rem', marginTop: '0.2rem' }}>
+              <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.2, wordBreak: 'break-word' }}>{c.species}</div>
+              <div style={{ color: 'var(--accent-gold)', fontWeight: 700, fontSize: '0.82rem', marginTop: '0.1rem' }}>
                 {c.attainable_stars > 0 ? '⭐'.repeat(c.attainable_stars) : '0 ⭐'}
               </div>
             </div>
             
-            <div style={{ flex: 1 }}>
-              <h4 style={{ fontWeight: 800, borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
-                Total Owned: {c.total_owned} (1 Base + {c.sacrifices_available} Sacrifices)
-              </h4>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                  Total Owned: <strong style={{ color: 'var(--accent-gold)' }}>{c.total_owned}</strong> (1 Base + {c.sacrifices_available} Sacrifices)
+                </span>
+                <span style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent-gold)', background: 'rgba(251, 191, 36, 0.1)', padding: '0.15rem 0.5rem', borderRadius: '4px', border: '1px solid rgba(251, 191, 36, 0.25)' }}>
+                  Lv. {c.base_level}
+                </span>
+              </div>
               
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Best Base Level</p>
-                  <p style={{ fontWeight: 700, fontSize: '1.1rem' }}>Lv. {c.base_level}</p>
-                  
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '0.75rem' }}>Passives</p>
-                  <div className="badge-container" style={{ marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>Passives:</div>
+                  <div className="badge-container" style={{ margin: 0 }}>
                     {c.passives && c.passives.length > 0 ? c.passives.map((p, idx) => (
-                      <span key={idx} className="badge badge-element">{p}</span>
-                    )) : <span style={{ color: 'var(--text-secondary)' }}>None</span>}
+                      <span key={idx} className="badge badge-element" style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem' }}>{p}</span>
+                    )) : <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>None</span>}
                   </div>
                 </div>
                 
-                <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', background: 'rgba(0,0,0,0.2)', padding: '0.75rem', borderRadius: '8px' }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>HP</div>
-                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.hp}</div>
-                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_hp}</div>
+                <div style={{ flexShrink: 0 }}>
+                  <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(0,0,0,0.25)', padding: '0.35rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div style={{ textAlign: 'center', minWidth: '46px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase' }}>HP</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-primary)' }}>{c.hp}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 600 }}>IV {c.iv_hp}</div>
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Attack</div>
-                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.attack}</div>
-                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_attack}</div>
+                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+                    <div style={{ textAlign: 'center', minWidth: '46px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase' }}>Atk</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-primary)' }}>{c.attack}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 600 }}>IV {c.iv_attack}</div>
                     </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Defense</div>
-                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{c.defense}</div>
-                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.8rem' }}>IV {c.iv_defense}</div>
+                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.08)' }}></div>
+                    <div style={{ textAlign: 'center', minWidth: '46px' }}>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.68rem', textTransform: 'uppercase' }}>Def</div>
+                      <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text-primary)' }}>{c.defense}</div>
+                      <div style={{ color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 600 }}>IV {c.iv_defense}</div>
                     </div>
                   </div>
                 </div>
@@ -1311,6 +1357,30 @@ function PalDetailModal({ pal, onClose }) {
             )}
 
             <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.9rem' }}>
+              {pal.isInstance ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Level</span>
+                    <span style={{ fontWeight: 700, color: 'var(--accent-gold)' }}>Lv. {pal.level}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Gender</span>
+                    <span style={{ fontWeight: 600 }}>{pal.gender === 'Male' ? '♂ Male' : pal.gender === 'Female' ? '♀ Female' : pal.gender || 'Unknown'}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Condenser Rank</span>
+                    <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.rank || 0} ⭐</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>IVs (HP/Atk/Def)</span>
+                    <span style={{ fontWeight: 700, color: '#38bdf8' }}>{pal.iv_hp} / {pal.iv_melee} / {pal.iv_defense}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Location</span>
+                    <span style={{ fontWeight: 600 }}>{pal.location ? pal.location.toUpperCase() : 'PALBOX'} {pal.location_details_base_camp_name ? `(${pal.location_details_base_camp_name})` : ''}</span>
+                  </div>
+                </>
+              ) : null}
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Size</span>
                 <span style={{ fontWeight: 600 }}>{pal.size || 'M'}</span>
@@ -1399,31 +1469,129 @@ function PalDetailModal({ pal, onClose }) {
 
             {/* Partner Skill */}
             {pal.partner_skill && (
-              <SkillBadgeWithTooltip skill={pal.partner_skill} style={{ display: 'block', width: '100%' }}>
-                <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem', cursor: 'pointer' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
-                    {pal.partner_skill.unlock_item && (
-                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
-                    )}
-                  </div>
-                  {pal.partner_skill.description && (
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>
+              <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
+                  {pal.partner_skill.unlock_item && (
+                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
                   )}
                 </div>
-              </SkillBadgeWithTooltip>
+                {pal.partner_skill.description && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>
+                )}
+              </div>
             )}
 
-            {/* Species Default Active & Passive Skills */}
-            {pal.skills && pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length > 0 && (
-              <div>
-                <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                  ⚔️ Active & Passive Skills ({pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length})
-                </h3>
-                <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').map(sk => (
-                    <SkillBadgeWithTooltip key={sk.id} skill={sk} style={{ display: 'block', width: '100%' }}>
-                      <div className="skill-row" style={{ cursor: 'pointer' }}>
+            {/* SKILLS SECTION: Instance Passives & Equipped Attacks vs Species Master Moves */}
+            {pal.isInstance ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                {/* Actual Rolled Passives */}
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                    🛡️ Pal Passives ({pal.passives ? pal.passives.length : 0})
+                  </h3>
+                  {pal.passives && pal.passives.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {pal.passives.map((pass, pIdx) => {
+                        const apt = pass.aptitude;
+                        return (
+                          <div key={pIdx} className="skill-row" style={{ padding: '0.65rem 0.85rem' }}>
+                            <div style={{ flexGrow: 1 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pass.name}</span>
+                                  {apt && (
+                                    <span 
+                                      className="badge" 
+                                      style={{
+                                        background: 
+                                          apt.color === 'red' ? 'rgba(239, 68, 68, 0.25)' :
+                                          apt.color === 'gold' ? 'rgba(245, 158, 11, 0.25)' :
+                                          apt.color === 'legend' ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(236, 72, 153, 0.4))' :
+                                          'rgba(255, 255, 255, 0.12)',
+                                        color: 
+                                          apt.color === 'red' ? '#ef4444' :
+                                          apt.color === 'gold' ? '#fbbf24' :
+                                          apt.color === 'legend' ? '#f472b6' :
+                                          '#f8fafc',
+                                        border: 
+                                          apt.color === 'red' ? '1px solid rgba(239, 68, 68, 0.4)' :
+                                          apt.color === 'gold' ? '1px solid rgba(245, 158, 11, 0.4)' :
+                                          apt.color === 'legend' ? '1px solid rgba(236, 72, 153, 0.5)' :
+                                          '1px solid rgba(255, 255, 255, 0.2)',
+                                        fontWeight: 800,
+                                        fontSize: '0.75rem'
+                                      }}
+                                    >
+                                      {apt.label}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {pass.stat_modifier ? (
+                                <p style={{ fontSize: '0.82rem', color: 'var(--accent-green)', fontWeight: 600, margin: '0.25rem 0 0 0' }}>
+                                  ✨ {pass.stat_modifier}
+                                </p>
+                              ) : pass.description ? (
+                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{pass.description}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>No passive skills on this Pal.</p>
+                  )}
+                </div>
+
+                {/* Equipped Active Attacks */}
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                    ⚔️ Equipped Active Attacks ({pal.equip_waza ? pal.equip_waza.length : 0})
+                  </h3>
+                  {pal.equip_waza && pal.equip_waza.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      {pal.equip_waza.map((waza, wIdx) => (
+                        <div key={wIdx} className="skill-row" style={{ padding: '0.65rem 0.85rem' }}>
+                          {waza.icon_path ? (
+                            <img src={waza.icon_path} alt={waza.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div className="skill-icon-large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>⚡</div>
+                          )}
+                          <div style={{ flexGrow: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 700 }}>{waza.name}</span>
+                              <div className="badge-container">
+                                {waza.element && <span className="badge badge-element">{waza.element}</span>}
+                              </div>
+                            </div>
+                            {waza.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem', margin: '0.25rem 0 0 0' }}>{waza.description}</p>}
+                            {(waza.power > 0 || (waza.cooldown_sec || waza.cooldown) > 0) && (
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.35rem', display: 'flex', gap: '1rem' }}>
+                                {waza.power > 0 && <span>Power: <strong style={{ color: 'var(--accent-gold)' }}>{waza.power}</strong></span>}
+                                {(waza.cooldown_sec || waza.cooldown) > 0 && <span>CD: <strong style={{ color: 'var(--text-primary)' }}>{waza.cooldown_sec || waza.cooldown}s</strong></span>}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', margin: 0 }}>No active attacks equipped.</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Master Species Default Skills */
+              pal.skills && pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length > 0 && (
+                <div>
+                  <h3 style={{ fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-primary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                    ⚔️ Active & Passive Skills ({pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').length})
+                  </h3>
+                  <div style={{ maxHeight: '250px', overflowY: 'auto', paddingRight: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {pal.skills.filter(sk => sk.type !== 'Partner' && sk.category !== 'Partner').map(sk => (
+                      <div key={sk.id} className="skill-row">
                         {sk.icon_path ? (
                           <img src={sk.icon_path} alt={sk.name} className="skill-icon-large" onError={(e) => { e.target.style.display = 'none'; }} />
                         ) : (
@@ -1451,11 +1619,12 @@ function PalDetailModal({ pal, onClose }) {
                           </div>
                         </div>
                       </div>
-                    </SkillBadgeWithTooltip>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )
             )}
+
 
             {/* Item Drops */}
             {pal.drops && pal.drops.length > 0 && (
@@ -1484,11 +1653,14 @@ function PalDetailModal({ pal, onClose }) {
 }
 
 function App() {
-    const [mode, setMode] = useState('home') // 'home', 'global', 'world', 'settings'
+  const [mode, setMode] = useState('home') // 'home', 'global', 'world', 'settings'
   const [activeTab, setActiveTab] = useState('paldex')
   const [worlds, setWorlds] = useState([])
   const [selectedWorldId, setSelectedWorldId] = useState('')
   const [worldLoading, setWorldLoading] = useState(false)
+  const [isEngineReady, setIsEngineReady] = useState(false)
+  const [engineInitError, setEngineInitError] = useState('')
+  const [initAttempts, setInitAttempts] = useState(0)
 
   // Fetch discovered active worlds
   const fetchWorlds = async () => {
@@ -1508,8 +1680,30 @@ function App() {
     }
   }
 
+  // Health check loop waiting for backend server
+  const initEngine = async () => {
+    setEngineInitError('')
+    let attempts = 0
+    while (attempts < 30) {
+      try {
+        const res = await fetch('/api/config')
+        if (res.ok) {
+          setIsEngineReady(true)
+          await fetchWorlds()
+          return
+        }
+      } catch (e) {
+        // Backend still initializing
+      }
+      attempts++
+      setInitAttempts(attempts)
+      await new Promise(r => setTimeout(r, 600))
+    }
+    setEngineInitError("Could not connect to Palopedix Backend Server. Please verify the server terminal is running.")
+  }
+
   useEffect(() => {
-    fetchWorlds()
+    initEngine()
   }, [])
 
     const handleSelectMode = (newMode, defaultTab) => {
@@ -1595,6 +1789,12 @@ function App() {
   const [reverseLoading, setReverseLoading] = useState(false)
   const [reverseSearched, setReverseSearched] = useState(false)
   const [reverseSearchTerm, setReverseSearchTerm] = useState('')
+
+  const [offspringParent, setOffspringParent] = useState('')
+  const [offspringResults, setOffspringResults] = useState([])
+  const [offspringLoading, setOffspringLoading] = useState(false)
+  const [offspringSearched, setOffspringSearched] = useState(false)
+  const [offspringSearchTerm, setOffspringSearchTerm] = useState('')
 
   const [ownedPals, setOwnedPals] = useState('')
   const [targetPal, setTargetPal] = useState('')
@@ -1782,6 +1982,28 @@ function App() {
     }
   }
 
+  // Calculate Offspring
+  const handleCalculateOffspring = async () => {
+    if (!offspringParent) return
+    setOffspringLoading(true)
+    setOffspringSearched(true)
+    setOffspringSearchTerm(offspringParent)
+    try {
+      const res = await fetch(`/api/breeding/offspring?parent=${encodeURIComponent(offspringParent)}`)
+      const data = await res.json()
+      if (res.ok) {
+        setOffspringResults(data)
+      } else {
+        setOffspringResults([])
+      }
+    } catch (e) {
+      console.error("Error finding offspring", e)
+      setOffspringResults([])
+    } finally {
+      setOffspringLoading(false)
+    }
+  }
+
   const [allBreedingPaths, setAllBreedingPaths] = useState([])
   const [activePathIdx, setActivePathIdx] = useState(0)
 
@@ -1826,6 +2048,36 @@ function App() {
     } finally {
       setPathLoading(false)
     }
+  }
+
+  if (!isEngineReady) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'radial-gradient(ellipse at center, #1e1b4b 0%, #0f172a 100%)', color: 'var(--text-primary)', padding: '2rem', textAlign: 'center' }}>
+        <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'linear-gradient(135deg, #6366f1, #a855f7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '3rem', fontWeight: 900, boxShadow: '0 12px 35px rgba(99,102,241,0.5)', marginBottom: '1.5rem' }}>
+          P
+        </div>
+        <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.5rem', background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          Palopedix
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '440px', lineHeight: 1.5, marginBottom: '2rem' }}>
+          Initializing Palworld 1.0+ database engine & discovering active saves...
+        </p>
+
+        {engineInitError ? (
+          <div className="glass-card" style={{ border: '1px solid #ef4444', background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', padding: '1.5rem', maxWidth: '420px', borderRadius: '16px' }}>
+            <p style={{ fontWeight: 600, marginBottom: '1rem' }}>{engineInitError}</p>
+            <button className="primary-btn" onClick={initEngine} style={{ width: '100%' }}>
+              🔄 Retry Connection
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'rgba(255,255,255,0.05)', padding: '0.75rem 1.5rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <span className="loading-spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }}></span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--accent-gold)', fontWeight: 600 }}>Connecting to engine...</span>
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -2096,35 +2348,55 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedInstances.map((pi, idx) => (
-                        <tr key={idx}>
-                          <td style={{ fontWeight: 600 }}>
-                            <div className="pal-avatar-container">
-                              {pi.icon_path && (
-                                <img src={pi.icon_path} alt={pi.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
-                              )}
-                              <span>{pi.display_name}</span>
-                            </div>
-                          </td>
-                          <td>Lv. {pi.level}</td>
-                          <td>{pi.gender}</td>
-                          <td>{pi.rank} ⭐</td>
-                          <td>{pi.iv_hp} / {pi.iv_melee} / {pi.iv_defense}</td>
-                          <td>{pi.location.toUpperCase()} {pi.location_details_base_camp_name && `(${pi.location_details_base_camp_name})`}</td>
-                          <td>
-                            <div className="badge-container">
-                              {pi.passives.map(pass => (
-                                <SkillBadgeWithTooltip key={pass.id} skill={pass}>
-                                  <span className="badge badge-element" style={{ cursor: 'pointer' }}>
-                                    {pass.name}
-                                  </span>
-                                </SkillBadgeWithTooltip>
-                              ))}
-                              {pi.passives.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>None</span>}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {sortedInstances.map((pi, idx) => {
+                        const handleRowClick = () => {
+                          const masterPal = pals.find(p => 
+                            (p.internal_name && (p.internal_name === pi.character_id || p.internal_name === pi.character_id_raw || p.internal_name === pi.species)) ||
+                            (p.id && (p.id === pi.character_id || p.id === pi.character_id_raw || p.id === pi.species)) ||
+                            (p.display_name && p.display_name.toLowerCase() === (pi.display_name || '').toLowerCase())
+                          );
+                          setSelectedPal({
+                            ...(masterPal || {}),
+                            ...pi,
+                            isInstance: true,
+                            display_name: pi.display_name,
+                            paldex_number: masterPal?.paldex_number || pi.paldex_number,
+                            partner_skill: masterPal?.partner_skill || pi.partner_skill,
+                            passives: pi.passives || [],
+                            equip_waza: pi.equip_waza || [],
+                          });
+                        };
+
+                        return (
+                          <tr key={idx} onClick={handleRowClick} style={{ cursor: 'pointer' }}>
+                            <td style={{ fontWeight: 600 }}>
+                              <div className="pal-avatar-container">
+                                {pi.icon_path && (
+                                  <img src={pi.icon_path} alt={pi.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                                )}
+                                <span style={{ color: 'var(--accent-gold)' }}>{pi.display_name}</span>
+                              </div>
+                            </td>
+                            <td>Lv. {pi.level}</td>
+                            <td>{pi.gender}</td>
+                            <td>{pi.rank} ⭐</td>
+                            <td>{pi.iv_hp} / {pi.iv_melee} / {pi.iv_defense}</td>
+                            <td>{pi.location.toUpperCase()} {pi.location_details_base_camp_name && `(${pi.location_details_base_camp_name})`}</td>
+                            <td>
+                              <div className="badge-container" onClick={e => e.stopPropagation()}>
+                                {pi.passives.map(pass => (
+                                  <SkillBadgeWithTooltip key={pass.id} skill={pass}>
+                                    <span className="badge badge-element" style={{ cursor: 'pointer' }}>
+                                      {pass.name}
+                                    </span>
+                                  </SkillBadgeWithTooltip>
+                                ))}
+                                {pi.passives.length === 0 && <span style={{ color: 'var(--text-secondary)' }}>None</span>}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2177,7 +2449,8 @@ function App() {
 
         {/* 🐣 Breeding Center Tab */}
         {activeTab === 'breeding' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2.5rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
             {/* Global vs Caught Source Selector */}
             <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', padding: '1.25rem 1.75rem' }}>
               <div>
@@ -2330,7 +2603,57 @@ function App() {
               )}
             </div>
 
-            {/* 3. Breeding Path Finder Card */}
+            {/* 3. Offspring Lookup Card */}
+            <div className="glass-card">
+              <h2 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>🌱 Possible Offspring Lookup</h2>
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'end', marginBottom: '1.5rem' }}>
+                <div style={{ flexGrow: 1 }}>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Parent Pal</label>
+                  <select 
+                    style={{ width: '100%', padding: '0.65rem 1rem', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-color)', color: 'white', fontSize: '0.95rem' }}
+                    value={offspringParent} 
+                    onChange={e => setOffspringParent(e.target.value)}
+                  >
+                    <option value="">-- Select Parent Pal --</option>
+                    {availablePalOptions.map((name, idx) => (
+                      <option key={idx} value={name}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button className="btn btn-primary" onClick={handleCalculateOffspring} disabled={!offspringParent || offspringLoading}>
+                  {offspringLoading ? 'Searching...' : 'Find Offspring'}
+                </button>
+              </div>
+
+              {offspringSearched && !offspringLoading && (
+                offspringResults.length > 0 ? (
+                  <div>
+                    <div style={{ marginBottom: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      Found {offspringResults.length} unique possible offspring for <strong>{offspringSearchTerm}</strong>:
+                    </div>
+                    <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', maxHeight: '400px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                      {offspringResults.map((pal, idx) => (
+                        <div key={idx} className="pal-card" style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem', background: 'rgba(0,0,0,0.2)' }}>
+                          {pal.icon_path && (
+                            <img src={pal.icon_path} alt={pal.display_name} style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{pal.display_name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Power: {pal.breeding_power}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--text-secondary)', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', textAlign: 'center' }}>
+                    No offspring combinations found for "{offspringSearchTerm}".
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* 4. Breeding Path Finder Card */}
             <div className="glass-card">
               <h2 style={{ marginBottom: '1.5rem', fontWeight: 800 }}>🧬 BFS Breeding Path Finder</h2>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem', fontSize: '0.9rem' }}>
@@ -2541,15 +2864,16 @@ function App() {
                           ))}
                         </div>
                       </div>
-                    )
+                    );
                   })()}
                 </div>
               )}
             </div>
           </div>
-        )}
-          </>
-        )}
+        </div>
+      )}
+    </>
+  )}
       </main>
     </div>
   )

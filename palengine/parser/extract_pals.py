@@ -173,6 +173,43 @@ _register(".worldSaveData.MapObjectSaveData", _selective_decode_map_object)
 _register(".worldSaveData.BaseCampSaveData.Value.RawData", _tolerant_base_camp_decode)
 _register(".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData", _tolerant_worker_director_decode)
 
+# ── FArchiveReader: support SetProperty (Palworld v0.3+ / v0.4+ Locker & Dimensional Palbox) ──
+import palworld_save_tools.archive as _archive_mod
+
+if not getattr(_archive_mod.FArchiveReader.property, "_set_property_patched", False):
+    _orig_archive_property = _archive_mod.FArchiveReader.property
+
+    def _tolerant_archive_property(self, type_name: str, size: int, path: str, nested_caller_path: str = ""):
+        if type_name == "SetProperty":
+            set_type = self.fstring()
+            _id = self.optional_guid()
+            self.u32()  # dummy / allocation flags
+            count = self.u32()
+            set_path = path + ".Set"
+            if set_type == "StructProperty":
+                struct_type = self.get_type_or(set_path, "StructProperty")
+            else:
+                struct_type = None
+            values = []
+            for _ in range(count):
+                if set_type == "Guid":
+                    values.append(self.guid())
+                elif set_type == "StrProperty":
+                    values.append(self.fstring())
+                else:
+                    values.append(self.prop_value(set_type, struct_type, set_path))
+            value = {
+                "set_type": set_type,
+                "id": _id,
+                "value": values,
+                "type": type_name,
+            }
+            return value
+        return _orig_archive_property(self, type_name, size, path, nested_caller_path=nested_caller_path)
+
+    _tolerant_archive_property._set_property_patched = True  # type: ignore[attr-defined]
+    _archive_mod.FArchiveReader.property = _tolerant_archive_property
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -405,6 +442,27 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
         passives = cast(list[str], passive_list_prop.get("values", []))
 
         rank = clean_value(save_param.get("Rank", {}).get("value", 0))
+        exp = clean_value(save_param.get("Exp", {}).get("value", 0))
+
+        equip_waza = cast(list[str], save_param.get("EquipWaza", {}).get("value", {}).get("values", []))
+        mastered_waza = cast(list[str], save_param.get("MasteredWaza", {}).get("value", {}).get("values", []))
+        
+        # Clean waza names
+        equip_waza = [w for w in (clean_value(w) for w in equip_waza) if w]
+        mastered_waza = [w for w in (clean_value(w) for w in mastered_waza) if w]
+
+        def _extract_status_points(prop_name: str) -> dict[str, int]:
+            pts_dict: dict[str, int] = {}
+            pts_prop = save_param.get(prop_name, {}).get("value", {}).get("values", [])
+            for pt_entry in pts_prop:
+                stat_name = clean_value(pt_entry.get("StatusName", {}).get("value"))
+                stat_val = clean_value(pt_entry.get("StatusPoint", {}).get("value", 0))
+                if stat_name and isinstance(stat_val, int):
+                    pts_dict[str(stat_name)] = stat_val
+            return pts_dict
+
+        soul_points = _extract_status_points("GotStatusPointList")
+        elixir_points = _extract_status_points("GotExStatusPointList")
 
         slot_id = cast(dict[str, Any], save_param.get("SlotID", {}).get("value") or save_param.get("SlotId", {}).get("value") or {})
         raw_cid = slot_id.get("ContainerId")
@@ -440,6 +498,11 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
             },
             "passives": passives,
             "rank": rank,
+            "exp": exp,
+            "equip_waza": equip_waza,
+            "mastered_waza": mastered_waza,
+            "soul_points": soul_points,
+            "elixir_points": elixir_points,
             "location": location_type,
             "location_details": location_details,
         }

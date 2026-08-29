@@ -1,58 +1,67 @@
-import React, { useState, useEffect } from 'react';
-
-const WORK_TYPE_ASSET_MAP = {
-  Kindling: { icon: '/assets/work/Kindling.png', label: 'Kindling' },
-  EmitFlame: { icon: '/assets/work/Kindling.png', label: 'Kindling' },
-  Watering: { icon: '/assets/work/Watering.png', label: 'Watering' },
-  Planting: { icon: '/assets/work/Planting.png', label: 'Planting' },
-  Seeding: { icon: '/assets/work/Planting.png', label: 'Planting' },
-  GeneratingElectricity: { icon: '/assets/work/GeneratingElectricity.png', label: 'Generating Electricity' },
-  Electricity: { icon: '/assets/work/GeneratingElectricity.png', label: 'Generating Electricity' },
-  Handcraft: { icon: '/assets/work/Handcraft.png', label: 'Handcraft' },
-  Handiwork: { icon: '/assets/work/Handcraft.png', label: 'Handiwork' },
-  Gathering: { icon: '/assets/work/Gathering.png', label: 'Gathering' },
-  Collection: { icon: '/assets/work/Gathering.png', label: 'Gathering' },
-  Lumbering: { icon: '/assets/work/Lumbering.png', label: 'Lumbering' },
-  Deforest: { icon: '/assets/work/Lumbering.png', label: 'Lumbering' },
-  Mining: { icon: '/assets/work/Mining.png', label: 'Mining' },
-  Mine: { icon: '/assets/work/Mining.png', label: 'Mining' },
-  Medicine: { icon: '/assets/work/Medicine.png', label: 'Medicine' },
-  MedicineProduction: { icon: '/assets/work/Medicine.png', label: 'Medicine' },
-  ProductMedicine: { icon: '/assets/work/Medicine.png', label: 'Medicine' },
-  Cooling: { icon: '/assets/work/Cooling.png', label: 'Cooling' },
-  Cool: { icon: '/assets/work/Cooling.png', label: 'Cooling' },
-  Transporting: { icon: '/assets/work/Transport.png', label: 'Transporting' },
-  Transport: { icon: '/assets/work/Transport.png', label: 'Transporting' },
-  Farming: { icon: '/assets/work/MonsterFarm.png', label: 'Farming' },
-  MonsterFarm: { icon: '/assets/work/MonsterFarm.png', label: 'Farming' },
-};
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { WORK_TYPE_ASSET_MAP, CATEGORY_STYLES } from '../constants/gameData';
 
 export default function BaseOptimizerView() {
   const [baseCamps, setBaseCamps] = useState([]);
   const [selectedBaseId, setSelectedBaseId] = useState('');
+  const [targetTeamSize, setTargetTeamSize] = useState('max'); // 'max', 'current', or custom number
+  const [reservedBreeding, setReservedBreeding] = useState('auto'); // 'auto', '0', '2', '4', '6', '8'
   const [recommendation, setRecommendation] = useState(null);
+  const recsCache = useRef({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Sorting state
+  const [sortCol, setSortCol] = useState('#');
+  const [sortDesc, setSortDesc] = useState(false);
 
   useEffect(() => {
     fetch('/api/base_camps')
       .then(res => res.json())
       .then(data => {
-        setBaseCamps(data);
-        if (data && data.length > 0) {
-          setSelectedBaseId(data[0].base_camp_id);
+        const arr = Array.isArray(data) ? data : [];
+        setBaseCamps(arr);
+        if (arr.length > 0) {
+          setSelectedBaseId(arr[0].base_camp_id);
         }
       })
       .catch(err => setError(err.message));
   }, []);
 
+  const activeBase = baseCamps.find(bc => bc.base_camp_id === selectedBaseId) || null;
+
+  // Build query parameters
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (activeBase) {
+      if (targetTeamSize === 'current') {
+        params.set('max_team_size', String(activeBase.assigned_pals_count || 1));
+      } else if (targetTeamSize !== 'max' && !isNaN(parseInt(targetTeamSize))) {
+        params.set('max_team_size', targetTeamSize);
+      }
+    }
+    if (reservedBreeding !== 'auto' && !isNaN(parseInt(reservedBreeding))) {
+      params.set('reserved_breeding', reservedBreeding);
+    }
+    const qStr = params.toString();
+    return qStr ? `?${qStr}` : '';
+  }, [activeBase, targetTeamSize, reservedBreeding]);
+
+  const cacheKey = `${selectedBaseId}_${targetTeamSize}_${reservedBreeding}`;
+
   useEffect(() => {
     if (!selectedBaseId) return;
+    if (recsCache.current[cacheKey]) {
+      setRecommendation(recsCache.current[cacheKey]);
+      return;
+    }
     setLoading(true);
     setError(null);
-    fetch(`/api/base_camps/${encodeURIComponent(selectedBaseId)}/recommendations`)
+    fetch(`/api/base_camps/${encodeURIComponent(selectedBaseId)}/recommendations${queryParams}`)
       .then(res => res.json())
       .then(data => {
+        recsCache.current[cacheKey] = data;
         setRecommendation(data);
         setLoading(false);
       })
@@ -60,175 +69,348 @@ export default function BaseOptimizerView() {
         setError(err.message);
         setLoading(false);
       });
-  }, [selectedBaseId]);
+  }, [selectedBaseId, queryParams, cacheKey]);
+
+  const handleSort = (col) => {
+    if (sortCol === col) {
+      setSortDesc(prev => !prev);
+    } else {
+      setSortCol(col);
+      setSortDesc(false);
+    }
+  };
+
+  // Sorted team list
+  const sortedTeam = useMemo(() => {
+    if (!recommendation || !recommendation.recommended_team) return [];
+    const list = [...recommendation.recommended_team].map((p, origIdx) => ({ ...p, _origRank: origIdx + 1 }));
+
+    list.sort((a, b) => {
+      let valA, valB;
+      switch (sortCol) {
+        case '#':
+          valA = a._origRank;
+          valB = b._origRank;
+          break;
+        case 'name':
+          valA = (a.display_name || a.species || '').toLowerCase();
+          valB = (b.display_name || b.species || '').toLowerCase();
+          break;
+        case 'level':
+          valA = a.level || 0;
+          valB = b.level || 0;
+          break;
+        case 'cycle':
+          valA = a.nocturnal ? 1 : 0;
+          valB = b.nocturnal ? 1 : 0;
+          break;
+        case 'score':
+          valA = a.total_score || 0;
+          valB = b.total_score || 0;
+          break;
+        default:
+          valA = a._origRank;
+          valB = b._origRank;
+      }
+      if (valA < valB) return sortDesc ? 1 : -1;
+      if (valA > valB) return sortDesc ? -1 : 1;
+      return 0;
+    });
+
+    return list;
+  }, [recommendation, sortCol, sortDesc]);
+
+  const catStyle = recommendation ? (CATEGORY_STYLES[recommendation.base_category] || CATEGORY_STYLES['Balanced']) : null;
+
+  // Practical food calculations:
+  // 1 in-game day (day + night) = ~30 minutes (0.5 hr).
+  // Baked Berries = 21 satiety, Salad = 84 satiety.
+  const hourlyFoodDrain = recommendation?.food_and_san_summary?.total_hourly_satiety_drain || 0;
+  const dailyFoodDrain = hourlyFoodDrain * 0.5;
+  const dailyBakedBerries = Math.ceil(dailyFoodDrain / 21);
+  const dailySalads = Math.ceil(dailyFoodDrain / 84);
+  const hourlyBakedBerries = Math.ceil(hourlyFoodDrain / 21);
+
+  // Demand entries for requirements bar
+  const demandEntries = recommendation?.demand_summary ? Object.entries(recommendation.demand_summary) : [];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      {/* Fixed Header & Base Camp Selector */}
-      <div style={{ flexShrink: 0, marginBottom: '0.75rem' }}>
-        <div className="glass-card" style={{ padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, margin: 0 }}>🏰 Base Optimizer</h2>
-            <p style={{ color: 'var(--text-secondary)', margin: '0.2rem 0 0 0', fontSize: '0.85rem' }}>
-              Automated work suitability demand matching, nocturnal 24/7 duty cycle bonuses, and food satiety balance.
-            </p>
-          </div>
-          {baseCamps.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <label style={{ fontWeight: 600, color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Select Base Camp:</label>
+      {/* Top Toolbar & Summary Stat Bar */}
+      <div style={{ flexShrink: 0, marginBottom: '0.4rem' }}>
+        <div className="glass-card" style={{ padding: '0.55rem 0.85rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+          
+          {/* Base Selector, Target Capacity & Breeding Reservation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {baseCamps.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>🏰 Base:</label>
+                <select
+                  value={selectedBaseId}
+                  onChange={e => setSelectedBaseId(e.target.value)}
+                  style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', background: 'rgba(10, 15, 30, 0.6)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 600, fontSize: '0.8rem', width: 'auto' }}
+                >
+                  {baseCamps.map(bc => {
+                    const bName = bc.custom_name || bc.display_name || bc.name || `Base Camp ${bc.base_camp_id.slice(0, 8)}`;
+                    return (
+                      <option key={bc.base_camp_id} value={bc.base_camp_id}>
+                        {bName} ({bc.assigned_pals_count}/{bc.max_pals} Pals)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+
+            {activeBase && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>🎯 Target Size:</label>
+                <select
+                  value={targetTeamSize}
+                  onChange={e => setTargetTeamSize(e.target.value)}
+                  style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', background: 'rgba(10, 15, 30, 0.6)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 600, fontSize: '0.78rem', width: 'auto' }}
+                >
+                  <option value="max">Full Max ({activeBase.max_pals} Pals)</option>
+                  {activeBase.assigned_pals_count !== activeBase.max_pals && (
+                    <option value="current">Current Crew ({activeBase.assigned_pals_count} Pals)</option>
+                  )}
+                  <option value="10">10 Pals (Compact)</option>
+                  <option value="15">15 Pals (Standard)</option>
+                  <option value="20">20 Pals (Max World)</option>
+                </select>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <label style={{ fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>🐣 Breeding Slots:</label>
               <select
-                value={selectedBaseId}
-                onChange={e => setSelectedBaseId(e.target.value)}
-                style={{ padding: '0.4rem 0.8rem', borderRadius: '8px', background: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 700, fontSize: '0.85rem' }}
+                value={reservedBreeding}
+                onChange={e => setReservedBreeding(e.target.value)}
+                style={{ padding: '0.3rem 0.6rem', borderRadius: '6px', background: 'rgba(10, 15, 30, 0.6)', color: 'var(--text-primary)', border: '1px solid var(--border-color)', fontWeight: 600, fontSize: '0.78rem', width: 'auto' }}
               >
-                {baseCamps.map(bc => (
-                  <option key={bc.base_camp_id} value={bc.base_camp_id}>
-                    {bc.name || `Base Camp ${bc.base_camp_id.slice(0, 8)}`} ({bc.assigned_pals_count}/{bc.max_pals} Pals)
-                  </option>
-                ))}
+                <option value="auto">Auto ({recommendation?.reserved_breeding_slots !== undefined ? recommendation.reserved_breeding_slots : 2} default)</option>
+                <option value="0">0 (No Breeding)</option>
+                <option value="2">2 (1 Pair)</option>
+                <option value="4">4 (2 Pairs)</option>
+                <option value="6">6 (3 Pairs)</option>
+                <option value="8">8 (4 Pairs)</option>
               </select>
+            </div>
+          </div>
+
+          {/* Real-Time Stats & Practical Food Units */}
+          {recommendation && !loading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              {catStyle && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: catStyle.bg, border: `1px solid ${catStyle.border}`, padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                  <span>{catStyle.emoji}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Focus:</span>
+                  <strong style={{ color: catStyle.color }}>{recommendation.base_category}</strong>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.25)', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Team:</span>
+                <strong style={{ color: '#60a5fa' }}>{recommendation.team_size} / {recommendation.effective_capacity || recommendation.max_capacity}</strong>
+              </div>
+
+              {recommendation.reserved_breeding_slots > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', background: 'rgba(236, 72, 153, 0.12)', border: '1px solid rgba(236, 72, 153, 0.3)', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.75rem' }} title={`${recommendation.reserved_breeding_slots} slots reserved for breeding pairs`}>
+                  <span>🐣</span>
+                  <span style={{ color: '#f472b6', fontWeight: 600 }}>{recommendation.reserved_breeding_slots} Reserved</span>
+                </div>
+              )}
+
+              {/* Practical Food Calculation Tooltip */}
+              <div 
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.75rem', cursor: 'help' }}
+                title={`Drain Rate: ${hourlyFoodDrain} pts/hr\n• Baked Berries (21 satiety): ~${dailyBakedBerries} / in-game day (~${hourlyBakedBerries} / real hr)\n• Salads (84 satiety): ~${dailySalads} / in-game day`}
+              >
+                <span>🍖</span>
+                <span style={{ color: 'var(--text-secondary)' }}>Food:</span>
+                <strong style={{ color: '#34d399' }}>~{dailyBakedBerries} Baked Berries/day</strong>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>({dailySalads} Salad)</span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(139, 92, 246, 0.12)', border: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(139, 92, 246, 0.25)', padding: '0.25rem 0.55rem', borderRadius: '6px', fontSize: '0.75rem' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>SAN:</span>
+                <strong style={{ color: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? '#ef4444' : '#a78bfa' }}>{recommendation.food_and_san_summary?.san_stability_status}</strong>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Scrollable Optimization Results Content */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      {/* Required Base Work Suitabilities Bar */}
+      {recommendation && !loading && demandEntries.length > 0 && (
+        <div className="glass-card" style={{ flexShrink: 0, marginBottom: '0.4rem', padding: '0.4rem 0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', background: 'rgba(15, 23, 42, 0.4)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>🛠️ Required Camp Roles:</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+            {demandEntries.map(([wsKey, dInfo]) => {
+              const asset = WORK_TYPE_ASSET_MAP[wsKey] || { emoji: '⚡', label: wsKey };
+              const isCovered = !recommendation.uncovered_suitabilities?.includes(wsKey);
+              return (
+                <span 
+                  key={wsKey}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '5px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    background: isCovered ? 'rgba(59, 130, 246, 0.12)' : 'rgba(239, 68, 68, 0.15)',
+                    border: `1px solid ${isCovered ? 'rgba(59, 130, 246, 0.25)' : 'rgba(239, 68, 68, 0.35)'}`,
+                    color: isCovered ? 'var(--text-primary)' : '#f87171',
+                  }}
+                  title={`Facilities: ${dInfo.facility_count}x | Urgency: ${dInfo.urgency_weight}x | Automated: ${dInfo.is_automated ? 'Yes' : 'Manual'}`}
+                >
+                  {asset.icon ? (
+                    <img src={asset.icon} alt={wsKey} style={{ width: '13px', height: '13px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <span>{asset.emoji}</span>
+                  )}
+                  <span>{asset.label || wsKey}</span>
+                  <span style={{ color: 'var(--accent-gold)', fontWeight: 700 }}>({dInfo.facility_count}x)</span>
+                  {!isCovered && <span style={{ color: '#ef4444', fontSize: '0.68rem', fontWeight: 700 }}>[UNCOVERED]</span>}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
+      {/* Focus Strategy Banner */}
+      {recommendation && !loading && catStyle && (
+        <div style={{ flexShrink: 0, marginBottom: '0.4rem', background: catStyle.bg, border: `1px solid ${catStyle.border}`, borderRadius: '8px', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '1rem' }}>{catStyle.emoji}</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{catStyle.desc}</span>
+          </div>
+          {recommendation.uncovered_suitabilities && recommendation.uncovered_suitabilities.length > 0 && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+              Uncovered roles: <span style={{ color: '#fbbf24' }}>{recommendation.uncovered_suitabilities.join(', ')}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Main Table Area */}
       {loading && (
-        <div className="glass-card" style={{ textAlign: 'center', padding: '3rem' }}>
-          <p style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>Evaluating work suitabilities & scoring owned Pals...</p>
+        <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>Evaluating work suitabilities, urgency tiers & scoring owned Pals...</p>
         </div>
       )}
 
       {error && (
-        <div className="glass-card" style={{ padding: '2rem', borderLeft: '4px solid #ef4444' }}>
-          <p style={{ color: '#ef4444', margin: 0 }}>Error loading recommendations: {error}</p>
+        <div className="glass-card" style={{ padding: '1rem', borderLeft: '4px solid #ef4444' }}>
+          <p style={{ color: '#ef4444', margin: 0, fontSize: '0.85rem' }}>Error loading recommendations: {error}</p>
         </div>
       )}
 
       {recommendation && !loading && (
-        <>
-          {/* Summary Dashboard Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: 'var(--accent-gold)' }}>
-                {recommendation.base_category}
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Primary Focus Category</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#3b82f6' }}>
-                {recommendation.team_size} / {recommendation.max_capacity}
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Recommended Team Capacity</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: '#10b981' }}>
-                {recommendation.food_and_san_summary?.total_hourly_satiety_drain} pts/hr
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>Est. Hourly Food Satiety Drain</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <div style={{ fontSize: '2.5rem', fontWeight: 900, color: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? '#ef4444' : '#8b5cf6' }}>
-                {recommendation.food_and_san_summary?.san_stability_status}
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '0.25rem' }}>SAN Stability Rating</div>
-            </div>
+        sortedTeam.length === 0 ? (
+          <div className="glass-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ color: 'var(--text-secondary)' }}>No recommended Pals found for this base camp.</p>
           </div>
-
-          {/* Recommended Team Table */}
-          <div className="glass-card" style={{ padding: '2rem' }}>
-            <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              ⭐ Recommended Base Pal Deployment Team
-            </h3>
-
-            {recommendation.recommended_team.length === 0 ? (
-              <p style={{ color: 'var(--text-secondary)' }}>No recommended Pals found for this base camp.</p>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                      <th style={{ padding: '0.75rem' }}>#</th>
-                      <th style={{ padding: '0.75rem' }}>Pal</th>
-                      <th style={{ padding: '0.75rem' }}>Level</th>
-                      <th style={{ padding: '0.75rem' }}>24/7 Nocturnal</th>
-                      <th style={{ padding: '0.75rem' }}>Work Suitability Roles</th>
-                      <th style={{ padding: '0.75rem' }}>Passives</th>
-                      <th style={{ padding: '0.75rem' }}>Match Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recommendation.recommended_team.map((pal, idx) => (
-                      <tr key={pal.instance_id || idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                        <td style={{ padding: '1rem 0.75rem', fontWeight: 700 }}>{idx + 1}</td>
-                        <td style={{ padding: '1rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        ) : (
+          <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 0, margin: 0, marginBottom: '1.25rem' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th onClick={() => handleSort('#')} style={{ width: '40px', textAlign: 'center', cursor: 'pointer' }}>
+                    #{sortCol === '#' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  </th>
+                  <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
+                    Pal{sortCol === 'name' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  </th>
+                  <th onClick={() => handleSort('level')} style={{ cursor: 'pointer' }}>
+                    Level{sortCol === 'level' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  </th>
+                  <th onClick={() => handleSort('cycle')} style={{ cursor: 'pointer' }}>
+                    Cycle{sortCol === 'cycle' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  </th>
+                  <th>Work Suitability Roles</th>
+                  <th>Passives</th>
+                  <th onClick={() => handleSort('score')} style={{ textAlign: 'right', cursor: 'pointer' }}>
+                    Score{sortCol === 'score' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedTeam.map((pal) => (
+                  <tr key={pal.instance_id || pal._origRank}>
+                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                      {pal._origRank}
+                    </td>
+                    <td>
+                      <PalInstanceTooltip instance={pal}>
+                        <div className="pal-avatar-container" style={{ cursor: 'help' }}>
                           {pal.icon_path && (
-                            <img src={pal.icon_path} alt={pal.display_name} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                            <img src={pal.icon_path} alt={pal.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
                           )}
-                          <span style={{ fontWeight: 700, fontSize: '1.05rem' }}>{pal.display_name}</span>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem' }}>Lv. {pal.level}</td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          {pal.nocturnal ? (
-                            <span style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', padding: '0.25rem 0.6rem', borderRadius: '12px', fontSize: '0.85rem', fontWeight: 700 }}>
-                              🌙 24/7 Nocturnal
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>☀️ Diurnal</span>
-                          )}
-                        </td>
+                          <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.display_name}</span>
+                        </div>
+                      </PalInstanceTooltip>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>Lv. {pal.level}</td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {pal.nocturnal ? (
+                        <span style={{ background: 'rgba(139, 92, 246, 0.2)', color: '#a78bfa', padding: '0.12rem 0.45rem', borderRadius: '6px', fontSize: '0.72rem', fontWeight: 700, border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+                          🌙 24/7
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>☀️ Day</span>
+                      )}
+                    </td>
 
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                            {pal.matching_roles.map(r => {
-                              const assetData = WORK_TYPE_ASSET_MAP[r.work_type] || {};
-                              return (
-                                <span key={r.work_type} style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.82rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                                  {assetData.icon ? (
-                                    <img 
-                                      src={assetData.icon} 
-                                      alt={r.work_type} 
-                                      style={{ width: '16px', height: '16px', objectFit: 'contain' }} 
-                                      onError={(e) => { e.target.style.display = 'none'; }} 
-                                    />
-                                  ) : (
-                                    <span>{assetData.emoji || '⚡'}</span>
-                                  )}
-                                  <span>{r.work_type}</span>
-                                  <strong style={{ color: 'var(--accent-gold)' }}>Lv.{r.level}</strong>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                            {pal.passives.map(p => (
-                              <span key={p} style={{ background: 'rgba(255, 255, 255, 0.08)', padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.8rem' }}>
-                                {p}
-                              </span>
-                            ))}
-                            {pal.passives.length === 0 && <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>None</span>}
-                          </div>
-                        </td>
-                        <td style={{ padding: '1rem 0.75rem', fontWeight: 800, color: 'var(--accent-gold)' }}>
-                          {pal.total_score} pts
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
+                        {pal.matching_roles.map(r => {
+                          const assetData = WORK_TYPE_ASSET_MAP[r.work_type] || {};
+                          return (
+                            <span key={r.work_type} style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', padding: '0.12rem 0.4rem', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                              {assetData.icon ? (
+                                <img 
+                                  src={assetData.icon} 
+                                  alt={r.work_type} 
+                                  style={{ width: '13px', height: '13px', objectFit: 'contain' }} 
+                                  onError={(e) => { e.target.style.display = 'none'; }} 
+                                />
+                              ) : (
+                                <span style={{ fontSize: '0.72rem' }}>{assetData.emoji || '⚡'}</span>
+                              )}
+                              <span>{r.work_type}</span>
+                              <strong style={{ color: 'var(--accent-gold)' }}>Lv.{r.level}</strong>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                        {pal.passives && pal.passives.map((p, pIdx) => {
+                          const pName = typeof p === 'string' ? p : (p.name || p.id || '');
+                          return (
+                            <span key={p.id || pName || pIdx} style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.1rem 0.38rem', borderRadius: '4px', fontSize: '0.72rem', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                              {pName}
+                            </span>
+                          );
+                        })}
+                        {(!pal.passives || pal.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--accent-gold)', whiteSpace: 'nowrap' }}>
+                      {pal.total_score} pts
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
+        )
       )}
-      </div>
     </div>
   );
 }

@@ -115,11 +115,51 @@ def test_api_pals_and_asset_urls():
 
 def test_breeding_calculations_palworld_db():
     client.post("/api/config", json={"static_data_source": "palworld_db"})
+
+    # 1. Direct Pair Calculator (/api/breeding/result and /api/breeding/calculate)
     res = client.get("/api/breeding/result?parent1=Relaxaurus&parent2=Sparkit")
     assert res.status_code == 200
     child = res.json()
-    assert "display_name" in child
+    assert child["display_name"] == "Relaxaurus Lux"
     assert child["icon_path"] is not None
+
+    res_alias = client.get("/api/breeding/calculate?parent1=Relaxaurus&parent2=Sparkit")
+    assert res_alias.status_code == 200
+    assert res_alias.json()["display_name"] == "Relaxaurus Lux"
+
+    # 2. Reverse Combos Lookup (/api/breeding/parents with query & path param)
+    parents_query = client.get("/api/breeding/parents?child=Anubis&owned=all")
+    assert parents_query.status_code == 200
+    assert len(parents_query.json()) > 0
+
+    parents_path = client.get("/api/breeding/parents/Anubis?source=all")
+    assert parents_path.status_code == 200
+    assert len(parents_path.json()) > 0
+
+    # 3. Possible Offspring (/api/breeding/offspring with query & path param)
+    offspring_query = client.get("/api/breeding/offspring?parent=Lamball&owned=all")
+    assert offspring_query.status_code == 200
+    assert len(offspring_query.json()) > 0
+
+    offspring_path = client.get("/api/breeding/offspring/Lamball?source=all")
+    assert offspring_path.status_code == 200
+    assert len(offspring_path.json()) > 0
+
+    # 4. Multi-Step Path Finder (/api/breeding/path)
+    path_res = client.get("/api/breeding/path?target=Shadowbeak&owned=Lamball,Cattiva,Penking")
+    assert path_res.status_code == 200
+    path_data = path_res.json()
+    assert path_data["target"] == "Shadowbeak"
+    assert "paths" in path_data
+
+    # 5. Uncaught Species Finder (/api/breeding/uncaught and /api/breeding/uncaught-opportunities)
+    uncaught_res = client.get("/api/breeding/uncaught?owned=all")
+    assert uncaught_res.status_code == 200
+    assert isinstance(uncaught_res.json(), list)
+
+    uncaught_alias = client.get("/api/breeding/uncaught-opportunities?source=all")
+    assert uncaught_alias.status_code == 200
+    assert isinstance(uncaught_alias.json(), list)
 
 
 def test_new_schema_api_endpoints():

@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "start:backend": "cd .. && python -m uvicorn palengine.api.main:app --reload --port 8000 --log-level warning",
+    "start:backend": "python -m uvicorn palengine.api.main:app --app-dir .. --reload --reload-dir ../palengine --port 8000 --log-level warning",
     "start:ui": "vite",
-    "dev": "concurrently \"npm run start:backend\" \"npm run start:ui\"",
+    "dev": "concurrently \"python -m uvicorn palengine.api.main:app --app-dir .. --reload --reload-dir ../palengine --port 8000 --log-level warning\" \"vite\"",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview"

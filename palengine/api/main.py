@@ -132,6 +132,8 @@ def get_pals(
     nocturnal: Optional[bool] = None,
     size: Optional[str] = None,
     suitability: Optional[str] = None,
+    partner_category: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries the static Paldex database."""
     filters: dict[str, Any] = {}
@@ -141,6 +143,8 @@ def get_pals(
         filters["nocturnal"] = nocturnal
     if size:
         filters["size"] = size
+    if partner_category or category:
+        filters["partner_category"] = partner_category or category
 
     if suitability:
         if ":" in suitability:
@@ -152,6 +156,12 @@ def get_pals(
     return db_engine.query_pals(filters)
 
 
+@app.get("/api/pals/partner-skill-categories")
+def get_partner_skill_categories() -> list[dict[str, Any]]:
+    """Returns all available Partner Skill categories with metadata and current Pal counts."""
+    return db_engine.get_partner_skill_categories()
+
+
 @app.get("/api/save/instances")
 def get_instances(
     location: Optional[str] = None,
@@ -159,6 +169,8 @@ def get_instances(
     gender: Optional[str] = None,
     min_level: Optional[int] = None,
     passive: Optional[str] = None,
+    partner_category: Optional[str] = None,
+    category: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries dynamic Pal instances (requires loading save game first)."""
     filters: dict[str, Any] = {}
@@ -172,6 +184,8 @@ def get_instances(
         filters["min_level"] = min_level
     if passive:
         filters["passive_id"] = passive
+    if partner_category or category:
+        filters["partner_category"] = partner_category or category
 
     return db_engine.query_instances(filters)
 
@@ -180,6 +194,12 @@ def get_instances(
 def get_condense_candidates() -> list[dict[str, Any]]:
     """Returns top condensing candidates from the dynamic save instances."""
     return db_engine.get_condense_candidates()
+
+
+@app.get("/api/save/missions")
+def get_active_missions() -> list[dict[str, Any]]:
+    """Returns active uncompleted sub-missions evaluated against targeted inventory items and caught Pals."""
+    return db_engine.get_active_missions()
 
 
 @app.get("/api/save/inventory")
@@ -194,17 +214,29 @@ def get_owned_species() -> list[str]:
     return db_engine.get_owned_pal_species()
 
 
+class RenameBaseRequest(BaseModel):
+    custom_name: str
+
+
 @app.get("/api/bases")
 def get_bases() -> list[dict[str, Any]]:
-    """Lists all base camps and structure Summaries."""
+    """Lists all base camps, structure summaries, and focus categories."""
+    from palengine.analytics.base_optimizer import BaseOptimizer
+    optimizer = BaseOptimizer(db_engine)
+
     cursor = db_engine.conn.cursor()
     cursor.execute("SELECT base_camp_id, name FROM base_camps")
     base_rows = cursor.fetchall()
 
     results = []
     for b in base_rows:
-        summary = db_engine.get_base_camp_summary(b["base_camp_id"])
+        bid = b["base_camp_id"]
+        summary = db_engine.get_base_camp_summary(bid)
         if summary:
+            audit = optimizer.audit_base_work_demand(bid)
+            summary["base_category"] = audit.get("base_category", "Balanced")
+            summary["electric_deficit"] = audit.get("electric_deficit", 0)
+            summary["breeding_farm_count"] = audit.get("breeding_farm_count", 0)
             results.append(summary)
     return results
 
@@ -212,15 +244,33 @@ def get_bases() -> list[dict[str, Any]]:
 @app.get("/api/bases/{base_camp_id}")
 def get_base_detail(base_camp_id: str) -> dict[str, Any]:
     """Returns detailed summary for a specific base camp."""
+    from palengine.analytics.base_optimizer import BaseOptimizer
     summary = db_engine.get_base_camp_summary(base_camp_id)
     if not summary:
         raise HTTPException(
             status_code=404, detail=f"Base camp not found: {base_camp_id}"
         )
+    audit = BaseOptimizer(db_engine).audit_base_work_demand(base_camp_id)
+    summary["base_category"] = audit.get("base_category", "Balanced")
+    summary["electric_deficit"] = audit.get("electric_deficit", 0)
+    summary["breeding_farm_count"] = audit.get("breeding_farm_count", 0)
     return summary
 
 
+@app.put("/api/base_camps/{base_camp_id}/name")
+@app.put("/api/bases/{base_camp_id}/name")
+def rename_base_camp(base_camp_id: str, request: RenameBaseRequest) -> dict[str, Any]:
+    """Sets a custom app-level name for a base camp."""
+    db_engine.set_base_camp_custom_name(base_camp_id, request.custom_name)
+    return {
+        "success": True,
+        "base_camp_id": base_camp_id,
+        "custom_name": request.custom_name.strip(),
+    }
+
+
 @app.get("/api/breeding/result")
+@app.get("/api/breeding/calculate")
 def get_breed_result(parent1: str, parent2: str) -> dict[str, Any]:
     """Calculates breeding result of two parent species."""
     res = db_engine.get_breeding_result(parent1, parent2)
@@ -233,29 +283,82 @@ def get_breed_result(parent1: str, parent2: str) -> dict[str, Any]:
 
 
 @app.get("/api/breeding/parents")
-def get_breed_parents(child: str) -> list[tuple[str, str]]:
-    """Lists all breeding combinations that yield the target child."""
+@app.get("/api/breeding/parents/{child}")
+def get_breed_parents(
+    child: Optional[str] = None,
+    owned: Optional[str] = None,
+    source: Optional[str] = None,
+) -> list[tuple[str, str]]:
+    """Lists all breeding combinations that yield the target child, optionally filtered by owned inventory."""
+    if not child:
+        raise HTTPException(status_code=400, detail="Target child Pal is required.")
+    pool_param = owned or source
+    if pool_param and pool_param.strip().lower() in ("all", "global", "*"):
+        return db_engine.find_parents_for_child(child)
+    elif pool_param and pool_param.strip().lower() in ("auto", "caught"):
+        owned_inv = list(db_engine.get_owned_pal_inventory().keys())
+        return db_engine.find_parents_for_child(child, pool=owned_inv)
+    elif pool_param:
+        owned_list = [s.strip() for s in pool_param.split(",") if s.strip()]
+        return db_engine.find_parents_for_child(child, pool=owned_list)
     return db_engine.find_parents_for_child(child)
 
 
 @app.get("/api/breeding/offspring")
-def get_breed_offspring(parent: str) -> list[dict[str, Any]]:
-    """Lists all unique offspring possible from a single parent."""
+@app.get("/api/breeding/offspring/{parent}")
+def get_breed_offspring(
+    parent: Optional[str] = None,
+    owned: Optional[str] = None,
+    source: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Lists all unique offspring possible from a single parent, optionally filtered by owned inventory."""
+    if not parent:
+        raise HTTPException(status_code=400, detail="Parent Pal is required.")
+    pool_param = owned or source
+    if pool_param and pool_param.strip().lower() in ("all", "global", "*"):
+        return db_engine.get_offspring_for_parent(parent)
+    elif pool_param and pool_param.strip().lower() in ("auto", "caught"):
+        owned_inv = list(db_engine.get_owned_pal_inventory().keys())
+        return db_engine.get_offspring_for_parent(parent, pool=owned_inv)
+    elif pool_param:
+        owned_list = [s.strip() for s in pool_param.split(",") if s.strip()]
+        return db_engine.get_offspring_for_parent(parent, pool=owned_list)
     return db_engine.get_offspring_for_parent(parent)
+
+
+@app.get("/api/breeding/uncaught")
+@app.get("/api/breeding/uncaught-opportunities")
+def get_uncaught_breeding_opportunities(
+    owned: Optional[str] = None,
+    source: Optional[str] = None,
+) -> list[dict[str, Any]]:
+    """Finds all Pal species not yet caught that can be bred from currently owned Pals or all game pals."""
+    pool_param = owned or source
+    if pool_param and pool_param.strip().lower() in ("all", "global", "*"):
+        return db_engine.get_uncaught_breeding_opportunities(parent_pool="all")
+    elif pool_param and pool_param.strip().lower() not in ("auto", "caught"):
+        owned_list = [s.strip() for s in pool_param.split(",") if s.strip()]
+        return db_engine.get_uncaught_breeding_opportunities(owned_input=owned_list, parent_pool=owned_list)
+    return db_engine.get_uncaught_breeding_opportunities(parent_pool="auto")
 
 
 @app.get("/api/breeding/path")
 def get_breeding_path(
     target: str,
     owned: Optional[str] = None,
+    owned_pals: Optional[str] = None,
+    source: Optional[str] = None,
     target_skills: Optional[str] = None,
 ) -> dict[str, Any]:
     """Finds shortest multi-generation breeding paths to target Pal with skill-aware parent instance quality & gender odds."""
-    if not owned or owned.strip().lower() == "auto":
+    pool_param = owned_pals or owned or source
+    if pool_param and pool_param.strip().lower() in ("all", "global", "*"):
+        paths = db_engine.find_all_breeding_paths("all", target, target_skills)
+    elif not pool_param or pool_param.strip().lower() in ("auto", "caught"):
         owned_inv = db_engine.get_owned_pal_inventory()
         paths = db_engine.find_all_breeding_paths(owned_inv, target, target_skills)
     else:
-        owned_list = [s.strip() for s in owned.split(",") if s.strip()]
+        owned_list = [s.strip() for s in pool_param.split(",") if s.strip()]
         paths = db_engine.find_all_breeding_paths(owned_list, target, target_skills)
 
     return {"target": target, "target_skills": target_skills, "paths": paths}
@@ -362,11 +465,23 @@ def get_base_camp_structures(base_camp_id: str) -> list[dict[str, Any]]:
 def get_base_camp_recommendations(
     base_camp_id: str,
     max_team_size: Optional[int] = Query(None, description="Optional max team size capacity override"),
+    reserved_breeding: Optional[int] = Query(None, description="Optional reserved breeding slots override"),
 ) -> dict[str, Any]:
-    """Generates optimal recommended Pal team for a given base camp."""
+    """Generates optimal recommended Pal team for a given base camp using holistic multi-base optimization."""
     from palengine.analytics.pal_recommender import PalRecommender
     recommender = PalRecommender(db_engine)
-    return recommender.recommend_pals_for_base(base_camp_id, max_team_size=max_team_size)
+    return recommender.recommend_pals_for_base(
+        base_camp_id,
+        max_team_size=max_team_size,
+        reserved_breeding=reserved_breeding,
+    )
+
+
+@app.get("/api/save/settings")
+def get_world_settings() -> dict[str, Any]:
+    """Returns active world multiplier settings (e.g. BaseCampWorkerMaxNum, EggHatchTime)."""
+    return db_engine.get_world_settings()
+
 
 
 

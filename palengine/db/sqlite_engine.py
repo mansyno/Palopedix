@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sqlite3
+from collections import defaultdict
 from typing import Any, Optional
 
 from palengine.world_manager import discover_worlds, get_world_by_id
@@ -20,44 +21,9 @@ from palengine.parser.extract_bases import extract_bases
 from palengine.parser.extract_pals import extract_pals
 from palengine.parser.extract_items import extract_items
 from palengine.parser.extract_players import extract_players
-
-
-STRUCTURE_ALIAS_MAP = {
-    # Farm / Plantation Blocks
-    "farmblockv2_berries": "BerryGarden",
-    "farmblock_berries": "BerryGarden",
-    "farmblockv2_lettuce": "LettuceGarden",
-    "farmblock_lettuce": "LettuceGarden",
-    "farmblockv2_tomato": "TomatoGarden",
-    "farmblock_tomato": "TomatoGarden",
-    "farmblockv2_wheet": "WheatGarden",
-    "farmblock_wheat": "WheatGarden",
-    "ancientfarmblock": "AncientFarmBlock",
-    # Medicine Facilities
-    "medicinefacility_01": "MedicineFactory_Primitive",
-    "medicinefacility_02": "MedicineFactory_Electric",
-    "medicinefacility": "MedicineFactory_Primitive",
-    # Cooking / Kitchen
-    "cookingstove": "BlastFurnace",
-    "electrickitchen": "BlastFurnace2",
-    "campfire": "BlastFurnace",
-    # Factories & Benches
-    "factory_hard_01": "WeaponFactory_Clean_01",
-    "factory_hard_02": "WeaponFactory_Clean_02",
-    "factory_hard_03": "WeaponFactory_Clean_03",
-    "workbench": "WorkBench",
-    "workbench_primitive": "WorkBench_Primitive",
-    "workbench_quality": "WorkBench_Quality",
-    "workbench_skillunlock": "WorkBench_SkillUnlock",
-    # Natural Terrain Resource Nodes
-    "natural_copperore": "StonePit",
-    "natural_stone": "StonePit",
-    "natural_coal": "StonePit",
-    "natural_sulfur": "StonePit",
-    "natural_quartz": "StonePit",
-    "natural_wood": "StationDeforest",
-    "natural_wood_fine": "StationDeforest",
-}
+from palengine.parser.extract_quests import extract_active_quests
+from palengine.parser.extract_settings import extract_world_settings
+from palengine.analytics.breeding_graph import BreedingGraphOptimizer
 
 
 def transform_icon_path(path: Optional[str]) -> Optional[str]:
@@ -78,268 +44,72 @@ def transform_icon_path(path: Optional[str]) -> Optional[str]:
             rel_path = "/" + rel_path
         return f"/assets{rel_path}"
     return normalized if (normalized.startswith("/") or normalized.startswith("http")) else None
-PASSIVE_DESCRIPTIONS_MAP: dict[str, str] = {
-    "artisan": "Work Speed +50%",
-    "serious": "Work Speed +20%",
-    "work slave": "Work Speed +30%, Attack -30%",
-    "clumsy": "Work Speed -10%",
-    "slacker": "Work Speed -30%",
-    "ferocious": "Attack +20%",
-    "musclehead": "Attack +30%, Work Speed -50%",
-    "aggressive": "Attack +10%, Defense -20%",
-    "coward": "Attack -10%",
-    "pacifist": "Attack -20%",
-    "sadist": "Attack +15%, Defense -15%",
-    "burly body": "Defense +20%",
-    "hard skin": "Defense +10%",
-    "brave": "Attack +10%",
-    "downtrodden": "Defense -10%",
-    "brittle": "Defense -20%",
-    "swift": "Movement Speed +30%",
-    "runner": "Movement Speed +20%",
-    "nimble": "Movement Speed +10%",
-    "ace swimmer": "Swimming Speed +15%",
-    "king of the waves": "Swimming Speed +30%",
-    "vanguard": "Player Attack +10%",
-    "stronghold strategist": "Player Defense +10%",
-    "motivational leader": "Player Work Speed +25%",
-    "mine foreman": "Player Mining Speed +25%",
-    "logging foreman": "Player Logging Speed +25%",
-    "workaholic": "SAN drops 15% slower",
-    "positive thinker": "SAN drops 10% slower",
-    "diet lover": "Hunger decreases 15% slower",
-    "efficient worker": "Hunger decreases 20% slower",
-    "legend": "Attack +20%, Defense +20%, Movement Speed +15%",
-    "lucky": "Work Speed +15%, Attack +15%",
-    "conceited": "Work Speed +10%, Defense -10%",
-    "masochist": "Defense +15%, Attack -15%",
-    "glutton": "Hunger drops +10% faster",
-    "bottomless stomach": "Hunger drops +15% faster",
-    "destructive": "SAN drops +15% faster",
-    "destabilized": "SAN drops +10% faster",
-    "zen mindset": "SAN drops +15% slower",
-    "serenity": "Active Skill Cooldown -30%, Attack +10%",
-    "impatient": "Active Skill Cooldown -15%",
-    "noble": "Trading price sell +5%, buy -5%",
-    "fine coat": "Trading price sell +10%, buy -10%",
-    "philanthropist": "Egg incubation time -100%",
-    "healing coach": "Player HP recovery speed +25%",
-    "wellness watcher": "Player Stamina recovery +25%",
-    "reload master": "Player Reload speed +25%",
-    "whopper": "Pal Size +15%",
-    "easygoing": "Defense -10%, Work Speed +10%",
-    "sloppy": "SAN drops +10% faster",
-    "shabby": "Max HP -10%",
-    "sickly": "SAN drops +15% faster",
-    "unstable": "SAN drops +20% faster",
-    "hooligan": "Attack +15%, Work Speed -10%",
-    "pal_rude": "Attack +15%, Work Speed -10%",
-    "blood is fuel": "Absorbs 10% of damage dealt as HP",
-    "savior": "Revives fallen player with 50% HP once per battle",
-    "abnormal": "10.0% decrease in incoming Neutral damage.",
-    "cheery": "10.0% decrease in incoming Dark damage.",
-    "dragonkiller": "10.0% increase in Dragon damage.",
-    "pyromaniac": "10.0% increase in Fire damage.",
-    "hydromaniac": "10.0% increase in Water damage.",
-    "botanist": "10.0% increase in Grass damage.",
-    "capacitor": "10.0% increase in Electric damage.",
-    "earth organ": "10.0% increase in Ground damage.",
-    "coldproof": "10.0% decrease in incoming Ice damage.",
-    "heatproof": "10.0% decrease in incoming Fire damage.",
-    "sunbath lover": "10.0% decrease in incoming Fire damage.",
-    "suntan lover": "10.0% decrease in incoming Fire damage.",
-    "celestial emperor": "20.0% increase in Neutral damage.",
-    "flame emperor": "20.0% increase in Fire damage.",
-    "lord of waves": "20.0% increase in Water damage.",
-    "lord of the sea": "20.0% increase in Water damage.",
-    "spirit emperor": "20.0% increase in Grass damage.",
-    "lord of lightning": "20.0% increase in Electric damage.",
-    "lord of the underworld": "20.0% increase in Dark damage.",
-    "ice emperor": "20.0% increase in Ice damage.",
-    "earth emperor": "20.0% increase in Ground damage.",
-    "siren of the void": "20.0% increase in Dark damage.",
-    "divine dragon": "20.0% increase in Dragon damage.",
-    "eternal flame": "20.0% increase in Fire & Dark damage.",
-    "invader": "20.0% increase in Dragon & Dark damage.",
-    "demon god": "20.0% increase in Dark & Normal damage.",
-    "remarkable craftsmanship": "Work Speed +50%",
-}
-
-
-
-PARTNER_SKILL_OVERRIDES = {
-    "sheepball": {
-        "name": "Fluffy Shield",
-        "description": "When activated, equips to the player and becomes a shield. Sometimes drops Wool when assigned to a Ranch.",
-        "unlock_item": "Lamball's Harness",
-    },
-    "chickenpal": {
-        "name": "Egg Layer",
-        "description": "Sometimes lays an Egg when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "cutefox": {
-        "name": "Dig Here!",
-        "description": "Sometimes digs up Pal Spheres and items from the ground when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "woolfox": {
-        "name": "Fluffy Wool",
-        "description": "While in party, increases Attack of Neutral Pals. Sometimes drops Wool when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "alpaca": {
-        "name": "Pacapaca Wool",
-        "description": "Can be ridden. While in party, increases Melpaca's Defense and Movement Speed. Sometimes drops Wool when assigned to a Ranch.",
-        "unlock_item": "Melpaca Saddle",
-    },
-    "lavagirl": {
-        "name": "Magma Tears",
-        "description": "While in party, recovers Health of the player and Party Pals. Sometimes produces Flame Organs when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "bastet": {
-        "name": "Gold Digger",
-        "description": "Sometimes digs up Gold Coins when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "bastet_ice": {
-        "name": "Icy Whispers",
-        "description": "Sometimes produces Sapphires when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "berrygoat": {
-        "name": "Berry Picker",
-        "description": "While in party, restores hunger to hungry Pals. Sometimes drops Red Berries when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "berrygoat_dark": {
-        "name": "Venom Picker",
-        "description": "While in party, restores hunger to hungry Pals. Sometimes drops Venom Glands when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "sweetssheep": {
-        "name": "Candy Pop",
-        "description": "While at a base, reduces SAN depletion rate. Sometimes produces Cotton Candy when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "sweetssheep_ground": {
-        "name": "Bitter Pop",
-        "description": "While at a base, reduces SAN depletion rate. Sometimes produces High Quality Pal Oil when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "cowpal": {
-        "name": "Milk Maker",
-        "description": "Sometimes produces Milk when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "soldierbee": {
-        "name": "Worker Bee",
-        "description": "While in party, increases Beegarde's Attack. Sometimes produces Honey when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "whitemoth": {
-        "name": "Silk Shroud",
-        "description": "When activated, attacks targeted enemy with Blizzard Spike. Sometimes produces High Quality Cloth when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "whitemoth_neutral": {
-        "name": "Gilded Shroud",
-        "description": "While in party, increases Defense of Neutral Pals. Sometimes produces High Quality Cloth when assigned to a Ranch.",
-        "unlock_item": None,
-    },
-    "plantslime": {
-        "name": "Logging Assistance",
-        "description": "While in party, improves efficiency of cutting trees.",
-        "unlock_item": None,
-    },
-    "plantslime_flower": {
-        "name": "Logging Assistance",
-        "description": "While in party, improves efficiency of cutting trees.",
-        "unlock_item": None,
-    },
-    "windchimes": {
-        "name": "Flying Trapeze",
-        "description": "While in party, can be summoned and used in place of a glider. Can carry the player high into the air while gliding.",
-        "unlock_item": "Hangyu's Gloves",
-    },
-    "windchimes_ice": {
-        "name": "Winter Trapeze",
-        "description": "While in party, can be summoned and used in place of a glider. Can carry the player high into the air while gliding.",
-        "unlock_item": "Hangyu Cryst's Gloves",
-    },
-}
 
 
 def clean_skill_text(text: Optional[str]) -> Optional[str]:
-    """Cleans up internal Unreal Engine string tokens and placeholders from skill text."""
+    """Removes Unreal Engine and rich-text markup tags from skill descriptions."""
     if not text:
         return None
-    cleaned = str(text)
-    
-    # 1. Remove HTML/XML markup tags like <NumBlue_13>...</> or <color>...</color>
-    cleaned = re.sub(r'<[^>]+>', '', cleaned)
-
-    # 2. Remove Unreal reference tokens like {ReferenceMsgId_...} or {ActiveSkillMainValueByRank}
-    cleaned = re.sub(r'\{ReferenceMsgId_[^}]+\}', '', cleaned)
-    cleaned = re.sub(r'\{[A-Za-z0-9_]+\}', '', cleaned)
-    
-    # 3. Resolve missing token extractions in game sentences
-    cleaned = cleaned.replace("Sometimes lays an when assigned to .", "Sometimes lays an Egg when assigned to a Ranch.")
-    cleaned = cleaned.replace("lays an when assigned to .", "lays an Egg when assigned to a Ranch.")
-    cleaned = cleaned.replace("Sometimes makes when assigned to .", "Sometimes produces High Quality Cloth when assigned to a Ranch.")
-    cleaned = cleaned.replace("Sometimes digs up when assigned to .", "Sometimes digs up Gold Coins when assigned to a Ranch.")
-    cleaned = cleaned.replace("Sometimes drops from its back when assigned to .", "Sometimes drops Red Berries when assigned to a Ranch.")
-    cleaned = cleaned.replace("Sometimes drops or when assigned to .", "Sometimes drops Mushrooms when assigned to a Ranch.")
-    cleaned = cleaned.replace("Sometimes drops when assigned to .", "Sometimes produces items when assigned to a Ranch.")
-    cleaned = cleaned.replace("drops when assigned to .", "drops items when assigned to a Ranch.")
-    cleaned = cleaned.replace("assigned to by 50%", "assigned to a Breeding Farm by 50%")
-    cleaned = cleaned.replace("afflicted with .", "afflicted with status conditions.")
-    cleaned = cleaned.replace("immune to .", "immune to temperature effects.")
-    cleaned = cleaned.replace("attacks targeted enemy with .", "attacks targeted enemy.")
-    cleaned = cleaned.replace("forged from .", "forged from ice.")
-    cleaned = cleaned.replace("player's attack type to and", "player's attack type to Electric and")
-    cleaned = cleaned.replace("When this Pal uses , it has a", "When this Pal uses its skill, it has a")
-    cleaned = cleaned.replace("when assigned to .", "when assigned to a Ranch.")
-    cleaned = cleaned.replace("(: )", "").replace("(:)", "")
-
-    # 4. Fix broken sentence fragments from ranch/assignment extractions
-    cleaned = re.sub(r'^\s*when assigned to a Ranch\.\s*$', 'Sometimes produces items when assigned to a Ranch.', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'^\s*when assigned to a Ranch\s*', 'Sometimes produces items when assigned to a Ranch. ', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\.\s*when assigned to a Ranch\.', '. Sometimes produces items when assigned to a Ranch.', cleaned, flags=re.IGNORECASE)
-
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
-    return cleaned if cleaned and cleaned.lower() != "none" else None
+    # Remove XML-style tags like <itemName id=|...|/> or </Color>
+    cleaned = re.sub(r"<[^>]+>", "", text)
+    # Remove Unreal placeholder variables like {ReferenceMsgId_RideSpeedUp}
+    cleaned = re.sub(r"\{[^}]+\}", "", cleaned)
+    # Normalize whitespace
+    cleaned = " ".join(cleaned.split())
+    return cleaned if cleaned else None
 
 
+def calculate_aptitude(name: str, p_id: str, category: Optional[str]) -> dict[str, Any]:
+    """Computes aptitude tier (▲/▼) and badge color for passive skills."""
+    n_lower = name.lower()
+    pid_lower = p_id.lower()
+    cat_lower = str(category or "").lower()
 
-def calculate_aptitude(name: str, p_id: str, category: Optional[str]) -> Optional[dict[str, str]]:
-    """Determines Palworld in-game passive skill aptitude degree and color."""
-    name_l = name.lower()
-    id_l = p_id.lower()
-    cat_l = (category or "").lower()
-
-    # Tier 4 / Legend
-    if "tier4" in cat_l or "legend" in name_l or "siren of the void" in name_l or "eternal flame" in name_l:
+    if "legend" in n_lower or "legend" in pid_lower:
         return {"label": "LEGEND", "color": "legend", "rank": 4}
-
-    # Negative / Red tiers (-1, -2, -3)
-    if "tier-3" in cat_l or any(k in name_l for k in ["slacker", "bottomless stomach", "destructive", "pacifist", "brittle"]):
-        return {"label": "▼▼▼", "color": "red", "rank": -3}
-    if "tier-2" in cat_l or any(k in name_l for k in ["clumsy", "work slave", "sadist", "downtrodden", "glutton", "destabilized"]):
-        return {"label": "▼▼", "color": "red", "rank": -2}
-    if "tier-1" in cat_l or any(k in name_l for k in ["coward", "masochist"]):
-        return {"label": "▼", "color": "red", "rank": -1}
-
-    # Positive / Gold tiers (+1, +2, +3)
-    if "tier3" in cat_l or any(k in name_l for k in ["artisan", "ferocious", "burly body", "swift", "runner", "vanguard", "stronghold strategist", "lucky"]):
+    if "lucky" in n_lower or "lucky" in pid_lower:
+        return {"label": "LUCKY", "color": "gold", "rank": 4}
+    if any(k in n_lower or k in pid_lower for k in ["emperor", "siren", "divine", "demon", "eternal", "invader"]):
         return {"label": "▲▲▲", "color": "gold", "rank": 3}
-    if "tier2" in cat_l or any(k in name_l for k in ["serious", "musclehead", "hard skin", "brave", "nimble", "workaholic", "positive thinker", "diet lover", "efficient worker", "zen mindset", "serenity"]):
-        return {"label": "▲▲", "color": "gold", "rank": 2}
-    if "tier1" in cat_l or any(k in name_l for k in ["aggressive", "conceited", "abnormal", "cheery", "dragonkiller", "pyromaniac", "hydromaniac", "botanist", "capacitor", "earth organ", "coldproof", "heatproof", "sunbath lover", "suntan lover"]):
-        return {"label": "▲", "color": "white", "rank": 1}
-
+    if "rank3" in cat_lower or "rank3" in pid_lower or "3" in pid_lower:
+        return {"label": "▲▲▲", "color": "gold", "rank": 3}
+    if "rank2" in cat_lower or "rank2" in pid_lower or "2" in pid_lower:
+        return {"label": "▲▲", "color": "white", "rank": 2}
+    if "down" in pid_lower or "deffence_down" in pid_lower or "attack_down" in pid_lower or any(k in n_lower for k in ["clumsy", "slacker", "coward", "pacifist", "downtrodden", "brittle", "glutton", "bottomless stomach", "destructive", "destabilized", "sloppy", "shabby", "sickly", "unstable"]):
+        return {"label": "▼", "color": "red", "rank": -1}
     return {"label": "▲", "color": "white", "rank": 1}
+
+
+RESTRICTED_BREEDING_SPECIES = {
+    # Strict Legendaries / Raid Bosses / Uniques (cannot be standard formula children)
+    "jetragon", "frostallion", "paladius", "necromus", "neptilius", "astralym", "panthalus", "hartalis",
+    "bellanoir", "bellanoir libero", "blazamut ryu", "selyne", "bastigor", "shaolong", "silvance", "dandilord",
+    "aegidron", "solenne", "renjishi", "xenovader", "xenogard", "xenolord", "chikipi", "chickenpal",
+    # Special-Recipe / Self-Only Pals (cannot be generic power children)
+    "shadowbeak", "faleris", "grizzbolt", "orserk", "lyleen", "jormuntide ignis", "mimog",
+    # Unreleased / Cut Content
+    "boltmane", "eleclion", "dragostrophe", "blackfurdragon", "pidf rider", "police_palride",
+    # Tower Boss Entities
+    "zoe & grizzbolt", "lily & lyleen", "marcus & faleris", "axel & orserk",
+    "victor & shadowbeak", "saya & selyne", "auri & shaolong", "bjorn & bastigor", "zenara & astralym",
+    # Crossover / Yakushima / Event Entities
+    "green slime", "blue slime", "red slime", "purple slime", "illuminant slime", "rainbow slime",
+    "enchanted sword", "cave bat", "illuminant bat", "eye of cthulhu", "demon eye", "true eye of cthulhu", "moon lord",
+    "tetroise primo", "tetroise",
+}
+
+
+def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Optional[set[str]] = None) -> bool:
+    if pal_dict.get("is_variant", 0) != 0:
+        return False
+    d_name = str(pal_dict.get("display_name", "")).strip().lower()
+    i_name = str(pal_dict.get("internal_name", "")).strip().lower()
+    if "&" in d_name or "boss" in i_name or i_name.startswith("yakushima") or i_name.startswith("raid_"):
+        return False
+    active_restricted = restricted_set if restricted_set is not None else RESTRICTED_BREEDING_SPECIES
+    if d_name in active_restricted or i_name in active_restricted:
+        return False
+    return True
 
 
 def categorize_passive_source(name: str, p_id: str, category: Optional[str]) -> str:
@@ -354,6 +124,7 @@ def categorize_passive_source(name: str, p_id: str, category: Optional[str]) -> 
 
 
 def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
+    """Enriches passive skill dictionary with clean descriptions, aptitudes, and sources."""
     name = str(skill_dict.get("name") or "").strip()
     p_id = str(skill_dict.get("id") or "").strip()
     raw_cat = skill_dict.get("category")
@@ -368,50 +139,6 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     desc = clean_skill_text(skill_dict.get("description"))
     mod = clean_skill_text(skill_dict.get("stat_modifier"))
 
-    if not mod or not desc:
-        n_lower = name.lower()
-        pid_lower = p_id.lower()
-        if n_lower in PASSIVE_DESCRIPTIONS_MAP:
-            mod = PASSIVE_DESCRIPTIONS_MAP[n_lower]
-        elif pid_lower in PASSIVE_DESCRIPTIONS_MAP:
-            mod = PASSIVE_DESCRIPTIONS_MAP[pid_lower]
-        else:
-            m_res = re.search(r"elementresist_([a-z]+)_?(\d+)?", pid_lower)
-            if m_res:
-                elem = m_res.group(1).capitalize()
-                lvl = m_res.group(2) or "1"
-                mod = f"Decreases incoming {elem} damage (Lv. {lvl})."
-
-            m_bst = re.search(r"elementboost_([a-z]+)_?(\d+)?", pid_lower)
-            if not mod and m_bst:
-                elem = m_bst.group(1).capitalize()
-                lvl = m_bst.group(2) or "1"
-                mod = f"Increases {elem} attack damage (Lv. {lvl})."
-
-            m_hp = re.search(r"hp_acc_up(\d+)", pid_lower)
-            if not mod and m_hp:
-                mod = f"Max HP +{int(m_hp.group(1))*5}%"
-
-            m_atk = re.search(r"attack_acc_up(\d+)", pid_lower)
-            if not mod and m_atk:
-                mod = f"Attack +{int(m_atk.group(1))*5}%"
-
-            m_def = re.search(r"def(e|n)ce_acc_up(\d+)", pid_lower)
-            if not mod and m_def:
-                mod = f"Defense +{int(m_def.group(2))*5}%"
-
-            m_wrk = re.search(r"workspeed_acc_up(\d+)", pid_lower)
-            if not mod and m_wrk:
-                mod = f"Work Speed +{int(m_wrk.group(1))*10}%"
-
-            m_exp = re.search(r"palexp_increase_(\d+)", pid_lower)
-            if not mod and m_exp:
-                mod = f"Pal EXP +{int(m_exp.group(1))*10}%"
-
-            m_temp = re.search(r"temperatureresist_([a-z0-9]+)", pid_lower)
-            if not mod and m_temp:
-                mod = f"Grants temperature protection ({m_temp.group(1)})"
-
     if not mod and desc:
         mod = desc
     if not desc and mod:
@@ -420,6 +147,326 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     skill_dict["description"] = desc
     skill_dict["stat_modifier"] = mod
     return skill_dict
+
+
+PARTNER_SKILL_CATEGORY_DEFS: list[dict[str, Any]] = [
+    {
+        "category_id": "flying_mount",
+        "name": "Flying Mounts",
+        "description": "Can be ridden as an airborne flying mount with vertical altitude control.",
+        "icon": "🦅",
+        "sort_order": 1,
+    },
+    {
+        "category_id": "ground_mount",
+        "name": "Ground Mounts",
+        "description": "Can be ridden for rapid terrestrial travel and exploration.",
+        "icon": "🐎",
+        "sort_order": 2,
+    },
+    {
+        "category_id": "swimming_mount",
+        "name": "Swimming Mounts",
+        "description": "Can be ridden across water surfaces without stamina drain.",
+        "icon": "🌊",
+        "sort_order": 3,
+    },
+    {
+        "category_id": "glider",
+        "name": "Gliders",
+        "description": "Replaces or enhances the equipped glider (speed glide, vertical lift, no fall damage).",
+        "icon": "🪂",
+        "sort_order": 4,
+    },
+    {
+        "category_id": "ranch_producer",
+        "name": "Ranch Producers",
+        "description": "Produces items, ingredients, or spheres when assigned to a Ranch.",
+        "icon": "🚜",
+        "sort_order": 5,
+    },
+    {
+        "category_id": "player_element_infusion",
+        "name": "Player Element Infusion",
+        "description": "Changes the player's weapon/attack element and boosts player attack while active or mounted.",
+        "icon": "⚡",
+        "sort_order": 6,
+    },
+    {
+        "category_id": "player_combat_buffer",
+        "name": "Player Combat Buffers",
+        "description": "Boosts player Attack %, Defense %, Dodge I-Frames, or Weak Point damage.",
+        "icon": "⚔️",
+        "sort_order": 7,
+    },
+    {
+        "category_id": "party_pal_buffer",
+        "name": "Pal / Party Combat Buffers",
+        "description": "Passively boosts attack, defense, or speed for party Pals or elemental allies.",
+        "icon": "🛡️",
+        "sort_order": 8,
+    },
+    {
+        "category_id": "heavy_artillery",
+        "name": "Heavy Artillery & Direct Weapons",
+        "description": "Pal operates as or equips heavy weaponry (Minigun, Missile Launcher, Grenade Launcher, Assault Rifle, Flamethrower).",
+        "icon": "💥",
+        "sort_order": 9,
+    },
+    {
+        "category_id": "coop_attacker",
+        "name": "Autonomous Co-Op Attackers",
+        "description": "Pal hovers beside player to fire independent magic bullets/lightning, syncs tandem attacks, or follows up player hits.",
+        "icon": "👥",
+        "sort_order": 10,
+    },
+    {
+        "category_id": "healer_lifesteal",
+        "name": "Healers & Life-Steal",
+        "description": "Actively heals player and party HP, grants life-steal on attacks, or revives on incapacitation.",
+        "icon": "💖",
+        "sort_order": 11,
+    },
+    {
+        "category_id": "carrying_capacity",
+        "name": "Carrying Capacity Boosters",
+        "description": "Increases maximum player inventory carrying weight or reduces encumbrance.",
+        "icon": "🎒",
+        "sort_order": 12,
+    },
+    {
+        "category_id": "drop_loot_booster",
+        "name": "Drop Rate & Loot Boosters",
+        "description": "Increases item drops or Pal Souls dropped when defeating enemies.",
+        "icon": "🎁",
+        "sort_order": 13,
+    },
+    {
+        "category_id": "resource_gathering",
+        "name": "Resource Gathering Boosters",
+        "description": "Enhances ore mining, tree logging efficiency, or preserves equipment durability.",
+        "icon": "⛏️",
+        "sort_order": 14,
+    },
+    {
+        "category_id": "breeding_egg_booster",
+        "name": "Breeding & Egg Boosters",
+        "description": "Accelerates egg incubation speed at base, breeding farm production, or boosts Alpha egg chance.",
+        "icon": "🥚",
+        "sort_order": 15,
+    },
+    {
+        "category_id": "fishing_helper",
+        "name": "Fishing & Mini-Game Helpers",
+        "description": "Enhances fishing minigame catch rate, reduces meter drain, or attracts talented Pals.",
+        "icon": "🎣",
+        "sort_order": 16,
+    },
+    {
+        "category_id": "exploration_survival",
+        "name": "Exploration & Environmental Protection",
+        "description": "Scans for nearby dungeons/chests/ores, provides thermal/lava/toxic gas immunity, or grants invisibility.",
+        "icon": "🧭",
+        "sort_order": 17,
+    },
+    {
+        "category_id": "no_active_skill",
+        "name": "No Functional Partner Skill",
+        "description": "Pals currently without an active partner skill (WIP abilities).",
+        "icon": "❓",
+        "sort_order": 18,
+    },
+]
+
+
+def classify_pal_partner_categories(
+    pal_name: str, partner_skill_name: Optional[str], partner_skill_desc: Optional[str]
+) -> list[str]:
+    """Deterministically classifies a Pal into one or more Partner Skill categories."""
+    ps_name = str(partner_skill_name or "").strip()
+    desc = str(partner_skill_desc or "").strip()
+    text = f"{ps_name} {desc}".lower()
+
+    if not ps_name or ps_name == "-" or "still being investigated" in desc.lower() or "under investigation" in desc.lower():
+        return ["no_active_skill"]
+
+    cats: list[str] = []
+    if "flying mount" in text or ("fly" in text and "ridden" in text):
+        cats.append("flying_mount")
+    elif "travel on water" in text or "water mount" in text:
+        cats.append("swimming_mount")
+    elif "ridden" in text or "ride" in text or "mounted" in text:
+        cats.append("ground_mount")
+
+    if "glider" in text or "gliding" in text or "glide" in text:
+        cats.append("glider")
+
+    if any(k in text for k in ["ranch", "when assigned to", "assigned to", "digs up", "drops when assigned", "sometimes drops", "milk maker"]):
+        cats.append("ranch_producer")
+
+    if "attack type" in text or "changes the player" in text:
+        cats.append("player_element_infusion")
+
+    if any(
+        k in text
+        for k in [
+            "player's attack",
+            "player attack",
+            "player's defense",
+            "player defense",
+            "player takes reduced damage",
+            "reduced damage",
+            "elemental resistance",
+            "player and party pals take",
+            "barrier",
+            "weak point",
+            "weak points",
+            "dodge roll",
+            "dodge step",
+            "inflict 50",
+            "melee weapon",
+            "weapon damage",
+            "bow damage",
+            "bow charge",
+            "enchant",
+            "critical strike",
+            "damage to enemies afflicted",
+            "climbing speed",
+            "capture rate",
+            "homeward prayer",
+        ]
+    ):
+        cats.append("player_combat_buffer")
+
+    if any(
+        k in text
+        for k in [
+            "increases attack of",
+            "increases defense of",
+            "enhances",
+            "party pal",
+            "fighting alongside you",
+            "in party, increases",
+            "each other pal in your party",
+            "work suitability level for all other",
+            "depletion rate of",
+        ]
+    ):
+        cats.append("party_pal_buffer")
+
+    if any(
+        k in text
+        for k in [
+            "minigun",
+            "missile",
+            "rocket",
+            "grenade",
+            "flamethrower",
+            "machine gun",
+            "shotgun",
+            "weapon-wielding",
+            "egg launcher",
+            "launcher",
+            "assault rifle",
+            "gunfire",
+            "bomb",
+            "thrown at an enemy",
+            "katana",
+            "player equips",
+        ]
+    ):
+        cats.append("heavy_artillery")
+
+    if any(
+        k in text
+        for k in [
+            "attacks alongside",
+            "follows up",
+            "in tandem",
+            "attacks targeted enemy",
+            "appears near the player",
+            "attacks hostile enemies",
+            "nightmare iris",
+            "nightmare stare",
+            "sentinel of the great sea",
+            "magic bullets",
+            "body surf",
+            "fire surf",
+            "mad eye lunge",
+            "phantasmal gaze",
+            "summons shadow",
+            "bat backup",
+            "assist during combat",
+        ]
+    ):
+        cats.append("coop_attacker")
+
+    if any(
+        k in text
+        for k in [
+            "restore",
+            "health",
+            "heal",
+            "life steal",
+            "absorbs damage and restores",
+            "revives",
+        ]
+    ):
+        cats.append("healer_lifesteal")
+
+    if any(k in text for k in ["carrying capacity", "weight", "luggage"]):
+        cats.append("carrying_capacity")
+
+    if any(
+        k in text
+        for k in [
+            "drop 50% more",
+            "drops +50%",
+            "more items when defeated",
+            "more pal souls",
+            "drop rate",
+        ]
+    ):
+        cats.append("drop_loot_booster")
+
+    if any(
+        k in text
+        for k in [
+            "incubate",
+            "breeding farm",
+            "pal egg",
+            "alpha pal egg",
+            "egg production",
+        ]
+    ):
+        cats.append("breeding_egg_booster")
+
+    if any(k in text for k in ["ore", "mining", "wood", "trees", "logging", "durability", "crops", "harvest", "work speed", "salvaging"]):
+        cats.append("resource_gathering")
+
+    if any(k in text for k in ["fishing", "talented pals", "capture gauge"]):
+        cats.append("fishing_helper")
+
+    if any(
+        k in text
+        for k in [
+            "detect",
+            "radar",
+            "invisible",
+            "temperature",
+            "cold resistance",
+            "heat resistance",
+            "lava damage",
+            "toxic gas",
+            "spores",
+            "night vision",
+            "teleports to the nearest base",
+            "open treasure chests",
+        ]
+    ):
+        cats.append("exploration_survival")
+
+    return cats if cats else ["no_active_skill"]
 
 
 class SQLiteEngine:
@@ -442,6 +489,8 @@ class SQLiteEngine:
         self.conn = None
         self.current_world_id = None
         self.current_save_path = None
+        self._cached_active_missions: Optional[list[dict[str, Any]]] = None
+        self._cached_base_recommendations: Optional[dict[str, Any]] = None
 
         # Auto-select newest world if world_id not specified
         worlds = discover_worlds()
@@ -459,10 +508,13 @@ class SQLiteEngine:
             db_file = os.path.join(self.data_dir, "userdata.db")
 
         os.makedirs(os.path.dirname(db_file), exist_ok=True)
-        self.conn = sqlite3.connect(db_file, check_same_thread=False)
+        self.conn = sqlite3.connect(db_file, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA busy_timeout=30000")
         self._create_tables()
         self._load_static_metadata()
+        self.breeding_optimizer = BreedingGraphOptimizer(self)
         
         # Auto-load save file into DB on launch ONLY if DB is empty or Level.sav file mtime updated
         if self.current_save_path and os.path.exists(self.current_save_path):
@@ -563,6 +615,12 @@ class SQLiteEngine:
         """
         )
 
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pal_instances_species ON pal_instances(species)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pal_instances_loc ON pal_instances(location)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pal_instance_passives_iid ON pal_instance_passives(instance_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pal_instance_waza_iid ON pal_instance_waza(instance_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pal_instance_status_iid ON pal_instance_status_points(instance_id)")
+
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS players (
@@ -627,6 +685,27 @@ class SQLiteEngine:
 
         cursor.execute(
             """
+            CREATE TABLE IF NOT EXISTS base_camp_custom_names (
+                base_camp_id TEXT PRIMARY KEY,
+                custom_name TEXT NOT NULL
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS structure_aliases (
+                alias TEXT PRIMARY KEY,
+                canonical_name TEXT,
+                display_name TEXT,
+                work_type TEXT,
+                is_automated INTEGER
+            )
+        """
+        )
+
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS item_containers (
                 container_id TEXT PRIMARY KEY,
                 container_type TEXT,
@@ -658,21 +737,44 @@ class SQLiteEngine:
         """
         )
 
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS player_active_missions (
+                quest_id TEXT PRIMARY KEY
+            )
+        """
+        )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS world_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT
+            )
+        """
+        )
+
         # ---------- Static Metadata Source Setup ----------
         use_palworld_db = (
             self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
         )
 
         if use_palworld_db:
-            # Attach external master SQLite database
+            # Attach external master SQLite database if not already attached
             db_path_clean = self.palworld_db_path.replace("\\", "/")
-            cursor.execute(f"ATTACH DATABASE '{db_path_clean}' AS palworld_master")
+            try:
+                cursor.execute(f"ATTACH DATABASE '{db_path_clean}' AS palworld_master")
+            except Exception:
+                pass
 
-            # Create in-memory tables populated from attached master database
-            cursor.execute("DROP TABLE IF EXISTS main.pals")
-            cursor.execute(
-                r"""
-                CREATE TABLE pals AS
+            cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pals'")
+            tables_exist = cursor.fetchone() is not None
+
+            if not tables_exist:
+                cursor.execute("DROP TABLE IF EXISTS main.pals")
+                cursor.execute(
+                    r"""
+                    CREATE TABLE pals AS
                 SELECT
                     coalesce(code, id) AS internal_name,
                     name AS display_name,
@@ -795,6 +897,26 @@ class SQLiteEngine:
                 """
             )
 
+            # Special Crossover Unique Combos (Eye of Cthulhu)
+            eye_combos = [
+                ("Eye of Cthulhu", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Blue Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Cave Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Demon Eye", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Enchanted Sword", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Green Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Illuminant Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Illuminant Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Purple Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Rainbow Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Red Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+            ]
+            for p1, p2, ch in eye_combos:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child) VALUES (?, ?, ?)",
+                    (p1, p2, ch),
+                )
+
             cursor.execute("DROP TABLE IF EXISTS main.work_suitabilities")
             cursor.execute(
                 """
@@ -825,6 +947,22 @@ class SQLiteEngine:
                     satiety_drain_per_min AS satiety_amount,
                     base_san_drain_per_min AS san_decay_multiplier
                 FROM palworld_master.food_satiety_rates
+            """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.sub_missions")
+            cursor.execute(
+                """
+                CREATE TABLE sub_missions AS
+                SELECT * FROM palworld_master.sub_missions
+            """
+            )
+
+            cursor.execute("DROP TABLE IF EXISTS main.sub_mission_rewards")
+            cursor.execute(
+                """
+                CREATE TABLE sub_mission_rewards AS
+                SELECT * FROM palworld_master.sub_mission_rewards
             """
             )
         else:
@@ -957,6 +1095,36 @@ class SQLiteEngine:
             """
             )
 
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sub_missions (
+                    id TEXT PRIMARY KEY,
+                    category TEXT,
+                    title TEXT,
+                    npc_name TEXT,
+                    objective TEXT,
+                    start_dialogue TEXT,
+                    in_progress_dialogue TEXT,
+                    completed_dialogue TEXT,
+                    target_type TEXT,
+                    target_id TEXT,
+                    target_count INTEGER
+                )
+            """
+            )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS sub_mission_rewards (
+                    id INTEGER PRIMARY KEY,
+                    mission_id TEXT,
+                    reward_type TEXT,
+                    item_id TEXT,
+                    item_name TEXT,
+                    quantity INTEGER
+                )
+            """
+            )
+
         self.conn.commit()
 
     def _load_static_metadata(self) -> None:
@@ -1006,6 +1174,26 @@ class SQLiteEngine:
                     """,
                         (bc.get("parent1"), bc.get("parent2"), bc.get("child")),
                     )
+
+            # Special Crossover Unique Combos (Eye of Cthulhu)
+            eye_combos = [
+                ("Eye of Cthulhu", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Blue Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Cave Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Demon Eye", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Enchanted Sword", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Green Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Illuminant Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Illuminant Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Purple Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Rainbow Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ("Red Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+            ]
+            for p1, p2, ch in eye_combos:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child) VALUES (?, ?, ?)",
+                    (p1, p2, ch),
+                )
 
             ps_path = os.path.join(self.data_dir, "partner_skills.json")
             if os.path.exists(ps_path):
@@ -1113,6 +1301,108 @@ class SQLiteEngine:
                         (ws.get("id"), ws.get("name"), ws.get("description")),
                     )
 
+        # ---------- Partner Skill Categories Table Setup & Population ----------
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS partner_skill_categories (
+                category_id TEXT PRIMARY KEY,
+                name TEXT,
+                description TEXT,
+                icon TEXT,
+                sort_order INTEGER
+            )
+            """
+        )
+        for cat in PARTNER_SKILL_CATEGORY_DEFS:
+            cursor.execute(
+                "INSERT OR REPLACE INTO partner_skill_categories (category_id, name, description, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
+                (cat["category_id"], cat["name"], cat["description"], cat["icon"], cat["sort_order"]),
+            )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pal_partner_skill_categories (
+                pal_internal_name TEXT,
+                category_id TEXT,
+                PRIMARY KEY (pal_internal_name, category_id)
+            )
+            """
+        )
+
+        # Populate categories for all pals
+        use_palworld_db = (
+            self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
+        )
+        try:
+            pal_rows = cursor.execute(
+                """
+                SELECT p.internal_name, p.display_name, p.id, p.code,
+                       ps.name as partner_name, ps.description as partner_desc
+                FROM pals p
+                LEFT JOIN partner_skills ps ON LOWER(p.internal_name) = LOWER(ps.pal_internal_name)
+                                            OR LOWER(p.id) = LOWER(ps.pal_internal_name)
+                                            OR LOWER(p.code) = LOWER(ps.pal_internal_name)
+                """
+            ).fetchall()
+
+            for pr in pal_rows:
+                pal_key = pr["internal_name"] or pr["id"] or pr["code"]
+                p_display = pr["display_name"]
+                ps_name = pr["partner_name"]
+                ps_desc = pr["partner_desc"]
+
+                # If partner_skills row didn't match via pal_internal_name, try checking palworld_master
+                if use_palworld_db and (not ps_name or not ps_desc):
+                    try:
+                        s_row = cursor.execute(
+                            """
+                            SELECT s.name, s.description
+                            FROM palworld_master.pal_skills ps
+                            JOIN palworld_master.skills s ON ps.skill_id = s.id
+                            WHERE (LOWER(ps.pal_id) = LOWER(?) OR ps.pal_id = ?)
+                              AND (s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%')
+                            LIMIT 1
+                            """,
+                            (pal_key, pal_key),
+                        ).fetchone()
+                        if s_row:
+                            ps_name = s_row["name"]
+                            ps_desc = clean_skill_text(s_row["description"])
+                    except Exception:
+                        pass
+
+                cats = classify_pal_partner_categories(p_display, ps_name, ps_desc)
+                for c in cats:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO pal_partner_skill_categories (pal_internal_name, category_id) VALUES (?, ?)",
+                        (pal_key, c),
+                    )
+        except Exception as e:
+            print(f"Warning populating partner skill categories: {e}")
+
+        # Seed structure aliases and friendly display names into SQLite structure_aliases table
+        aliases_path = os.path.join(self.data_dir, "structure_aliases.json")
+        if os.path.exists(aliases_path):
+            try:
+                with open(aliases_path, "r", encoding="utf-8") as f:
+                    aliases_data = json.load(f)
+                for sa in aliases_data:
+                    cursor.execute(
+                        """
+                        INSERT OR REPLACE INTO structure_aliases (alias, canonical_name, display_name, work_type, is_automated)
+                        VALUES (?, ?, ?, ?, ?)
+                    """,
+                        (
+                            sa.get("alias"),
+                            sa.get("canonical_name"),
+                            sa.get("display_name"),
+                            sa.get("work_type"),
+                            sa.get("is_automated", 0),
+                        ),
+                    )
+            except Exception as e:
+                print(f"Warning populating structure aliases: {e}")
+
         self.conn.commit()
 
     # ---------- Save Data Reload capability ----------
@@ -1176,6 +1466,10 @@ class SQLiteEngine:
         cursor.execute("DELETE FROM base_structures_instances")
         cursor.execute("DELETE FROM item_container_slots")
         cursor.execute("DELETE FROM item_containers")
+        cursor.execute("DELETE FROM player_active_missions")
+        cursor.execute("DELETE FROM world_settings")
+        self._cached_base_recommendations = None
+        self._cached_active_missions = None
         self.conn.commit()
 
     def load_save_data(self, sav_path: str) -> None:
@@ -1187,8 +1481,23 @@ class SQLiteEngine:
         bases = extract_bases(sav_path)
         items_data = extract_items(sav_path)
         players = extract_players(sav_path)
+        active_quests = extract_active_quests(sav_path)
+        world_settings = extract_world_settings(sav_path)
 
         cursor = self.conn.cursor()
+
+        for k, v in world_settings.items():
+            cursor.execute(
+                "INSERT OR REPLACE INTO world_settings (setting_key, setting_value) VALUES (?, ?)",
+                (str(k), str(v))
+            )
+
+        for q in active_quests:
+            if q.get("quest_id"):
+                cursor.execute(
+                    "INSERT OR REPLACE INTO player_active_missions (quest_id) VALUES (?)",
+                    (q["quest_id"],)
+                )
         
         for p in players:
             cursor.execute(
@@ -1551,6 +1860,33 @@ class SQLiteEngine:
         ).fetchall()
         return [r["display_name"] for r in rows if r["display_name"]]
 
+    def get_restricted_breeding_species(self) -> set[str]:
+        """Returns a lowercased set of all Pal internal and display names that cannot be standard average-formula offspring."""
+        if hasattr(self, "_restricted_breeding_set") and self._restricted_breeding_set:
+            return self._restricted_breeding_set
+
+        restricted = set(RESTRICTED_BREEDING_SPECIES)
+        try:
+            rows = self.conn.execute(
+                "SELECT DISTINCT LOWER(child) FROM breeding_combos WHERE LOWER(parent1) = LOWER(parent2) AND LOWER(parent2) = LOWER(child)"
+            ).fetchall()
+            for r in rows:
+                if r[0]:
+                    restricted.add(r[0].strip().lower())
+
+            p_rows = self.conn.execute("SELECT LOWER(display_name), LOWER(internal_name) FROM pals").fetchall()
+            for dn, iname in p_rows:
+                dn_l = (dn or "").strip().lower()
+                in_l = (iname or "").strip().lower()
+                if dn_l in restricted or in_l in restricted:
+                    restricted.add(dn_l)
+                    restricted.add(in_l)
+        except Exception:
+            pass
+
+        self._restricted_breeding_set = restricted
+        return restricted
+
     def get_breeding_result(self, parent1: str, parent2: str) -> Optional[dict[str, Any]]:
         """Calculates breeding result child for two parent species."""
         p1_in = parent1.strip().lower()
@@ -1621,34 +1957,18 @@ class SQLiteEngine:
 
         target_power = (p1_power + p2_power + 1) // 2
 
-        restricted = (
-            "jetragon",
-            "frostallion",
-            "paladius",
-            "necromus",
-            "bellanoir",
-            "chikipi",
-            "xenovader",
-            "xenogard",
-            "xenolord",
-        )
-
-        query = f"""
-            SELECT * FROM pals
-            WHERE is_variant = 0
-              AND LOWER(display_name) NOT IN ({','.join('?' for _ in restricted)})
-            ORDER BY abs(breeding_power - ?) ASC, index_order ASC
-            LIMIT 1
-        """
-        child_row = self.conn.execute(query, restricted + (target_power,)).fetchone()
-        if child_row:
-            res = dict(child_row)
+        restricted_set = self.get_restricted_breeding_species()
+        all_pals_rows = self.conn.execute("SELECT * FROM pals WHERE is_variant = 0 ORDER BY index_order ASC").fetchall()
+        candidate_pals = [dict(r) for r in all_pals_rows if is_valid_standard_candidate(dict(r), restricted_set)]
+        if candidate_pals:
+            best_pal = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - target_power))
+            res = dict(best_pal)
             res["icon_path"] = transform_icon_path(res.get("icon_path"))
             return res
         return None
 
-    def get_offspring_for_parent(self, parent: str) -> list[dict[str, Any]]:
-        """Finds all unique offspring possible from the given parent."""
+    def get_offspring_for_parent(self, parent: str, pool: Optional[list[str]] = None) -> list[dict[str, Any]]:
+        """Finds all unique offspring possible from the given parent with partner parents list and pool filtering."""
         p_row = self.conn.execute(
             "SELECT display_name, internal_name, breeding_power FROM pals WHERE LOWER(display_name) = ? OR LOWER(internal_name) = ?",
             (parent.lower(), parent.lower()),
@@ -1659,24 +1979,36 @@ class SQLiteEngine:
 
         if not p_row:
             return []
-            
-        all_pals = self.conn.execute("SELECT display_name, internal_name, breeding_power FROM pals").fetchall()
-        
-        offspring_set = set()
-        offspring_results = []
-        
-        for other in all_pals:
+
+        all_pals = self.conn.execute("SELECT display_name, internal_name, breeding_power, index_order FROM pals").fetchall()
+
+        pool_set = {p.strip().lower() for p in pool} if pool else None
+        if pool_set:
+            candidate_others = [dict(r) for r in all_pals if r["display_name"].lower() in pool_set or r["internal_name"].lower() in pool_set]
+        else:
+            candidate_others = [dict(r) for r in all_pals]
+
+        offspring_map: dict[str, dict[str, Any]] = {}
+
+        for other in candidate_others:
             res = self.get_breeding_result(p_row["display_name"], other["display_name"])
             if res:
                 c_name = res["display_name"]
-                if c_name not in offspring_set:
-                    offspring_set.add(c_name)
-                    offspring_results.append(res)
-                    
-        return offspring_results
+                if c_name not in offspring_map:
+                    entry = dict(res)
+                    entry["other_parents"] = [other["display_name"]]
+                    offspring_map[c_name] = entry
+                else:
+                    if other["display_name"] not in offspring_map[c_name]["other_parents"]:
+                        offspring_map[c_name]["other_parents"].append(other["display_name"])
 
-    def find_parents_for_child(self, child: str) -> list[tuple[str, str]]:
-        """Returns all breeding combinations (Parent 1, Parent 2) that yield target child."""
+        for entry in offspring_map.values():
+            entry["other_parents"].sort()
+
+        return sorted(list(offspring_map.values()), key=lambda x: (x.get("index_order", 9999), x.get("display_name", "")))
+
+    def find_parents_for_child(self, child: str, pool: Optional[list[str]] = None) -> list[tuple[str, str]]:
+        """Returns all breeding combinations (Parent 1, Parent 2) that yield target child, optionally filtered by available pool."""
         c = child.strip().lower()
 
         child_row = self.conn.execute(
@@ -1695,7 +2027,7 @@ class SQLiteEngine:
         target_child_lower = child_name.lower()
 
         pals_rows = self.conn.execute(
-            "SELECT display_name, breeding_power, is_variant, index_order FROM pals"
+            "SELECT display_name, internal_name, breeding_power, is_variant, index_order FROM pals"
         ).fetchall()
         all_pals = [dict(r) for r in pals_rows]
 
@@ -1708,14 +2040,8 @@ class SQLiteEngine:
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
-        restricted = {
-            "jetragon", "frostallion", "paladius", "necromus",
-            "bellanoir", "chikipi", "xenovader", "xenogard", "xenolord"
-        }
-        candidate_pals = [
-            p for p in all_pals
-            if p["is_variant"] == 0 and p["display_name"].lower() not in restricted
-        ]
+        restricted_set = self.get_restricted_breeding_species()
+        candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
         def calc_standard_child(power1: int, power2: int) -> str:
@@ -1726,10 +2052,13 @@ class SQLiteEngine:
             )
             return best_pal["display_name"]
 
+        pool_set = {p.strip().lower() for p in pool} if pool else None
+
         results = set()
 
-        # Same-species breeding gives same species
-        results.add((child_name, child_name))
+        # Same-species breeding gives same species (only if child is in pool when pool filtering active)
+        if not pool_set or child_name.lower() in pool_set:
+            results.add((child_name, child_name))
 
         for i in range(len(all_pals)):
             for j in range(i, len(all_pals)):
@@ -1737,14 +2066,19 @@ class SQLiteEngine:
                 p2_name = all_pals[j]["display_name"]
                 p1_l, p2_l = p1_name.lower(), p2_name.lower()
 
+                if pool_set and (p1_l not in pool_set or p2_l not in pool_set):
+                    continue
+
                 if p1_l == p2_l:
                     result_child = p1_name
                 elif (p1_l, p2_l) in special_combos:
                     result_child = special_combos[(p1_l, p2_l)]
-                else:
+                elif p1_name.lower() not in restricted_set and p2_name.lower() not in restricted_set:
                     pow1 = all_pals[i]["breeding_power"]
                     pow2 = all_pals[j]["breeding_power"]
                     result_child = calc_standard_child(pow1, pow2)
+                else:
+                    continue
 
                 if result_child.lower() == target_child_lower:
                     p1_n, p2_n = p1_name, p2_name
@@ -1753,6 +2087,138 @@ class SQLiteEngine:
                     results.add((p1_n, p2_n))
 
         return sorted(list(results), key=lambda x: (x[0].lower(), x[1].lower()))
+
+    def get_uncaught_breeding_opportunities(
+        self,
+        owned_input: Optional[Any] = None,
+        parent_pool: Optional[Any] = None
+    ) -> list[dict[str, Any]]:
+        """Finds all Pal species NOT yet caught in the save file that can be bred using available Pals."""
+        if owned_input is not None:
+            if isinstance(owned_input, str):
+                owned_species = [s.strip() for s in owned_input.split(",") if s.strip()]
+            else:
+                owned_species = list(owned_input)
+        else:
+            owned_inv = self.get_owned_pal_inventory()
+            owned_species = list(owned_inv.keys()) if owned_inv else []
+
+        owned_set = {s.strip().lower() for s in owned_species}
+
+        pals_rows = self.conn.execute(
+            "SELECT display_name, paldex_number, icon_path, element_1, element_2, rarity, breeding_power, is_variant, index_order FROM pals ORDER BY paldex_number ASC, index_order ASC"
+        ).fetchall()
+        all_pals = [dict(r) for r in pals_rows]
+
+        combos_rows = self.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
+        special_combos: dict[tuple[str, str], str] = {}
+        for r in combos_rows:
+            p1_l = r["parent1"].lower()
+            p2_l = r["parent2"].lower()
+            ch_name = r["child"]
+            special_combos[(p1_l, p2_l)] = ch_name
+            special_combos[(p2_l, p1_l)] = ch_name
+
+        restricted_set = self.get_restricted_breeding_species()
+        candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
+        candidate_pals.sort(key=lambda x: x["index_order"])
+
+        # Pre-compute power to child table for O(1) lookup
+        max_pow = max(p["breeding_power"] for p in all_pals) * 2 + 100
+        power_to_child = [None] * max_pow
+        for p_val in range(max_pow):
+            best_pal = min(candidate_pals, key=lambda cp: abs(cp["breeding_power"] - p_val))
+            power_to_child[p_val] = best_pal["display_name"]
+
+        # Determine which pool of parents can be used
+        is_all_game = False
+        if parent_pool is not None:
+            if isinstance(parent_pool, str):
+                if parent_pool.lower() in ("all", "global", "*"):
+                    is_all_game = True
+                    pool_pals = all_pals
+                elif parent_pool.lower() in ("auto", "caught"):
+                    pool_pals = [p for p in all_pals if p["display_name"].lower() in owned_set]
+                else:
+                    custom_set = {s.strip().lower() for s in parent_pool.split(",") if s.strip()}
+                    pool_pals = [p for p in all_pals if p["display_name"].lower() in custom_set]
+            elif isinstance(parent_pool, (list, set)):
+                custom_set = {s.strip().lower() for s in parent_pool if s.strip()}
+                pool_pals = [p for p in all_pals if p["display_name"].lower() in custom_set]
+            else:
+                pool_pals = [p for p in all_pals if p["display_name"].lower() in owned_set]
+        else:
+            pool_pals = [p for p in all_pals if p["display_name"].lower() in owned_set]
+
+        # Fast single pass over pool pairs to group uncaught offspring
+        uncaught_pairs_map: dict[str, list[tuple[str, str]]] = {}
+        uncaught_set = {
+            p["display_name"].lower() for p in all_pals
+            if p["display_name"].lower() not in owned_set
+            and "&" not in p["display_name"]
+            and p["display_name"].lower() not in {"boltmane", "dragostrophe", "pidf rider"}
+            and not str(p.get("internal_name") or "").startswith("POLICE_")
+            and "Boss" not in str(p.get("internal_name") or "")
+        }
+
+        for i in range(len(pool_pals)):
+            p1 = pool_pals[i]
+            p1_name = p1["display_name"]
+            p1_l = p1_name.lower()
+            for j in range(i, len(pool_pals)):
+                p2 = pool_pals[j]
+                p2_name = p2["display_name"]
+                p2_l = p2_name.lower()
+
+                if p1_l == p2_l:
+                    result_child = p1_name
+                elif (p1_l, p2_l) in special_combos:
+                    result_child = special_combos[(p1_l, p2_l)]
+                elif p1_l not in restricted_set and p2_l not in restricted_set:
+                    tp = (p1["breeding_power"] + p2["breeding_power"] + 1) // 2
+                    result_child = power_to_child[tp] if tp < max_pow else candidate_pals[0]["display_name"]
+                else:
+                    continue
+
+                ch_l = result_child.lower()
+                if ch_l in uncaught_set:
+                    # Disallow self-breeding (Child + Child) as an acquisition path for an uncaught species
+                    if p1_l == ch_l and p2_l == ch_l:
+                        continue
+                    if ch_l not in uncaught_pairs_map:
+                        uncaught_pairs_map[ch_l] = []
+                    p1_n, p2_n = p1_name, p2_name
+                    if p1_n.lower() > p2_n.lower():
+                        p1_n, p2_n = p2_n, p1_n
+                    uncaught_pairs_map[ch_l].append((p1_n, p2_n))
+
+        results = []
+        for r in all_pals:
+            d_name = r["display_name"]
+            d_lower = d_name.lower()
+            if (
+                d_lower in owned_set
+                or "&" in d_name
+                or d_lower in {"boltmane", "dragostrophe", "pidf rider"}
+                or str(r.get("internal_name") or "").startswith("POLICE_")
+                or "Boss" in str(r.get("internal_name") or "")
+            ):
+                continue
+
+            pairs = uncaught_pairs_map.get(d_lower, [])
+            if pairs:
+                results.append({
+                    "species": d_name,
+                    "paldex_number": r["paldex_number"],
+                    "icon_path": transform_icon_path(r["icon_path"]),
+                    "element_1": r["element_1"],
+                    "element_2": r["element_2"],
+                    "rarity": r["rarity"],
+                    "possible_pairs_count": len(pairs),
+                    "pairs": [{"parent1": p1, "parent2": p2} for p1, p2 in pairs]
+                })
+
+        return results
 
     def find_all_breeding_paths(
         self,
@@ -1813,14 +2279,8 @@ class SQLiteEngine:
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
-        restricted = {
-            "jetragon", "frostallion", "paladius", "necromus",
-            "bellanoir", "chikipi", "xenovader", "xenogard", "xenolord"
-        }
-        candidate_pals = [
-            p for p in all_pals
-            if p["is_variant"] == 0 and p["display_name"].lower() not in restricted
-        ]
+        restricted_set = self.get_restricted_breeding_species()
+        candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
         def calc_child_fast(p1_l: str, p2_l: str) -> str:
@@ -1828,7 +2288,7 @@ class SQLiteEngine:
                 return cased_names.get(p1_l, p1_l)
             if (p1_l, p2_l) in special_combos:
                 return special_combos[(p1_l, p2_l)]
-            if p1_l in power_map and p2_l in power_map:
+            if p1_l not in restricted_set and p2_l not in restricted_set and p1_l in power_map and p2_l in power_map:
                 pow1 = power_map[p1_l]
                 pow2 = power_map[p2_l]
                 target_pow = (pow1 + pow2 + 1) // 2
@@ -1844,6 +2304,46 @@ class SQLiteEngine:
                 target = matched
             else:
                 return []
+
+        is_all_mode = False
+        if isinstance(owned_input, str) and owned_input.strip().lower() in ("all", "global", "*"):
+            is_all_mode = True
+        elif isinstance(owned_input, list) and any(str(i).strip().lower() in ("all", "global", "*") for i in owned_input):
+            is_all_mode = True
+
+        if is_all_mode:
+            all_pairs = self.find_parents_for_child(target)
+            if not all_pairs:
+                return []
+            
+            diff_pairs = [p for p in all_pairs if p[0].lower() != target.lower() or p[1].lower() != target.lower()]
+            same_pairs = [p for p in all_pairs if p[0].lower() == target.lower() and p[1].lower() == target.lower()]
+            selected_pairs = diff_pairs[:8] if diff_pairs else same_pairs[:1]
+            
+            paths = []
+            for idx, (p1, p2) in enumerate(selected_pairs):
+                is_same = (p1.lower() == target.lower() and p2.lower() == target.lower())
+                hatch_info = get_hatch_odds(target, "Any")
+                step_obj = {
+                    "step": 1,
+                    "parent1": p1,
+                    "parent1_gender": "Male",
+                    "parent2": p2,
+                    "parent2_gender": "Female",
+                    "child": cased_names.get(target, target),
+                    "gender_note": hatch_info.get("gender_note", ""),
+                    "hatch_chance_pct": hatch_info.get("hatch_chance_pct", "100%"),
+                    "avg_eggs": hatch_info.get("avg_eggs", "~1 egg"),
+                }
+                title = f"Same-Species: {p1} + {p2}" if is_same else f"Direct Pair: {p1} + {p2}"
+                paths.append({
+                    "path_id": idx + 1,
+                    "title": title,
+                    "difficulty": "1 Generation (Direct Combination)",
+                    "steps": [step_obj],
+                    "total_quality_score": 0,
+                })
+            return paths
 
         reachable_genders: dict[str, set[str]] = {}
 
@@ -1909,17 +2409,18 @@ class SQLiteEngine:
                         child_name = calc_child_fast(parent1, parent2)
                         if child_name:
                             child = child_name.lower()
-                            if child not in starting_owned:
+                            if child not in starting_owned or child == target:
                                 new_breeds.append((child, parent1, g1_req, parent2, g2_req))
 
             for child, p1, g1_req, p2, g2_req in new_breeds:
-                # Ignore self-breeding loops
-                if p1 == p2 and child == p1:
+                # Ignore self-breeding loops for intermediate steps, but allow for target if compatible
+                if p1 == p2 and child == p1 and child != target:
                     continue
 
                 if child not in recipes_for_child:
                     recipes_for_child[child] = []
-                    next_queue.append(child)
+                    if child != target:
+                        next_queue.append(child)
 
                 # Canonicalize parent pair to prevent order swapping duplicates
                 pair_key = tuple(sorted([(p1, g1_req), (p2, g2_req)], key=lambda x: x[0]))
@@ -2012,6 +2513,15 @@ class SQLiteEngine:
                 if best_p1_list:
                     b1 = best_p1_list[0]
                     s_step["parent1_instance_id"] = b1.get("instance_id")
+                    s_step["parent1_level"] = b1.get("level")
+                    s_step["parent1_rank"] = b1.get("rank", 0)
+                    s_step["parent1_nickname"] = b1.get("nickname")
+                    s_step["parent1_ivs"] = {
+                        "hp": b1.get("iv_hp") if b1.get("iv_hp") is not None else b1.get("ivs", {}).get("hp"),
+                        "melee": b1.get("iv_melee") if b1.get("iv_melee") is not None else b1.get("ivs", {}).get("melee"),
+                        "shot": b1.get("iv_shot") if b1.get("iv_shot") is not None else b1.get("ivs", {}).get("shot"),
+                        "defense": b1.get("iv_defense") if b1.get("iv_defense") is not None else b1.get("ivs", {}).get("defense"),
+                    }
                     s_step["parent1_score"] = b1.get("skill_score", 0)
                     s_step["parent1_passives"] = [
                         p_item.get("name") if isinstance(p_item, dict) else str(p_item)
@@ -2019,11 +2529,22 @@ class SQLiteEngine:
                     ]
                     s_step["parent1_matched_passives"] = b1.get("matched_passives", [])
                     s_step["parent1_location"] = b1.get("location")
+                    s_step["parent1_location_details"] = b1.get("location_details")
+                    s_step["parent1_icon_path"] = b1.get("icon_path")
 
                 best_p2_list = self.get_best_parent_instances(p2_sp, p2_g, target_skills_list)
                 if best_p2_list:
                     b2 = best_p2_list[0]
                     s_step["parent2_instance_id"] = b2.get("instance_id")
+                    s_step["parent2_level"] = b2.get("level")
+                    s_step["parent2_rank"] = b2.get("rank", 0)
+                    s_step["parent2_nickname"] = b2.get("nickname")
+                    s_step["parent2_ivs"] = {
+                        "hp": b2.get("iv_hp") if b2.get("iv_hp") is not None else b2.get("ivs", {}).get("hp"),
+                        "melee": b2.get("iv_melee") if b2.get("iv_melee") is not None else b2.get("ivs", {}).get("melee"),
+                        "shot": b2.get("iv_shot") if b2.get("iv_shot") is not None else b2.get("ivs", {}).get("shot"),
+                        "defense": b2.get("iv_defense") if b2.get("iv_defense") is not None else b2.get("ivs", {}).get("defense"),
+                    }
                     s_step["parent2_score"] = b2.get("skill_score", 0)
                     s_step["parent2_passives"] = [
                         p_item.get("name") if isinstance(p_item, dict) else str(p_item)
@@ -2031,6 +2552,8 @@ class SQLiteEngine:
                     ]
                     s_step["parent2_matched_passives"] = b2.get("matched_passives", [])
                     s_step["parent2_location"] = b2.get("location")
+                    s_step["parent2_location_details"] = b2.get("location_details")
+                    s_step["parent2_icon_path"] = b2.get("icon_path")
 
             sig = "||".join(get_step_sig(s) for s in p)
             if sig in path_signatures:
@@ -2151,6 +2674,22 @@ class SQLiteEngine:
                 params.append(s_filter["min_level"])
             query += ")"
 
+        if "partner_category" in filters and filters["partner_category"]:
+            raw_cat = str(filters["partner_category"]).strip().lower()
+            query += """ AND (
+                internal_name IN (
+                    SELECT pal_internal_name FROM pal_partner_skill_categories
+                    WHERE LOWER(category_id) = LOWER(?) OR LOWER(category_id) = LOWER(REPLACE(?, ' ', '_'))
+                       OR category_id IN (SELECT category_id FROM partner_skill_categories WHERE LOWER(name) = LOWER(?))
+                )
+                OR id IN (
+                    SELECT pal_internal_name FROM pal_partner_skill_categories
+                    WHERE LOWER(category_id) = LOWER(?) OR LOWER(category_id) = LOWER(REPLACE(?, ' ', '_'))
+                       OR category_id IN (SELECT category_id FROM partner_skill_categories WHERE LOWER(name) = LOWER(?))
+                )
+            )"""
+            params.extend([raw_cat, raw_cat, raw_cat, raw_cat, raw_cat, raw_cat])
+
         query += " ORDER BY paldex_number ASC"
 
         rows = self.conn.execute(query, params).fetchall()
@@ -2163,6 +2702,8 @@ class SQLiteEngine:
         for r in rows:
             pal_dict = dict(r)
             pal_dict["icon_path"] = transform_icon_path(pal_dict.get("icon_path"))
+            pal_dict["base_speed"] = pal_dict.get("run_speed") or pal_dict.get("speed") or 0
+            pal_dict["run_speed"] = pal_dict.get("run_speed") or pal_dict.get("speed") or 0
 
             if use_palworld_db:
                 pal_id = pal_dict.get("internal_name") or pal_dict.get("id")
@@ -2190,16 +2731,6 @@ class SQLiteEngine:
                         s_desc = clean_skill_text(s_dict.get("description"))
                         s_item = s_dict.get("unlock_item")
 
-                        # Apply official partner skill overrides if applicable
-                        if (s_type == "Partner" or s_cat == "Partner") and pal_key in PARTNER_SKILL_OVERRIDES:
-                            ov = PARTNER_SKILL_OVERRIDES[pal_key]
-                            if "name" in ov:
-                                s_name = ov["name"]
-                            if "description" in ov:
-                                s_desc = ov["description"]
-                            if "unlock_item" in ov:
-                                s_item = ov["unlock_item"]
-
                         pal_skills_list.append({
                             "id": s_dict.get("id"),
                             "name": s_name,
@@ -2225,12 +2756,18 @@ class SQLiteEngine:
                     pal_dict["skills"] = []
                     pal_dict["partner_skill"] = None
 
-                # Attach work suitabilities from palworld_master
+                # Attach work suitabilities from palworld_master or main.pal_work_suitabilities
                 try:
-                    ws_rows = self.conn.execute(
-                        "SELECT work_type, level FROM palworld_master.work_suitability WHERE pal_id = ? ORDER BY level DESC",
-                        (pal_id,),
-                    ).fetchall()
+                    try:
+                        ws_rows = self.conn.execute(
+                            "SELECT work_type, level FROM palworld_master.work_suitability WHERE pal_id = ? ORDER BY level DESC",
+                            (pal_id,),
+                        ).fetchall()
+                    except Exception:
+                        ws_rows = self.conn.execute(
+                            "SELECT suitability_name as work_type, level FROM pal_work_suitabilities WHERE pal_internal_name = ? ORDER BY level DESC",
+                            (pal_id,),
+                        ).fetchall()
                     
                     work_type_map = {
                         "EmitFlame": ("Kindling", "Kindling.png"),
@@ -2305,9 +2842,44 @@ class SQLiteEngine:
                 except Exception:
                     pal_dict["drops"] = []
 
+            # Attach Partner Skill Categories
+            try:
+                pal_key = pal_dict.get("internal_name") or pal_dict.get("id") or ""
+                cat_rows = self.conn.execute(
+                    """
+                    SELECT DISTINCT c.category_id as id, c.name, c.icon, c.description
+                    FROM pal_partner_skill_categories pc
+                    JOIN partner_skill_categories c ON pc.category_id = c.category_id
+                    WHERE LOWER(pc.pal_internal_name) = LOWER(?)
+                    ORDER BY c.sort_order ASC
+                    """,
+                    (pal_key,),
+                ).fetchall()
+                pal_dict["partner_skill_categories"] = [dict(cr) for cr in cat_rows]
+            except Exception:
+                pal_dict["partner_skill_categories"] = []
+
             results.append(pal_dict)
 
         return results
+
+    def get_partner_skill_categories(self) -> list[dict[str, Any]]:
+        """Returns all partner skill categories with icons, descriptions, and current pal counts."""
+        try:
+            rows = self.conn.execute(
+                """
+                SELECT c.category_id, c.name, c.description, c.icon, c.sort_order,
+                       COUNT(DISTINCT pc.pal_internal_name) as pal_count
+                FROM partner_skill_categories c
+                LEFT JOIN pal_partner_skill_categories pc ON c.category_id = pc.category_id
+                GROUP BY c.category_id
+                ORDER BY c.sort_order ASC
+                """
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            print(f"Error querying partner skill categories: {e}")
+            return []
 
     def query_items(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
         """Queries items catalog with optional category, subcategory, and rarity filters."""
@@ -2532,15 +3104,6 @@ class SQLiteEngine:
 
                 for r in self.conn.execute(prt_query, prt_params).fetchall():
                     d = dict(r)
-                    pal_key = str(d.get("pal_id") or "").lower().strip()
-                    if pal_key in PARTNER_SKILL_OVERRIDES:
-                        ov = PARTNER_SKILL_OVERRIDES[pal_key]
-                        if "name" in ov:
-                            d["name"] = ov["name"]
-                        if "description" in ov:
-                            d["description"] = ov["description"]
-                        if "unlock_item" in ov:
-                            d["unlock_item"] = ov["unlock_item"]
                     d["icon_path"] = transform_icon_path(d.get("icon_path"))
                     d["pal_icon"] = transform_icon_path(d.get("pal_icon"))
                     d["description"] = clean_skill_text(d.get("description"))
@@ -2647,169 +3210,323 @@ class SQLiteEngine:
 
     def query_instances(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
         """Queries dynamic Pal instances table with multiple filter conditions."""
-        query = """
-            SELECT pi.*,
-                   coalesce(p.display_name, pi.species) as display_name,
-                   p.element_1, p.element_2, p.hp, p.attack_melee, p.defense, p.icon_path
-            FROM pal_instances pi
-            LEFT JOIN pals p ON LOWER(pi.species) = LOWER(p.internal_name)
-                             OR LOWER(pi.species) = LOWER(p.display_name)
-                             OR LOWER(pi.species) = LOWER(p.id)
-                             OR LOWER(pi.species) = LOWER(p.code)
-                             OR REPLACE(LOWER(pi.species), 'boss_', '') = LOWER(p.internal_name)
-                             OR REPLACE(LOWER(pi.species), 'boss_', '') = LOWER(p.display_name)
-                             OR REPLACE(LOWER(pi.species), 'boss_', '') = LOWER(p.id)
-                             OR REPLACE(LOWER(pi.species), 'boss_', '') = LOWER(p.code)
-            WHERE 1=1
-        """
+        # 1. Preload master pals dictionary in memory for O(1) attribute lookup
+        pal_rows = self.conn.execute("SELECT * FROM pals").fetchall()
+        pals_map = {}
+        for p in pal_rows:
+            pd = dict(p)
+            for k in ("internal_name", "display_name", "id", "code"):
+                val = pd.get(k)
+                if val:
+                    pals_map[str(val).lower()] = pd
+
+        query = "SELECT * FROM pal_instances WHERE 1=1"
         params: list[Any] = []
 
-        if "species" in filters:
-            query += " AND (LOWER(coalesce(p.display_name, pi.species)) = ? OR LOWER(pi.species) = ?)"
-            params.extend([filters["species"].lower(), filters["species"].lower()])
-
-        if "location" in filters:
-            query += " AND pi.location = ?"
+        if "location" in filters and filters["location"]:
+            query += " AND location = ?"
             params.append(filters["location"])
 
-        if "gender" in filters:
-            query += " AND pi.gender = ?"
+        if "gender" in filters and filters["gender"]:
+            query += " AND gender = ?"
             params.append(filters["gender"])
 
-        if "min_level" in filters:
-            query += " AND pi.level >= ?"
+        if "min_level" in filters and filters["min_level"]:
+            query += " AND level >= ?"
             params.append(filters["min_level"])
 
-        if "min_rank" in filters:
-            query += " AND pi.rank >= ?"
+        if "min_rank" in filters and filters["min_rank"]:
+            query += " AND rank >= ?"
             params.append(filters["min_rank"])
 
-        if "min_iv_hp" in filters:
-            query += " AND pi.iv_hp >= ?"
+        if "min_iv_hp" in filters and filters["min_iv_hp"]:
+            query += " AND iv_hp >= ?"
             params.append(filters["min_iv_hp"])
 
-        if "min_iv_melee" in filters:
-            query += " AND pi.iv_melee >= ?"
+        if "min_iv_melee" in filters and filters["min_iv_melee"]:
+            query += " AND iv_melee >= ?"
             params.append(filters["min_iv_melee"])
 
-        if "min_iv_shot" in filters:
-            query += " AND pi.iv_shot >= ?"
+        if "min_iv_shot" in filters and filters["min_iv_shot"]:
+            query += " AND iv_shot >= ?"
             params.append(filters["min_iv_shot"])
 
-        if "min_iv_defense" in filters:
-            query += " AND pi.iv_defense >= ?"
+        if "min_iv_defense" in filters and filters["min_iv_defense"]:
+            query += " AND iv_defense >= ?"
             params.append(filters["min_iv_defense"])
 
-        if "instance_id" in filters:
-            query += " AND pi.instance_id = ?"
+        if "instance_id" in filters and filters["instance_id"]:
+            query += " AND instance_id = ?"
             params.append(filters["instance_id"])
 
-        if "passive_id" in filters:
-            query += """ AND pi.instance_id IN (
+        if "passive_id" in filters and filters["passive_id"]:
+            query += """ AND instance_id IN (
                 SELECT instance_id FROM pal_instance_passives
                 WHERE LOWER(passive_id) = ?
             )"""
             params.append(filters["passive_id"].lower())
 
-        query += " ORDER BY pi.level DESC, pi.species ASC"
+        query += " ORDER BY level DESC, species ASC"
 
         rows = self.conn.execute(query, params).fetchall()
+        if not rows:
+            return []
 
-        results = []
+        # Filter by species in Python if requested
+        if "species" in filters and filters["species"]:
+            s_target = str(filters["species"]).strip().lower()
+            filtered_rows = []
+            for r in rows:
+                sp = (r["species"] or "").lower()
+                clean_sp = sp[5:] if sp.startswith("boss_") else sp
+                p_meta = pals_map.get(clean_sp) or pals_map.get(sp) or {}
+                d_name = (p_meta.get("display_name") or sp).lower()
+                if s_target in d_name or s_target in sp:
+                    filtered_rows.append(r)
+            rows = filtered_rows
+            if not rows:
+                return []
+
+        # Filter by partner_category in Python if requested
+        if "partner_category" in filters or "category" in filters:
+            cat_val = (filters.get("partner_category") or filters.get("category") or "").strip().lower()
+            matching_pal_rows = self.conn.execute(
+                """
+                SELECT LOWER(pal_internal_name) as p_name
+                FROM pal_partner_skill_categories pc
+                JOIN partner_skill_categories c ON pc.category_id = c.category_id
+                WHERE LOWER(c.category_id) = ? OR LOWER(c.name) = ?
+                """,
+                (cat_val, cat_val),
+            ).fetchall()
+            matching_pal_names = {r["p_name"] for r in matching_pal_rows if r["p_name"]}
+            filtered_rows = []
+            for r in rows:
+                sp = (r["species"] or "").lower()
+                clean_sp = sp[5:] if sp.startswith("boss_") else sp
+                p_meta = pals_map.get(clean_sp) or pals_map.get(sp) or {}
+                p_keys = {
+                    sp, clean_sp,
+                    (p_meta.get("internal_name") or "").lower(),
+                    (p_meta.get("id") or "").lower(),
+                    (p_meta.get("code") or "").lower(),
+                    (p_meta.get("display_name") or "").lower(),
+                }
+                if p_keys & matching_pal_names:
+                    filtered_rows.append(r)
+            rows = filtered_rows
+            if not rows:
+                return []
+
         use_palworld_db = (
             self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
         )
 
+        inst_ids = [r["instance_id"] for r in rows if r["instance_id"]]
+
+        # 1. Batch load Partner Skill Categories mapping
+        pal_cats_map = defaultdict(list)
+        try:
+            pal_cats_rows = self.conn.execute(
+                """
+                SELECT pc.pal_internal_name, c.category_id as id, c.name, c.icon, c.description
+                FROM pal_partner_skill_categories pc
+                JOIN partner_skill_categories c ON pc.category_id = c.category_id
+                ORDER BY c.sort_order ASC
+                """
+            ).fetchall()
+            for cr in pal_cats_rows:
+                pal_cats_map[cr["pal_internal_name"].lower()].append({
+                    "id": cr["id"],
+                    "name": cr["name"],
+                    "icon": cr["icon"],
+                    "description": cr["description"]
+                })
+        except Exception:
+            pass
+
+        # 1b. Batch load Work Suitabilities mapping
+        pal_ws_map = defaultdict(dict)
+        try:
+            ws_rows = self.conn.execute("SELECT pal_internal_name, suitability_name, level FROM pal_work_suitabilities").fetchall()
+            for wsr in ws_rows:
+                pal_ws_map[wsr["pal_internal_name"].lower()][wsr["suitability_name"]] = wsr["level"]
+        except Exception:
+            pass
+
+        # Preload master skills dictionary once in-memory for instant O(1) enrichment
+        skills_map = {}
+        if use_palworld_db:
+            try:
+                s_rows = self.conn.execute("SELECT * FROM palworld_master.skills").fetchall()
+                for sr in s_rows:
+                    sd = dict(sr)
+                    s_id = str(sd.get("id") or "").lower()
+                    s_name = str(sd.get("name") or "").lower()
+                    skills_map[s_id] = sd
+                    skills_map[s_name] = sd
+                    skills_map[s_id.replace("epalwazaid::", "")] = sd
+            except Exception:
+                pass
+
+        # 2. Batch load Passives
+        passives_map = defaultdict(list)
+        if inst_ids:
+            try:
+                id_placeholders = ",".join("?" for _ in inst_ids)
+                p_rows = self.conn.execute(
+                    f"SELECT instance_id, passive_id FROM pal_instance_passives WHERE instance_id IN ({id_placeholders})",
+                    inst_ids,
+                ).fetchall()
+
+                for pr in p_rows:
+                    iid = pr["instance_id"]
+                    pid = pr["passive_id"]
+                    s_meta = skills_map.get(pid.lower()) if use_palworld_db else {}
+                    pd = {
+                        "instance_id": iid,
+                        "id": pid,
+                        "name": s_meta.get("name") or pid,
+                        "rank": s_meta.get("power", 1) if use_palworld_db else 1,
+                        "description": s_meta.get("description"),
+                        "stat_modifier": s_meta.get("stat_modifier"),
+                        "category": s_meta.get("category"),
+                        "type": "Passive",
+                        "icon_path": transform_icon_path(s_meta.get("icon_path")),
+                    }
+                    pd = enrich_passive_skill(pd)
+                    passives_map[iid].append(pd)
+            except Exception:
+                pass
+
+        # 3. Batch load Waza (Attacks)
+        waza_map = defaultdict(lambda: {"equip": [], "mastered": []})
+        if inst_ids:
+            try:
+                id_placeholders = ",".join("?" for _ in inst_ids)
+                w_rows = self.conn.execute(
+                    f"SELECT instance_id, waza_id, is_equipped FROM pal_instance_waza WHERE instance_id IN ({id_placeholders}) ORDER BY is_equipped DESC",
+                    inst_ids,
+                ).fetchall()
+
+                for wr in w_rows:
+                    iid = wr["instance_id"]
+                    wid = wr["waza_id"]
+                    is_eq = wr["is_equipped"]
+                    s_meta = (
+                        skills_map.get(wid.lower())
+                        or skills_map.get(wid.lower().replace("epalwazaid::", ""))
+                        or {}
+                    ) if use_palworld_db else {}
+
+                    wd = {
+                        "instance_id": iid,
+                        "id": wid,
+                        "name": s_meta.get("name") or wid.replace("EPalWazaID::", ""),
+                        "element": s_meta.get("element"),
+                        "power": s_meta.get("power"),
+                        "cooldown": s_meta.get("cooldown"),
+                        "cooldown_sec": s_meta.get("cooldown"),
+                        "icon_path": transform_icon_path(s_meta.get("icon_path")),
+                        "description": clean_skill_text(s_meta.get("description")),
+                        "type": "Active",
+                        "is_equipped": is_eq,
+                    }
+                    if is_eq == 1:
+                        waza_map[iid]["equip"].append(wd)
+                    else:
+                        waza_map[iid]["mastered"].append(wd)
+            except Exception:
+                pass
+
+        # 4. Batch load Status Points
+        soul_map = defaultdict(dict)
+        elixir_map = defaultdict(dict)
+        if inst_ids:
+            try:
+                id_placeholders = ",".join("?" for _ in inst_ids)
+                sp_rows = self.conn.execute(
+                    f"SELECT instance_id, stat_name, points, type FROM pal_instance_status_points WHERE instance_id IN ({id_placeholders})",
+                    inst_ids,
+                ).fetchall()
+                for spr in sp_rows:
+                    if spr["type"] == "soul":
+                        soul_map[spr["instance_id"]][spr["stat_name"]] = spr["points"]
+                    elif spr["type"] == "elixir":
+                        elixir_map[spr["instance_id"]][spr["stat_name"]] = spr["points"]
+            except Exception:
+                pass
+
+        # 5. Batch load custom base names
+        custom_names_map = self.get_base_camp_custom_names()
+
+        results = []
         for r in rows:
             d = dict(r)
-            d["icon_path"] = transform_icon_path(d.get("icon_path"))
-            if use_palworld_db:
-                p_rows = self.conn.execute(
-                    """
-                    SELECT COALESCE(s.name, pip.passive_id) as name,
-                           pip.passive_id as id,
-                           s.power as rank,
-                           s.description,
-                           s.stat_modifier,
-                           s.category,
-                           'Passive' as type,
-                           s.icon_path
-                    FROM pal_instance_passives pip
-                    LEFT JOIN palworld_master.skills s ON LOWER(pip.passive_id) = LOWER(s.id) OR LOWER(pip.passive_id) = LOWER(s.name)
-                    WHERE pip.instance_id = ?
-                """,
-                    (d["instance_id"],),
-                ).fetchall()
-            else:
-                p_rows = self.conn.execute(
-                    """
-                    SELECT COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id, ps.rank, ps.description, 'Passive' as type
-                    FROM pal_instance_passives pip
-                    LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
-                    WHERE pip.instance_id = ?
-                """,
-                    (d["instance_id"],),
-                ).fetchall()
-            
-            passives_list = []
-            for pr in p_rows:
-                pd = dict(pr)
-                pd["icon_path"] = transform_icon_path(pd.get("icon_path"))
-                pd = enrich_passive_skill(pd)
-                passives_list.append(pd)
-            d["passives"] = passives_list
-            
-            # Fetch Waza (Attacks) with full metadata
-            if use_palworld_db:
-                w_rows = self.conn.execute(
-                    """
-                    SELECT piw.waza_id as id,
-                           piw.is_equipped,
-                           COALESCE(s.name, REPLACE(piw.waza_id, 'EPalWazaID::', '')) as name,
-                           s.element,
-                           s.power,
-                           s.cooldown,
-                           s.icon_path,
-                           s.description,
-                           'Active' as type
-                    FROM pal_instance_waza piw
-                    LEFT JOIN palworld_master.skills s 
-                           ON LOWER(piw.waza_id) = LOWER(s.id) 
-                           OR LOWER(piw.waza_id) = LOWER(REPLACE(s.id, 'EPalWazaID::', ''))
-                           OR LOWER(piw.waza_id) = LOWER(s.name)
-                    WHERE piw.instance_id = ?
-                    ORDER BY piw.is_equipped DESC, s.power DESC
-                    """,
-                    (d["instance_id"],)
-                ).fetchall()
-            else:
-                w_rows = self.conn.execute(
-                    "SELECT waza_id as id, is_equipped, waza_id as name, 'Active' as type FROM pal_instance_waza WHERE instance_id = ?",
-                    (d["instance_id"],)
-                ).fetchall()
+            base_id = d.get("location_details_base_camp_id")
+            if base_id and base_id in custom_names_map:
+                d["location_details_base_camp_name"] = custom_names_map[base_id]
 
-            equipped_waza = []
-            mastered_waza = []
-            for wr in w_rows:
-                wd = dict(wr)
-                wd["cooldown_sec"] = wd.get("cooldown")
-                wd["icon_path"] = transform_icon_path(wd.get("icon_path"))
-                wd["description"] = clean_skill_text(wd.get("description"))
-                if wd.get("is_equipped") == 1:
-                    equipped_waza.append(wd)
-                else:
-                    mastered_waza.append(wd)
+            sp = (d.get("species") or "").lower()
+            clean_sp = sp[5:] if sp.startswith("boss_") else sp
+            p_meta = pals_map.get(clean_sp) or pals_map.get(sp) or {}
+            d["display_name"] = p_meta.get("display_name") or d.get("species")
+            d["element_1"] = p_meta.get("element_1")
+            d["element_2"] = p_meta.get("element_2")
+            d["hp"] = p_meta.get("hp")
+            d["attack_melee"] = p_meta.get("attack_melee")
+            d["defense"] = p_meta.get("defense")
+            d["icon_path"] = transform_icon_path(p_meta.get("icon_path"))
+            pal_key = (p_meta.get("internal_name") or p_meta.get("id") or d.get("character_id") or d.get("species") or "").lower()
+            d["partner_skill_categories"] = pal_cats_map.get(pal_key, [])
+            inst_id = d.get("instance_id")
+            inst_passives = passives_map.get(inst_id, [])
+            d["passives"] = inst_passives
+            d["equip_waza"] = waza_map[inst_id]["equip"]
+            d["mastered_waza"] = waza_map[inst_id]["mastered"]
+            d["soul_points"] = soul_map.get(inst_id, {})
+            d["elixir_points"] = elixir_map.get(inst_id, {})
+            d["ivs"] = {
+                "hp": d.get("iv_hp"),
+                "melee": d.get("iv_melee"),
+                "shot": d.get("iv_shot"),
+                "defense": d.get("iv_defense"),
+            }
 
-            d["equip_waza"] = equipped_waza
-            d["mastered_waza"] = mastered_waza
+            # Calculate movement speed & passive buffs
+            base_speed = int(p_meta.get("run_speed") or p_meta.get("speed") or 0)
+            speed_mod = 0
+            speed_buffs = []
+            for pas in inst_passives:
+                p_name = str(pas.get("name") or pas.get("id") or "").lower()
+                if "swift" in p_name:
+                    speed_mod += 30
+                    speed_buffs.append("Swift (+30%)")
+                elif "runner" in p_name:
+                    speed_mod += 20
+                    speed_buffs.append("Runner (+20%)")
+                elif "nimble" in p_name:
+                    speed_mod += 10
+                    speed_buffs.append("Nimble (+10%)")
+                elif "legend" in p_name:
+                    speed_mod += 15
+                    speed_buffs.append("Legend (+15%)")
+                elif "ace swimmer" in p_name:
+                    speed_mod += 15
+                    speed_buffs.append("Ace Swimmer (+15%)")
+                elif "king of the waves" in p_name:
+                    speed_mod += 30
+                    speed_buffs.append("King of the Waves (+30%)")
+
+            d["base_speed"] = base_speed
+            d["speed_modifier_pct"] = speed_mod
+            d["speed_buffs"] = speed_buffs
+            d["current_speed"] = round(base_speed * (1.0 + speed_mod / 100.0)) if base_speed else 0
             
-            # Fetch Status Points
-            sp_rows = self.conn.execute(
-                "SELECT stat_name, points, type FROM pal_instance_status_points WHERE instance_id = ?",
-                (d["instance_id"],)
-            ).fetchall()
-            d["soul_points"] = {r["stat_name"]: r["points"] for r in sp_rows if r["type"] == "soul"}
-            d["elixir_points"] = {r["stat_name"]: r["points"] for r in sp_rows if r["type"] == "elixir"}
+            # Attach work suitabilities
+            inst_ws = pal_ws_map.get(clean_sp, {}) or pal_ws_map.get(sp, {}) or pal_ws_map.get(pal_key, {})
+            d["suitabilities"] = inst_ws
+            d["work_suitabilities"] = inst_ws
             
             results.append(d)
 
@@ -2818,20 +3535,35 @@ class SQLiteEngine:
     def get_base_camp_summary(self, base_camp_id: str) -> Optional[dict[str, Any]]:
         """Returns details, workers, and structure counts for a given Base Camp."""
         base_row = self.conn.execute(
-            "SELECT * FROM base_camps WHERE base_camp_id = ?", (base_camp_id,)
+            """
+            SELECT bc.*, cn.custom_name
+            FROM base_camps bc
+            LEFT JOIN base_camp_custom_names cn ON bc.base_camp_id = cn.base_camp_id
+            WHERE bc.base_camp_id = ?
+            """,
+            (base_camp_id,),
         ).fetchone()
 
         if not base_row:
             return None
 
         summary = dict(base_row)
+        if summary.get("custom_name"):
+            summary["display_name"] = summary["custom_name"]
+        else:
+            summary["display_name"] = summary.get("name") or f"Base {base_camp_id[:8]}"
 
         struct_rows = self.conn.execute(
             """
-            SELECT bsi.structure_name, bsi.count, bs.name as display_name, bs.category
+            SELECT bsi.structure_name, bsi.count,
+                   COALESCE(sa.display_name, bs.name, bsi.structure_name) as display_name,
+                   COALESCE(bs.category, 'Infrastructure') as category
             FROM base_structures_instances bsi
+            LEFT JOIN structure_aliases sa ON LOWER(bsi.structure_name) = LOWER(sa.alias)
             LEFT JOIN base_structures bs ON LOWER(bsi.structure_name) = LOWER(bs.id)
                                          OR LOWER(bsi.structure_name) = LOWER(bs.name)
+                                         OR LOWER(sa.canonical_name) = LOWER(bs.id)
+                                         OR LOWER(sa.canonical_name) = LOWER(bs.name)
             WHERE bsi.base_camp_id = ?
             ORDER BY bsi.structure_name ASC
         """,
@@ -2949,7 +3681,7 @@ class SQLiteEngine:
             }
 
         cursor.execute("""
-            SELECT i.instance_id, i.species, i.level, i.rank, i.iv_hp, i.iv_melee, i.iv_defense,
+            SELECT i.instance_id, i.species, i.level, i.rank, i.iv_hp, i.iv_melee, i.iv_defense, i.location, i.location_details_base_camp_name,
                    GROUP_CONCAT(p.passive_id, ',') as passives
             FROM pal_instances i
             LEFT JOIN pal_instance_passives p ON i.instance_id = p.instance_id
@@ -3013,6 +3745,7 @@ class SQLiteEngine:
             candidates.append({
                 'species': display_species,
                 'count': len(pals),
+                'pals': pals,
                 'best_pal': best_pal,
                 'score': len(pals) * 100000 + get_score(best_pal)
             })
@@ -3025,6 +3758,15 @@ class SQLiteEngine:
             total_owned = c['count']
             sacrifices = total_owned - 1
             best = c['best_pal']
+
+            loc_counts = defaultdict(int)
+            for p in c['pals']:
+                loc = (p.get('location') or 'storage').lower()
+                if loc == 'dps': loc_counts['Dimensional Storage'] += 1
+                elif loc == 'palbox': loc_counts['Palbox'] += 1
+                elif loc == 'party': loc_counts['Party'] += 1
+                elif loc == 'base': loc_counts['Base Camp'] += 1
+                else: loc_counts['Storage'] += 1
             
             lvl = best.get('level') or 1
             curr_rank = best.get('rank', 0) or 0
@@ -3077,12 +3819,35 @@ class SQLiteEngine:
                 parts = raw_icon.replace('\\', '/').split('/')
                 icon_path = "/assets/" + parts[-2] + "/" + parts[-1]
 
+            best_loc_str = (best.get('location') or 'storage').lower()
+            if best_loc_str == 'dps': best_loc_display = 'Dimensional Storage'
+            elif best_loc_str == 'palbox': best_loc_display = 'Palbox'
+            elif best_loc_str == 'party': best_loc_display = 'Party'
+            # Attach partner skill categories
+            c_cats = []
+            try:
+                cat_rows = self.conn.execute(
+                    """
+                    SELECT DISTINCT c.category_id as id, c.name, c.icon, c.description
+                    FROM pal_partner_skill_categories pc
+                    JOIN partner_skill_categories c ON pc.category_id = c.category_id
+                    WHERE LOWER(pc.pal_internal_name) = LOWER(?) OR LOWER(pc.pal_internal_name) = LOWER(?)
+                    ORDER BY c.sort_order ASC
+                    """,
+                    (species, best.get("species", "")),
+                ).fetchall()
+                c_cats = [dict(cr) for cr in cat_rows]
+            except Exception:
+                c_cats = []
+
             results.append({
                 'species': species,
                 'total_owned': total_owned,
                 'sacrifices_available': sacrifices,
                 'attainable_stars': attainable_stars,
                 'base_level': lvl,
+                'best_location': best_loc_display,
+                'locations_breakdown': dict(loc_counts),
                 'hp': est_hp,
                 'attack': est_atk,
                 'defense': est_def,
@@ -3090,6 +3855,7 @@ class SQLiteEngine:
                 'iv_attack': iv_atk,
                 'iv_defense': iv_def,
                 'passives': passives_list,
+                'partner_skill_categories': c_cats,
                 'icon_path': icon_path
             })
             
@@ -3112,14 +3878,73 @@ class SQLiteEngine:
         rows = cursor.execute("SELECT * FROM food_satiety_rates ORDER BY food_rating ASC").fetchall()
         return [dict(r) for r in rows]
 
-    def get_base_camps(self) -> list[dict[str, Any]]:
-        """Returns all base camps with structure counts, assigned Pals, and max capacity."""
+    def get_world_settings(self) -> dict[str, Any]:
+        """Returns extracted world multiplier settings from WorldOption.sav or PalWorldSettings.ini."""
         cursor = self.conn.cursor()
-        camps = cursor.execute("SELECT * FROM base_camps").fetchall()
+        try:
+            rows = cursor.execute("SELECT setting_key, setting_value FROM world_settings").fetchall()
+            res: dict[str, Any] = {}
+            for r in rows:
+                val_str = r["setting_value"]
+                if val_str.lower() == "true":
+                    res[r["setting_key"]] = True
+                elif val_str.lower() == "false":
+                    res[r["setting_key"]] = False
+                else:
+                    try:
+                        if "." in val_str:
+                            res[r["setting_key"]] = float(val_str)
+                        else:
+                            res[r["setting_key"]] = int(val_str)
+                    except ValueError:
+                        res[r["setting_key"]] = val_str
+            return res
+        except Exception:
+            return {}
+
+    def set_base_camp_custom_name(self, base_camp_id: str, custom_name: str) -> None:
+        """Sets a custom user-defined display name for a base camp."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT OR REPLACE INTO base_camp_custom_names (base_camp_id, custom_name)
+            VALUES (?, ?)
+            """,
+            (base_camp_id, custom_name.strip()),
+        )
+        self.conn.commit()
+        self._cached_base_recommendations = None
+
+    def get_base_camp_custom_names(self) -> dict[str, str]:
+        """Returns mapping of base_camp_id to custom_name."""
+        cursor = self.conn.cursor()
+        try:
+            rows = cursor.execute("SELECT base_camp_id, custom_name FROM base_camp_custom_names").fetchall()
+            return {r["base_camp_id"]: r["custom_name"] for r in rows}
+        except Exception:
+            return {}
+
+    def get_base_camps(self) -> list[dict[str, Any]]:
+        """Returns all base camps with structure counts, assigned Pals, and dynamic max capacity."""
+        cursor = self.conn.cursor()
+        camps = cursor.execute(
+            """
+            SELECT bc.base_camp_id, bc.name, cn.custom_name
+            FROM base_camps bc
+            LEFT JOIN base_camp_custom_names cn ON bc.base_camp_id = cn.base_camp_id
+            """
+        ).fetchall()
+        settings = self.get_world_settings()
+        default_max = int(settings.get("BaseCampWorkerMaxNum", 15))
+
         results = []
         for c in camps:
             c_dict = dict(c)
             camp_id = c_dict["base_camp_id"]
+            if c_dict.get("custom_name"):
+                c_dict["display_name"] = c_dict["custom_name"]
+            else:
+                c_dict["display_name"] = c_dict.get("name") or f"Base {camp_id[:8]}"
             
             # Count structure instances
             struct_count = cursor.execute(
@@ -3133,7 +3958,7 @@ class SQLiteEngine:
 
             c_dict["structure_count"] = struct_count
             c_dict["assigned_pals_count"] = assigned_count
-            c_dict["max_pals"] = 15  # Baseline Palbox base capacity
+            c_dict["max_pals"] = max(assigned_count, default_max)
             results.append(c_dict)
         return results
 
@@ -3142,9 +3967,16 @@ class SQLiteEngine:
         cursor = self.conn.cursor()
         rows = cursor.execute(
             """
-            SELECT bsi.structure_name, bsi.count, bwt.work_type, bwt.is_automated, bwt.work_amount_modifier
+            SELECT bsi.structure_name, bsi.count,
+                   COALESCE(bwt.work_type, sa.work_type) as work_type,
+                   COALESCE(bwt.is_automated, sa.is_automated, 0) as is_automated,
+                   COALESCE(bwt.work_amount_modifier, 1.0) as work_amount_modifier,
+                   COALESCE(sa.display_name, bs.name, bsi.structure_name) as display_name
             FROM base_structures_instances bsi
-            LEFT JOIN building_work_types bwt ON bsi.structure_name = bwt.building_id
+            LEFT JOIN structure_aliases sa ON LOWER(bsi.structure_name) = LOWER(sa.alias)
+            LEFT JOIN building_work_types bwt ON LOWER(bsi.structure_name) = LOWER(bwt.building_id)
+                                              OR LOWER(sa.canonical_name) = LOWER(bwt.building_id)
+            LEFT JOIN base_structures bs ON LOWER(bsi.structure_name) = LOWER(bs.id)
             WHERE bsi.base_camp_id = ?
             """,
             (base_camp_id,),
@@ -3155,9 +3987,11 @@ class SQLiteEngine:
         for r in rows:
             s_name = r["structure_name"]
             count = r["count"]
+            disp_name = r["display_name"]
             if s_name not in structures_map:
                 structures_map[s_name] = {
                     "structure_name": s_name,
+                    "display_name": disp_name,
                     "count": count,
                     "work_types": [],
                 }
@@ -3167,22 +4001,6 @@ class SQLiteEngine:
                     "is_automated": r["is_automated"],
                     "work_amount_modifier": r["work_amount_modifier"],
                 })
-
-        # Fallback check using STRUCTURE_ALIAS_MAP for structure names that didn't match building_work_types
-        for s_name, s_data in structures_map.items():
-            if not s_data["work_types"]:
-                alias = STRUCTURE_ALIAS_MAP.get(s_name.lower())
-                if alias:
-                    alias_rows = cursor.execute(
-                        "SELECT work_type, is_automated, work_amount_modifier FROM building_work_types WHERE LOWER(building_id) = LOWER(?)",
-                        (alias,),
-                    ).fetchall()
-                    for ar in alias_rows:
-                        s_data["work_types"].append({
-                            "work_type": ar["work_type"],
-                            "is_automated": ar["is_automated"],
-                            "work_amount_modifier": ar["work_amount_modifier"],
-                        })
 
         result_list = list(structures_map.values())
 
@@ -3206,7 +4024,7 @@ class SQLiteEngine:
         return result_list
 
     def get_owned_pals_with_suitabilities(self) -> list[dict[str, Any]]:
-        """Returns all owned Pal instances in the Palbox with work suitabilities and passives."""
+        """Returns all owned Pal instances in the Palbox with work suitabilities and passives (batch-optimized)."""
         cursor = self.conn.cursor()
         instances = cursor.execute(
             """
@@ -3216,32 +4034,336 @@ class SQLiteEngine:
             """
         ).fetchall()
 
+        if not instances:
+            return []
+
+        # Batch load suitabilities into lookup dict
+        ws_lookup: dict[str, dict[str, int]] = {}
+        for r in cursor.execute("SELECT LOWER(pal_internal_name) as k, suitability_name, level FROM pal_work_suitabilities").fetchall():
+            k = r["k"]
+            if k not in ws_lookup:
+                ws_lookup[k] = {}
+            ws_lookup[k][r["suitability_name"]] = r["level"]
+
+        # Batch load passives into lookup dict
+        pass_lookup: dict[str, list[dict[str, str]]] = {}
+        for r in cursor.execute(
+            """
+            SELECT pip.instance_id, COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id
+            FROM pal_instance_passives pip
+            LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
+            """
+        ).fetchall():
+            iid = r["instance_id"]
+            if iid not in pass_lookup:
+                pass_lookup[iid] = []
+            pass_lookup[iid].append({"name": r["name"], "id": r["id"]})
+
         results = []
         for inst in instances:
             d = dict(inst)
             inst_id = d["instance_id"]
-            species = d["species"]
+            species_k = (d.get("species") or "").lower()
 
-            # Get work suitabilities for species
-            ws_rows = cursor.execute(
-                "SELECT suitability_name, level FROM pal_work_suitabilities WHERE LOWER(pal_internal_name) = LOWER(?)",
-                (species,),
-            ).fetchall()
-            d["suitabilities"] = {r["suitability_name"]: r["level"] for r in ws_rows}
-
-            # Get passives for instance joining passive_skills for display name
-            pass_rows = cursor.execute(
-                """
-                SELECT COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id
-                FROM pal_instance_passives pip
-                LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
-                WHERE pip.instance_id = ?
-                """,
-                (inst_id,),
-            ).fetchall()
-            d["passives"] = [r["name"] for r in pass_rows]
-            d["raw_passives"] = [r["id"] for r in pass_rows]
-
+            d["suitabilities"] = ws_lookup.get(species_k, {})
+            pass_list = pass_lookup.get(inst_id, [])
+            d["passives"] = [p["name"] for p in pass_list]
+            d["raw_passives"] = [p["id"] for p in pass_list]
             d["icon_path"] = transform_icon_path(d.get("icon_path"))
             results.append(d)
         return results
+
+    def get_active_missions(self, save_path: Optional[str] = None) -> list[dict[str, Any]]:
+        """Evaluates active uncompleted NPC sub-missions against targeted inventory items and caught Pals."""
+        if save_path is None and getattr(self, "_cached_active_missions", None) is not None:
+            return self._cached_active_missions
+
+        cursor = self.conn.cursor()
+
+        # 1. Read cached active quest IDs from database
+        cursor.execute("CREATE TABLE IF NOT EXISTS player_active_missions (quest_id TEXT PRIMARY KEY)")
+        rows = cursor.execute("SELECT quest_id FROM player_active_missions").fetchall()
+        active_ids = [r["quest_id"] for r in rows if r["quest_id"]]
+
+        if not active_ids:
+            effective_path = save_path or self.current_save_path
+            if effective_path:
+                extracted = extract_active_quests(effective_path)
+                for q in extracted:
+                    if q.get("quest_id"):
+                        cursor.execute("INSERT OR REPLACE INTO player_active_missions (quest_id) VALUES (?)", (q["quest_id"],))
+                self.conn.commit()
+                active_ids = [q["quest_id"] for q in extracted if q.get("quest_id")]
+
+        if not active_ids:
+            # Fallback: if no active missions, check sub_missions table
+            all_m_rows = cursor.execute("SELECT id FROM sub_missions LIMIT 25").fetchall()
+            active_ids = [r["id"] for r in all_m_rows]
+
+        if not active_ids:
+            return []
+
+        # 2. Query master missions from SQLite
+        sub_m_cols = [c[1] for c in cursor.execute("PRAGMA table_info(sub_missions)").fetchall()]
+        has_alias = "alias_id" in sub_m_cols
+        placeholders = ",".join("?" for _ in active_ids)
+
+        missions_by_key = {}
+        if has_alias:
+            m_rows = cursor.execute(
+                f"""
+                SELECT id, alias_id, category, title, npc_name, location, objective, mission_type, requires_giving_pal
+                FROM sub_missions
+                WHERE id IN ({placeholders}) OR alias_id IN ({placeholders})
+                """,
+                active_ids + active_ids
+            ).fetchall()
+            for mr in m_rows:
+                m_dict = dict(mr)
+                missions_by_key[mr["id"].lower()] = m_dict
+                if mr["alias_id"]:
+                    missions_by_key[mr["alias_id"].lower()] = m_dict
+        else:
+            m_rows = cursor.execute(
+                f"""
+                SELECT id, category, title, npc_name, objective, target_type, target_id, target_count
+                FROM sub_missions
+                WHERE id IN ({placeholders})
+                """,
+                active_ids
+            ).fetchall()
+            for mr in m_rows:
+                m_dict = dict(mr)
+                m_dict["alias_id"] = None
+                m_dict["location"] = "Palpagos Islands"
+                m_dict["mission_type"] = "item_delivery" if m_dict.get("target_type") == "Item" else "pal_give" if m_dict.get("target_type") in ("Pal", "PassiveSkill") else "hunt"
+                m_dict["requires_giving_pal"] = 1 if m_dict.get("target_type") in ("Pal", "PassiveSkill") else 0
+                missions_by_key[mr["id"].lower()] = m_dict
+
+        found_db_ids = list({m["id"] for m in missions_by_key.values()})
+        targets_by_mid: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        rewards_by_mid: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        needed_item_ids: set[str] = set()
+
+        if found_db_ids:
+            db_placeholders = ",".join("?" for _ in found_db_ids)
+            try:
+                t_rows = cursor.execute(
+                    f"""
+                    SELECT mission_id, target_type, target_id, target_name, target_count, target_passive, target_suitability
+                    FROM sub_mission_targets
+                    WHERE mission_id IN ({db_placeholders})
+                    """,
+                    found_db_ids
+                ).fetchall()
+                for tr in t_rows:
+                    td = dict(tr)
+                    targets_by_mid[tr["mission_id"]].append(td)
+                    if tr["target_type"] == "item" and tr["target_id"]:
+                        needed_item_ids.add(tr["target_id"].lower())
+            except Exception:
+                pass
+
+            try:
+                r_rows = cursor.execute(
+                    f"""
+                    SELECT mission_id, reward_type, item_id, item_name, quantity
+                    FROM sub_mission_rewards
+                    WHERE mission_id IN ({db_placeholders})
+                    """,
+                    found_db_ids
+                ).fetchall()
+                for rr in r_rows:
+                    rewards_by_mid[rr["mission_id"]].append(dict(rr))
+            except Exception:
+                pass
+
+        # 3. Targeted inventory query (personal + base chests)
+        item_counts: dict[str, int] = {}
+        if needed_item_ids:
+            item_placeholders = ",".join("?" for _ in needed_item_ids)
+            inv_rows = cursor.execute(
+                f"SELECT LOWER(item_id) as item_id, SUM(count) as total_count FROM item_container_slots WHERE LOWER(item_id) IN ({item_placeholders}) GROUP BY LOWER(item_id)",
+                list(needed_item_ids),
+            ).fetchall()
+            for ir in inv_rows:
+                item_counts[ir["item_id"]] = ir["total_count"] or 0
+
+        # Build evaluated missions
+        evaluated_missions = []
+        for raw_qid in active_ids:
+            clean_key = raw_qid.lower()
+            m_def = missions_by_key.get(clean_key) or missions_by_key.get(clean_key.replace("sub_", ""))
+
+            if not m_def:
+                m_def = {
+                    "id": raw_qid,
+                    "title": raw_qid.replace("Sub_", "").replace("_", " "),
+                    "npc_name": "World NPC",
+                    "location": "Palpagos Islands",
+                    "objective": raw_qid,
+                    "mission_type": "custom",
+                    "requires_giving_pal": 0,
+                }
+
+            mid = m_def["id"]
+            m_targets = targets_by_mid.get(mid, [])
+            m_rewards = rewards_by_mid.get(mid, [])
+
+            # Format reward string
+            reward_parts = []
+            for r in m_rewards:
+                r_type = r.get("reward_type")
+                qty = r.get("quantity", 1)
+                i_name = r.get("item_name")
+                if r_type == "Exp":
+                    reward_parts.append(f"+{qty:,} EXP")
+                elif r_type == "Gold":
+                    reward_parts.append(f"{qty:,} Gold")
+                elif i_name:
+                    reward_parts.append(f"{qty} {i_name}" if qty > 1 else f"1 {i_name}")
+            reward_str = ", ".join(reward_parts)
+
+            req_items_eval = []
+            req_pals_eval = []
+            all_items_met = True
+            all_pals_met = True
+            has_some_items = False
+            has_some_pals = False
+
+            for tgt in m_targets:
+                tt = tgt.get("target_type")
+                need = tgt.get("target_count", 1)
+
+                if tt == "item":
+                    iid = str(tgt.get("target_id") or "").lower()
+                    have = item_counts.get(iid, 0)
+                    is_met = have >= need
+                    if not is_met:
+                        all_items_met = False
+                    if have > 0:
+                        has_some_items = True
+                    req_items_eval.append({
+                        "item_id": tgt.get("target_id"),
+                        "name": tgt.get("target_name"),
+                        "count_required": need,
+                        "count_have": have,
+                        "is_met": is_met,
+                    })
+
+                elif tt in ("pal", "passive", "suitability"):
+                    spec = str(tgt.get("target_id") or "").strip()
+                    req_passive = tgt.get("target_passive")
+                    req_suit = tgt.get("target_suitability")
+
+                    try:
+                        if req_passive and spec:
+                            p_rows = cursor.execute("""
+                                SELECT p.instance_id, p.species, p.location, p.location_details_base_camp_name
+                                FROM pal_instances p
+                                LEFT JOIN pals ON LOWER(p.species) = LOWER(pals.internal_name) OR LOWER(p.species) = LOWER(pals.id)
+                                JOIN pal_instance_passives pip ON p.instance_id = pip.instance_id
+                                WHERE (LOWER(p.species) = LOWER(?) OR LOWER(COALESCE(pals.display_name, '')) = LOWER(?) OR LOWER(COALESCE(pals.internal_name, '')) = LOWER(?))
+                                  AND (LOWER(pip.passive_id) LIKE LOWER(?) OR LOWER(pip.passive_id) = LOWER(?))
+                            """, (spec, spec, spec, f"%{req_passive}%", req_passive)).fetchall()
+                        elif req_passive:
+                            p_rows = cursor.execute("""
+                                SELECT p.instance_id, p.species, p.location, p.location_details_base_camp_name
+                                FROM pal_instances p
+                                JOIN pal_instance_passives pip ON p.instance_id = pip.instance_id
+                                WHERE (LOWER(pip.passive_id) LIKE LOWER(?) OR LOWER(pip.passive_id) = LOWER(?))
+                            """, (f"%{req_passive}%", req_passive)).fetchall()
+                        elif spec:
+                            p_rows = cursor.execute("""
+                                SELECT p.instance_id, p.species, p.location, p.location_details_base_camp_name
+                                FROM pal_instances p
+                                LEFT JOIN pals ON LOWER(p.species) = LOWER(pals.internal_name) OR LOWER(p.species) = LOWER(pals.id)
+                                WHERE LOWER(p.species) = LOWER(?) OR LOWER(COALESCE(pals.display_name, '')) = LOWER(?) OR LOWER(COALESCE(pals.internal_name, '')) = LOWER(?)
+                            """, (spec, spec, spec)).fetchall()
+                        else:
+                            p_rows = []
+                    except Exception:
+                        p_rows = []
+
+                    have = len(p_rows)
+                    is_met = have >= need
+                    if not is_met:
+                        all_pals_met = False
+                    if have > 0:
+                        has_some_pals = True
+
+                    locations_found = set()
+                    for prow in p_rows:
+                        loc = (prow["location"] or "storage").lower()
+                        if loc == "palbox":
+                            locations_found.add("Palbox")
+                        elif loc == "party":
+                            locations_found.add("Party")
+                        elif loc == "base":
+                            bname = prow["location_details_base_camp_name"]
+                            locations_found.add(f"Base: {bname}" if bname else "Base")
+                        elif loc == "cage":
+                            bname = prow["location_details_base_camp_name"]
+                            locations_found.add(f"Cage: {bname}" if bname else "Cage")
+                        elif loc == "dps":
+                            locations_found.add("Dimensional Storage")
+                        else:
+                            locations_found.add("Storage")
+
+                    req_pals_eval.append({
+                        "species": tgt.get("target_id"),
+                        "name": tgt.get("target_name"),
+                        "passive": req_passive,
+                        "count_required": need,
+                        "count_have": have,
+                        "is_met": is_met,
+                        "locations": sorted(list(locations_found)),
+                    })
+
+            is_ready = (all_items_met and all_pals_met) if (req_items_eval or req_pals_eval) else False
+            if is_ready:
+                status = "ready"
+            elif has_some_items or has_some_pals:
+                status = "in_progress"
+            else:
+                status = "missing"
+
+            evaluated_missions.append({
+                "quest_id": raw_qid,
+                "name": m_def["title"],
+                "npc_name": m_def["npc_name"],
+                "location": m_def["location"],
+                "objective": m_def["objective"],
+                "type": m_def["mission_type"],
+                "requires_giving_pal": bool(m_def.get("requires_giving_pal")),
+                "required_items": req_items_eval,
+                "required_pals": req_pals_eval,
+                "rewards": reward_str,
+                "status": status,
+                "is_ready": is_ready,
+            })
+
+        # Group missions by settlement / location
+        locations_map: dict[str, list[dict[str, Any]]] = {}
+        for m in evaluated_missions:
+            loc = m.get("location", "Palpagos Islands")
+            if loc not in locations_map:
+                locations_map[loc] = []
+            locations_map[loc].append(m)
+
+        grouped_locations = []
+        for loc_name, m_list in locations_map.items():
+            ready_count = sum(1 for m in m_list if m["is_ready"])
+            grouped_locations.append({
+                "location": loc_name,
+                "total_missions": len(m_list),
+                "ready_missions": ready_count,
+                "has_batch_turnin": ready_count >= 2,
+                "missions": m_list,
+            })
+
+        if save_path is None:
+            self._cached_active_missions = grouped_locations
+
+        return grouped_locations
+

@@ -302,3 +302,28 @@ def test_skill_aware_breeding_path_prioritization():
     assert best_male[0]["skill_score"] > best_male[1]["skill_score"]
 
 
+def test_partner_skill_categories_db():
+    engine = SQLiteEngine()
+
+    # Check categories table
+    categories = engine.get_partner_skill_categories()
+    assert len(categories) == 18
+    cat_ids = [c["category_id"] for c in categories]
+    assert "flying_mount" in cat_ids
+    assert "ranch_producer" in cat_ids
+    assert "player_element_infusion" in cat_ids
+
+    # Check query_pals with partner_category filter
+    flying_pals = engine.query_pals({"partner_category": "flying_mount"})
+    assert len(flying_pals) >= 20
+    assert any(p["display_name"] == "Jetragon" for p in flying_pals)
+
+    # Check partner_skill_categories attached to each pal
+    jetragon = next(p for p in flying_pals if p["display_name"] == "Jetragon")
+    assert "partner_skill_categories" in jetragon
+    jet_cat_ids = [c["id"] for c in jetragon["partner_skill_categories"]]
+    assert "flying_mount" in jet_cat_ids
+    assert "heavy_artillery" in jet_cat_ids
+
+
+

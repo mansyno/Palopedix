@@ -81,3 +81,32 @@ def test_api_breeding_path_with_target_skills():
         assert len(data["paths"]) == 1
         mock_fn.assert_called_once_with(mock_fn.call_args[0][0], "Bushi", "Artisan,Swift")
 
+
+def test_api_partner_skill_categories():
+    mock_cats = [
+        {"category_id": "flying_mount", "name": "Flying Mounts", "icon": "🦅", "pal_count": 29}
+    ]
+    with patch("palengine.api.main.db_engine.get_partner_skill_categories", return_value=mock_cats):
+        response = client.get("/api/pals/partner-skill-categories")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["category_id"] == "flying_mount"
+
+
+def test_api_get_pals_with_partner_category():
+    mock_pals = [
+        {
+            "display_name": "Jetragon",
+            "partner_skill_categories": [{"id": "flying_mount", "name": "Flying Mounts"}],
+        }
+    ]
+    with patch("palengine.api.main.db_engine.query_pals", return_value=mock_pals) as mock_fn:
+        response = client.get("/api/pals?partner_category=flying_mount")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["display_name"] == "Jetragon"
+        mock_fn.assert_called_once_with({"partner_category": "flying_mount"})
+
+

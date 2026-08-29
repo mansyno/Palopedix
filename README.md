@@ -6,7 +6,7 @@ Palopedix is an advanced save parser, analytics engine, and database viewer for 
 
 ## Key Features
 
-- **Paldex & Skills Catalog**: Explore stats, elements, partner skills, active skills, passives, and work suitabilities for all Pals.
+- **Paldex & Skills Catalog**: Explore stats, elements, partner skills, active skills, passives, work suitabilities, and **18 deterministic Partner Skill categories** (Flying Mounts, Ranch Producers, Player Infusions, Artillery, Healers, Combat Buffs, etc.).
 - **Save Game Parser & World Manager**: Auto-discovers Palworld save games (`Level.sav`), supports multi-world save switching, and decodes caught Pals, IVs, souls, ranks, and inventory.
 - **Base Camp Work Crew Optimizer**: Analyzes placed infrastructure in active base camps, calculates work suitability demand, balances food consumption and SAN decay, and recommends optimal 24/7 Pal crews.
 - **Multi-Generation Breeding Path Finder**: BFS pathfinding from owned Pals to any target Pal, complete with parent instance quality scoring, target passive skill preservation, and gender probability calculations.

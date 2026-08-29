@@ -183,28 +183,13 @@ if not getattr(_archive_mod.FArchiveReader.property, "_set_property_patched", Fa
         if type_name == "SetProperty":
             set_type = self.fstring()
             _id = self.optional_guid()
-            self.u32()  # dummy / allocation flags
-            count = self.u32()
-            set_path = path + ".Set"
-            if set_type == "StructProperty":
-                struct_type = self.get_type_or(set_path, "StructProperty")
-            else:
-                struct_type = None
-            values = []
-            for _ in range(count):
-                if set_type == "Guid":
-                    values.append(self.guid())
-                elif set_type == "StrProperty":
-                    values.append(self.fstring())
-                else:
-                    values.append(self.prop_value(set_type, struct_type, set_path))
-            value = {
+            self.data.seek(self.data.tell() + size)
+            return {
                 "set_type": set_type,
                 "id": _id,
-                "value": values,
+                "value": [],
                 "type": type_name,
             }
-            return value
         return _orig_archive_property(self, type_name, size, path, nested_caller_path=nested_caller_path)
 
     _tolerant_archive_property._set_property_patched = True  # type: ignore[attr-defined]
@@ -221,15 +206,28 @@ def clean_value(val: Any) -> Any:
     return val
 
 
-from palworld_save_tools.gvas import GvasFile
+from palworld_save_tools.gvas import GvasFile, GvasHeader
 from palworld_save_tools.palsav import decompress_sav_to_gvas
 from palworld_save_tools.paltypes import PALWORLD_TYPE_HINTS
+from palworld_save_tools.archive import FArchiveReader
+
+NEEDED_WORLD_SAVE_DATA_PROPERTIES = {
+    "CharacterSaveParameterMap",
+    "BaseCampSaveData",
+    "MapObjectSaveData",
+    "ItemContainerSaveData",
+    "GroupSaveDataMap",
+    "GameTimeSaveData",
+    "GuildExtraSaveDataMap",
+    "QuestSaveData",
+}
 
 
 def load_gvas_from_sav(sav_path: str, custom_properties_keys: list[str]) -> GvasFile:
     """Loads Level.sav and returns parsed GvasFile with selective custom properties decoding.
 
-    Supports both PlZ (zlib) and PlM (Oodle) compression formats.
+    Supports both PlZ (zlib) and PlM (Oodle) compression formats, and selectively parses
+    essential worldSaveData sub-properties while cleanly skipping heavy/unsupported world dump structs.
     """
     with open(sav_path, "rb") as f:
         data = f.read()
@@ -256,12 +254,15 @@ def load_gvas_from_sav(sav_path: str, custom_properties_keys: list[str]) -> Gvas
 
     import contextlib
     import os
+
     with open(os.devnull, 'w') as f, contextlib.redirect_stdout(f), contextlib.redirect_stderr(f):
         gvas_file = GvasFile.read(
             gvas_data,
             type_hints=PALWORLD_TYPE_HINTS,
             custom_properties=custom_properties,
+            allow_nan=True,
         )
+
     return gvas_file
 
 
@@ -400,7 +401,155 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
                 if storage_id:
                     player_containers[str(storage_id)] = (p_uid_str, "palbox")
 
-    # 3. Extract Pal instances
+def _parse_pal_data(
+    save_param: dict[str, Any],
+    instance_id: Any,
+    owner_player_uid: Any,
+    location_type: str,
+    location_details: Any,
+) -> dict[str, Any]:
+    character_id = clean_value(save_param.get("CharacterID", {}).get("value"))
+    level = clean_value(save_param.get("Level", {}).get("value", 1))
+    gender_raw = save_param.get("Gender", {}).get("value", "EPalGenderType::None")
+    gender = clean_value(gender_raw)
+    if isinstance(gender, str):
+        if gender.startswith("EPalGenderType::"):
+            gender = gender.replace("EPalGenderType::", "")
+    else:
+        gender = "None"
+
+    iv_hp = clean_value(save_param.get("Talent_HP", {}).get("value", 0))
+    iv_melee = clean_value(save_param.get("Talent_Melee", {}).get("value", 0))
+    iv_shot = clean_value(save_param.get("Talent_Shot", {}).get("value", 0))
+    iv_defense = clean_value(save_param.get("Talent_Defense", {}).get("value", 0))
+
+    # Newer Palworld saves renamed Talent_Melee to Talent_Shot.
+    actual_melee_iv = int(iv_melee) if (str(iv_melee).isdigit() and int(iv_melee) > 0) else (int(iv_shot) if str(iv_shot).isdigit() else 0)
+
+    passive_list_prop = cast(dict[str, Any], save_param.get("PassiveSkillList", {}).get("value", {}))
+    passives = cast(list[str], passive_list_prop.get("values", []))
+
+    rank = clean_value(save_param.get("Rank", {}).get("value", 0))
+    exp = clean_value(save_param.get("Exp", {}).get("value", 0))
+
+    equip_waza = cast(list[str], save_param.get("EquipWaza", {}).get("value", {}).get("values", []))
+    mastered_waza = cast(list[str], save_param.get("MasteredWaza", {}).get("value", {}).get("values", []))
+
+    # Clean waza names
+    equip_waza = [w for w in (clean_value(w) for w in equip_waza) if w]
+    mastered_waza = [w for w in (clean_value(w) for w in mastered_waza) if w]
+
+    def _extract_status_points(prop_name: str) -> dict[str, int]:
+        pts_dict: dict[str, int] = {}
+        pts_prop = save_param.get(prop_name, {}).get("value", {}).get("values", [])
+        for pt_entry in pts_prop:
+            stat_name = clean_value(pt_entry.get("StatusName", {}).get("value"))
+            stat_val = clean_value(pt_entry.get("StatusPoint", {}).get("value", 0))
+            if stat_name and isinstance(stat_val, int):
+                pts_dict[str(stat_name)] = stat_val
+        return pts_dict
+
+    soul_points = _extract_status_points("GotStatusPointList")
+    elixir_points = _extract_status_points("GotExStatusPointList")
+
+    return {
+        "instance_id": str(instance_id) if instance_id is not None else None,
+        "owner_uid": str(owner_player_uid) if owner_player_uid is not None else None,
+        "species": character_id,
+        "level": level,
+        "gender": gender,
+        "ivs": {
+            "hp": iv_hp,
+            "melee": actual_melee_iv,
+            "shot": iv_shot,
+            "defense": iv_defense,
+        },
+        "passives": passives,
+        "rank": rank,
+        "exp": exp,
+        "equip_waza": equip_waza,
+        "mastered_waza": mastered_waza,
+        "soul_points": soul_points,
+        "elixir_points": elixir_points,
+        "location": location_type,
+        "location_details": location_details,
+    }
+
+
+def extract_pals(sav_path: str) -> list[dict[str, Any]]:
+    """Reads Level.sav and Players/*_dps.sav to extract all Pal instances.
+
+    Differentiates between party, Palbox, base camp, viewing cage, and Dimensional Pal Storage.
+    """
+    import os
+    import contextlib
+    from pathlib import Path
+
+    custom_props: list[str] = [
+        ".worldSaveData.CharacterSaveParameterMap.Value.RawData",
+        ".worldSaveData.GroupSaveDataMap",
+        ".worldSaveData.BaseCampSaveData.Value.RawData",
+        ".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData",
+    ]
+    gvas_file = load_gvas_from_sav(sav_path, custom_props)
+
+    properties = cast(dict[str, Any], gvas_file.properties)
+    world_save_data = cast(dict[str, Any], properties["worldSaveData"]["value"])
+
+    # 1. Parse base camps to identify base camp worker containers
+    base_camp_containers: dict[str, dict[str, str]] = {}
+    base_camp_save_data = cast(
+        list[dict[str, Any]],
+        world_save_data.get("BaseCampSaveData", {}).get("value", []),
+    )
+    for entry in base_camp_save_data:
+        val = cast(dict[str, Any], entry.get("value", {}))
+        raw_data = cast(dict[str, Any], val.get("RawData", {}).get("value") or {})
+        base_id = raw_data.get("id")
+        base_name = cast(str, raw_data.get("name", "Unnamed Base"))
+        if not base_name or "新規生成拠点" in base_name:
+            base_name = "Unnamed Base"
+
+        worker_director = cast(dict[str, Any], val.get("WorkerDirector", {}).get("value", {}))
+        wd_raw_data = cast(
+            dict[str, Any], worker_director.get("RawData", {}).get("value") or {}
+        )
+        worker_container_id = wd_raw_data.get("container_id")
+
+        if worker_container_id is not None and base_id is not None:
+            base_camp_containers[str(worker_container_id)] = {
+                "base_camp_id": str(base_id),
+                "base_camp_name": base_name,
+            }
+
+    # 2. Load player container IDs from Players/*.sav and CharacterSaveParameterMap
+    player_containers: dict[str, tuple[str, str]] = load_player_containers(sav_path)
+
+    char_save_parameter_map = cast(
+        list[dict[str, Any]],
+        world_save_data.get("CharacterSaveParameterMap", {}).get("value", []),
+    )
+
+    for char_entry in char_save_parameter_map:
+        val = cast(dict[str, Any], char_entry.get("value", {}))
+        raw_data = cast(dict[str, Any], val.get("RawData", {}).get("value") or {})
+        char_obj = cast(dict[str, Any], raw_data.get("object") or {})
+        save_param = cast(dict[str, Any], char_obj.get("SaveParameter", {}).get("value") or {})
+        is_player = bool(clean_value(save_param.get("IsPlayer", {}).get("value", False)))
+        if is_player:
+            key_struct = clean_value(char_entry.get("key")) or {}
+            player_uid = clean_value(key_struct.get("PlayerUId"))
+            if player_uid is not None:
+                p_uid_str = str(player_uid)
+                otomo_id = clean_value(save_param.get("OtomoCharacterContainerId"))
+                if otomo_id:
+                    player_containers[str(otomo_id)] = (p_uid_str, "party")
+
+                storage_id = clean_value(save_param.get("PalStorageContainerId"))
+                if storage_id:
+                    player_containers[str(storage_id)] = (p_uid_str, "palbox")
+
+    # 3. Extract Pal instances from Level.sav CharacterSaveParameterMap
     pals: list[dict[str, Any]] = []
     for char_entry in char_save_parameter_map:
         val = cast(dict[str, Any], char_entry.get("value", {}))
@@ -420,56 +569,11 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
         instance_id = key_struct.get("InstanceId", {}).get("value")
         owner_player_uid = key_struct.get("PlayerUId", {}).get("value")
 
-
-        level = clean_value(save_param.get("Level", {}).get("value", 1))
-        gender_raw = save_param.get("Gender", {}).get("value", "EPalGenderType::None")
-        gender = clean_value(gender_raw)
-        if isinstance(gender, str):
-            if gender.startswith("EPalGenderType::"):
-                gender = gender.replace("EPalGenderType::", "")
-        else:
-            gender = "None"
-
-        iv_hp = clean_value(save_param.get("Talent_HP", {}).get("value", 0))
-        iv_melee = clean_value(save_param.get("Talent_Melee", {}).get("value", 0))
-        iv_shot = clean_value(save_param.get("Talent_Shot", {}).get("value", 0))
-        iv_defense = clean_value(save_param.get("Talent_Defense", {}).get("value", 0))
-        
-        # Newer Palworld saves renamed Talent_Melee to Talent_Shot.
-        actual_melee_iv = int(iv_melee) if (str(iv_melee).isdigit() and int(iv_melee) > 0) else (int(iv_shot) if str(iv_shot).isdigit() else 0)
-
-        passive_list_prop = cast(dict[str, Any], save_param.get("PassiveSkillList", {}).get("value", {}))
-        passives = cast(list[str], passive_list_prop.get("values", []))
-
-        rank = clean_value(save_param.get("Rank", {}).get("value", 0))
-        exp = clean_value(save_param.get("Exp", {}).get("value", 0))
-
-        equip_waza = cast(list[str], save_param.get("EquipWaza", {}).get("value", {}).get("values", []))
-        mastered_waza = cast(list[str], save_param.get("MasteredWaza", {}).get("value", {}).get("values", []))
-        
-        # Clean waza names
-        equip_waza = [w for w in (clean_value(w) for w in equip_waza) if w]
-        mastered_waza = [w for w in (clean_value(w) for w in mastered_waza) if w]
-
-        def _extract_status_points(prop_name: str) -> dict[str, int]:
-            pts_dict: dict[str, int] = {}
-            pts_prop = save_param.get(prop_name, {}).get("value", {}).get("values", [])
-            for pt_entry in pts_prop:
-                stat_name = clean_value(pt_entry.get("StatusName", {}).get("value"))
-                stat_val = clean_value(pt_entry.get("StatusPoint", {}).get("value", 0))
-                if stat_name and isinstance(stat_val, int):
-                    pts_dict[str(stat_name)] = stat_val
-            return pts_dict
-
-        soul_points = _extract_status_points("GotStatusPointList")
-        elixir_points = _extract_status_points("GotExStatusPointList")
-
         slot_id = cast(dict[str, Any], save_param.get("SlotID", {}).get("value") or save_param.get("SlotId", {}).get("value") or {})
         raw_cid = slot_id.get("ContainerId")
         container_id = clean_value(raw_cid)
         if isinstance(container_id, dict) and "ID" in container_id:
             container_id = clean_value(container_id["ID"])
-
 
         location_type = "unknown"
         location_details = None
@@ -483,29 +587,63 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
             elif container_id_str in base_camp_containers:
                 location_type = "base"
                 location_details = base_camp_containers[container_id_str]
+            else:
+                location_type = "cage"
+                location_details = {"container_id": container_id_str}
 
-        pal_info = {
-            "instance_id": str(instance_id) if instance_id is not None else None,
-            "owner_uid": str(owner_player_uid) if owner_player_uid is not None else None,
-            "species": character_id,
-            "level": level,
-            "gender": gender,
-            "ivs": {
-                "hp": iv_hp,
-                "melee": actual_melee_iv,
-                "shot": iv_shot,
-                "defense": iv_defense,
-            },
-            "passives": passives,
-            "rank": rank,
-            "exp": exp,
-            "equip_waza": equip_waza,
-            "mastered_waza": mastered_waza,
-            "soul_points": soul_points,
-            "elixir_points": elixir_points,
-            "location": location_type,
-            "location_details": location_details,
-        }
+        pal_info = _parse_pal_data(
+            save_param=save_param,
+            instance_id=instance_id,
+            owner_player_uid=owner_player_uid,
+            location_type=location_type,
+            location_details=location_details,
+        )
         pals.append(pal_info)
+
+    # 4. Extract Pals from Dimensional Pal Storage (Players/*_dps.sav)
+    players_dir = Path(sav_path).parent / "Players"
+    if players_dir.exists():
+        for dps_path in players_dir.glob("*_dps.sav"):
+            try:
+                with open(dps_path, "rb") as f:
+                    raw = f.read()
+
+                uncompressed_len = int.from_bytes(raw[0:4], byteorder="little")
+                magic = raw[8:11]
+
+                if magic == b"PlM":
+                    import ooz
+                    gvas_data = ooz.decompress(raw[12:], uncompressed_len)
+                else:
+                    gvas_data, _ = decompress_sav_to_gvas(raw)
+
+                with open(os.devnull, "w") as f_null, contextlib.redirect_stdout(f_null), contextlib.redirect_stderr(f_null):
+                    gvas_dps = GvasFile.read(
+                        gvas_data,
+                        type_hints=PALWORLD_TYPE_HINTS,
+                        custom_properties={},
+                    )
+
+                player_uid_stem = dps_path.stem.replace("_dps", "")
+                spa = gvas_dps.properties.get("SaveParameterArray", {}).get("value", {}).get("values", [])
+                for idx, slot_entry in enumerate(spa):
+                    save_param = cast(dict[str, Any], slot_entry.get("SaveParameter", {}).get("value") or {})
+                    character_id = clean_value(save_param.get("CharacterID", {}).get("value"))
+                    if not character_id:
+                        continue
+
+                    inst_id = clean_value(slot_entry.get("InstanceId", {}).get("value")) or clean_value(save_param.get("InstanceId", {}).get("value"))
+                    owner_uid = clean_value(save_param.get("OwnerPlayerUId", {}).get("value")) or player_uid_stem
+
+                    pal_info = _parse_pal_data(
+                        save_param=save_param,
+                        instance_id=inst_id,
+                        owner_player_uid=owner_uid,
+                        location_type="dps",
+                        location_details={"slot_index": idx, "player_uid": player_uid_stem},
+                    )
+                    pals.append(pal_info)
+            except Exception:
+                pass
 
     return pals

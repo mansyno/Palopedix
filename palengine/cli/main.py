@@ -115,6 +115,7 @@ def cli(ctx: click.Context, format: str) -> None:
     help="Filter by work suitability and min level in 'name:level' format (e.g. handiwork:3).",
 )
 @click.option("--size", type=click.Choice(["XS", "S", "M", "L", "XL"]), help="Filter by size.")
+@click.option("--category", "-c", help="Filter by Partner Skill category (e.g. flying_mount, 'Flying Mounts').")
 @click.pass_context
 def pals(
     ctx: click.Context,
@@ -122,6 +123,7 @@ def pals(
     nocturnal: Optional[bool],
     suitability: Optional[str],
     size: Optional[str],
+    category: Optional[str],
 ) -> None:
     """Queries the static Paldex database."""
     engine: SQLiteEngine = ctx.obj["engine"]
@@ -133,6 +135,8 @@ def pals(
         filters["nocturnal"] = nocturnal
     if size:
         filters["size"] = size
+    if category:
+        filters["partner_category"] = category
 
     if suitability:
         if ":" in suitability:
@@ -146,12 +150,14 @@ def pals(
     # Clean display fields for CLI printing
     display_results = []
     for r in results:
+        cats_str = ", ".join([c["name"] for c in r.get("partner_skill_categories", [])])
         display_results.append(
             {
                 "Paldex #": r["paldex_number"],
                 "Name": r["display_name"],
                 "Elements": "/".join(filter(None, [r["element_1"], r["element_2"]])),
                 "Breeding Power": r["breeding_power"],
+                "Categories": cats_str,
                 "Nocturnal": "Yes" if r["nocturnal"] else "No",
                 "Size": r["size"],
             }
@@ -171,6 +177,7 @@ def pals(
     help="Filter by minimum IV in 'stat:value' format (e.g. melee:70, defense:80).",
 )
 @click.option("--passive", help="Filter by passive skill ID.")
+@click.option("--category", "-c", help="Filter by Partner Skill category (e.g. flying_mount, 'Flying Mounts').")
 @click.pass_context
 def instances(
     ctx: click.Context,
@@ -181,6 +188,7 @@ def instances(
     min_level: Optional[int],
     min_iv: Optional[str],
     passive: Optional[str],
+    category: Optional[str],
 ) -> None:
     """Queries dynamic Pal instances from the save game."""
     engine: SQLiteEngine = ctx.obj["engine"]
@@ -200,6 +208,8 @@ def instances(
         filters["min_level"] = min_level
     if passive:
         filters["passive_id"] = passive
+    if category:
+        filters["partner_category"] = category
 
     if min_iv and ":" in min_iv:
         stat, val = min_iv.split(":", 1)
@@ -210,12 +220,14 @@ def instances(
     display_results = []
     for r in results:
         passives_list = [p["name"] for p in r.get("passives", [])]
+        cats_str = ", ".join([c["name"] for c in r.get("partner_skill_categories", [])])
         display_results.append(
             {
                 "Species": r["display_name"],
                 "Level": r["level"],
                 "Gender": r["gender"],
                 "Rank": f"{r['rank']} Star" if r["rank"] > 0 else "0 Star",
+                "Categories": cats_str,
                 "IVs (HP/Atk/Def)": f"{r['iv_hp']}/{r['iv_melee']}/{r['iv_defense']}",
                 "Location": r["location"].capitalize(),
                 "Passives": ", ".join(passives_list) if passives_list else "None",
@@ -554,7 +566,64 @@ def boss_party(
             click.echo(f"  Breeding Path: {steps}\n")
 
 
+@cli.command("missions")
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.pass_context
+def missions(
+    ctx: click.Context,
+    save_path: Optional[str],
+) -> None:
+    """Evaluates active uncompleted NPC sub-missions against targeted inventory and caught Pals."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    resolved_path = None
+    if save_path:
+        resolved_path = get_resolved_save_path(save_path)
+
+    grouped_missions = engine.get_active_missions(save_path=resolved_path)
+
+    if ctx.obj["format"] == "json":
+        click.echo(json.dumps(grouped_missions, indent=2))
+        return
+
+    if not grouped_missions:
+        click.echo("No active sub-missions found.")
+        return
+
+    for group in grouped_missions:
+        loc = group["location"]
+        ready_tag = f"({group['ready_missions']}/{group['total_missions']} Ready)"
+        batch_tag = " [READY FOR BATCH TURN-IN]" if group.get("has_batch_turnin") else ""
+        click.echo(f"\n📍 {loc.upper()} {ready_tag}{batch_tag}")
+        click.echo("=" * (len(loc) + len(ready_tag) + len(batch_tag) + 4))
+
+        rows = []
+        for m in group["missions"]:
+            req_parts = []
+            for item in m.get("required_items", []):
+                status_icon = "✓" if item["is_met"] else "✗"
+                req_parts.append(f"{item['name']}: {item['count_have']}/{item['count_required']} {status_icon}")
+            for pal in m.get("required_pals", []):
+                status_icon = "✓" if pal["is_met"] else "✗"
+                req_parts.append(f"{pal['name']}: {pal['count_have']}/{pal['count_required']} {status_icon}")
+
+            warning = "⚠️ GIVES PAL" if m.get("requires_giving_pal") else "-"
+            status_text = "READY" if m["is_ready"] else ("IN PROGRESS" if m["status"] == "in_progress" else "MISSING")
+
+            rows.append({
+                "Status": status_text,
+                "Mission": m["name"],
+                "NPC": m["npc_name"],
+                "Requirements": "; ".join(req_parts) if req_parts else m.get("type", ""),
+                "Pal Warning": warning,
+                "Rewards": m.get("rewards", ""),
+            })
+
+        click.echo(tabulate(rows, headers="keys", tablefmt="github"))
+        click.echo("")
+
+
 if __name__ == "__main__":
     cli(obj={})
+
 
 

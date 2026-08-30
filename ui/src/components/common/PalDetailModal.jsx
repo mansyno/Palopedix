@@ -1,5 +1,6 @@
 import React from 'react';
 import { WORK_SUITABILITY_MAP } from '../../constants/gameData';
+import { PassiveBadge, getPassiveMeta } from './PassiveBadge';
 
 export function PalDetailModal({ pal, onClose }) {
   if (!pal) return null;
@@ -222,46 +223,19 @@ export function PalDetailModal({ pal, onClose }) {
                     🛡️ Pal Passives ({pal.passives ? pal.passives.length : 0})
                   </h3>
                   {pal.passives && pal.passives.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.65rem' }}>
                       {pal.passives.map((pass, pIdx) => {
-                        const apt = pass.aptitude;
+                        const meta = getPassiveMeta(pass);
                         return (
-                          <div key={pIdx} className="skill-row" style={{ padding: '0.65rem 0.85rem' }}>
-                            <div style={{ flexGrow: 1 }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{pass.name}</span>
-                                  {apt && (
-                                    <span 
-                                      className="badge" 
-                                      style={{
-                                        background: 
-                                          apt.color === 'red' ? 'rgba(239, 68, 68, 0.25)' :
-                                          apt.color === 'gold' ? 'rgba(245, 158, 11, 0.25)' :
-                                          apt.color === 'legend' ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(236, 72, 153, 0.4))' :
-                                          'rgba(255, 255, 255, 0.12)',
-                                        color: 
-                                          apt.color === 'red' ? '#ef4444' :
-                                          apt.color === 'gold' ? '#fbbf24' :
-                                          apt.color === 'legend' ? '#f472b6' :
-                                          '#f8fafc',
-                                        fontWeight: 800,
-                                        fontSize: '0.75rem'
-                                      }}
-                                    >
-                                      {apt.label}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                              {pass.stat_modifier ? (
-                                <p style={{ fontSize: '0.82rem', color: 'var(--accent-green)', fontWeight: 600, margin: '0.25rem 0 0 0' }}>
-                                  ✨ {pass.stat_modifier}
-                                </p>
-                              ) : pass.description ? (
-                                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0 0' }}>{pass.description}</p>
-                              ) : null}
-                            </div>
+                          <div key={pIdx} className="skill-row" style={{ padding: '0.5rem 0.65rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <PassiveBadge skill={pass} size="modal" />
+                            {meta?.statModifier ? (
+                              <p style={{ fontSize: '0.78rem', color: 'var(--accent-green)', fontWeight: 600, margin: '0.15rem 0 0 0.25rem' }}>
+                                ✨ {meta.statModifier}
+                              </p>
+                            ) : meta?.description ? (
+                              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: '0.15rem 0 0 0.25rem' }}>{meta.description}</p>
+                            ) : null}
                           </div>
                         );
                       })}

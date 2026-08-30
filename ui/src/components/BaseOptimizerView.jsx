@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { PassiveBadge } from './common/PassiveBadge';
 import { WORK_TYPE_ASSET_MAP, CATEGORY_STYLES } from '../constants/gameData';
 
 export default function BaseOptimizerView() {
@@ -389,15 +390,10 @@ export default function BaseOptimizerView() {
                       </div>
                     </td>
                     <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                        {pal.passives && pal.passives.map((p, pIdx) => {
-                          const pName = typeof p === 'string' ? p : (p.name || p.id || '');
-                          return (
-                            <span key={p.id || pName || pIdx} style={{ background: 'rgba(255, 255, 255, 0.06)', padding: '0.1rem 0.38rem', borderRadius: '4px', fontSize: '0.72rem', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                              {pName}
-                            </span>
-                          );
-                        })}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                        {pal.passives && pal.passives.map((p, pIdx) => (
+                          <PassiveBadge key={p.id || p.name || pIdx} skill={p} size="sm" />
+                        ))}
                         {(!pal.passives || pal.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
                       </div>
                     </td>

@@ -1,6 +1,27 @@
 import React, { useState, useMemo } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
-import { SkillBadgeWithTooltip } from './common/SkillBadgeWithTooltip';
+import { PassiveBadge } from './common/PassiveBadge';
+
+const SHORT_CATEGORY_NAMES = {
+  flying_mount: 'Fly',
+  ground_mount: 'Mount',
+  swimming_mount: 'Swim',
+  glider: 'Glider',
+  ranch_producer: 'Ranch',
+  player_element_infusion: 'Infuse',
+  player_combat_buffer: 'Buff',
+  party_pal_buffer: 'Party',
+  heavy_artillery: 'Cannon',
+  coop_attacker: 'Co-Op',
+  healer_lifesteal: 'Heal',
+  carrying_capacity: 'Weight',
+  drop_loot_booster: 'Loot',
+  resource_gathering: 'Gather',
+  breeding_egg_booster: 'Breed',
+  fishing_helper: 'Fish',
+  exploration_survival: 'Radar',
+  no_active_skill: '',
+};
 
 export function SaveGameExplorerView({
   instances = [],
@@ -149,19 +170,19 @@ export function SaveGameExplorerView({
 
       {/* Scrollable Table Area */}
       {saveLoaded ? (
-        <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 0, marginBottom: '1.5rem' }}>
-          <table>
+        <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 0, marginBottom: '1.5rem' }}>
+          <table style={{ width: '100%', tableLayout: 'auto' }}>
             <thead>
               <tr>
-                <th onClick={() => handleSort('display_name')} style={{ cursor: 'pointer' }}>Species{sortCol === 'display_name' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th onClick={() => handleSort('level')} style={{ cursor: 'pointer' }}>Level{sortCol === 'level' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th onClick={() => handleSort('gender')} style={{ cursor: 'pointer' }}>Gender{sortCol === 'gender' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th onClick={() => handleSort('rank')} style={{ cursor: 'pointer' }}>Rank{sortCol === 'rank' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th>Partner Groups</th>
-                <th onClick={() => handleSort('current_speed')} style={{ cursor: 'pointer' }}>Speed (Cur/Base){sortCol === 'current_speed' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th>IVs (HP/Melee/Defense)</th>
-                <th onClick={() => handleSort('location')} style={{ cursor: 'pointer' }}>Location{sortCol === 'location' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th>Passives</th>
+                <th onClick={() => handleSort('display_name')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.4rem', width: '130px' }}>Species{sortCol === 'display_name' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th onClick={() => handleSort('level')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.25rem', width: '45px' }}>Level{sortCol === 'level' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th onClick={() => handleSort('gender')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.25rem', width: '35px' }}>Sex{sortCol === 'gender' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th onClick={() => handleSort('rank')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.25rem', width: '35px' }}>Rank{sortCol === 'rank' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th style={{ whiteSpace: 'nowrap', padding: '0.3rem 0.35rem', width: '110px' }}>Partner Groups</th>
+                <th onClick={() => handleSort('current_speed')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.25rem', width: '55px' }}>Speed{sortCol === 'current_speed' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th style={{ whiteSpace: 'nowrap', padding: '0.3rem 0.25rem', width: '65px' }}>IVs (H/A/D)</th>
+                <th onClick={() => handleSort('location')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.3rem 0.35rem', width: '70px' }}>Location{sortCol === 'location' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th style={{ padding: '0.3rem 0.4rem' }}>Passives</th>
               </tr>
             </thead>
             <tbody>
@@ -189,84 +210,92 @@ export function SaveGameExplorerView({
                   ? pi.partner_skill_categories
                   : (pals.find(p => p.display_name?.toLowerCase() === (pi.display_name || '').toLowerCase())?.partner_skill_categories || []);
 
+                const validCats = displayCats.filter(c => c.id !== 'no_active_skill');
+
                 return (
                   <tr key={pi.instance_id} onClick={handleRowClick} style={{ cursor: 'pointer' }}>
-                    <td style={{ fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap', padding: '0.25rem 0.4rem' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                         {pi.icon_path ? (
-                          <img src={pi.icon_path} alt={pi.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          <img src={pi.icon_path} alt={pi.display_name} style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }} onError={(e) => { e.target.style.display = 'none'; }} />
                         ) : (
-                          <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+                          <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.7rem', flexShrink: 0 }}>
                             {pi.display_name ? pi.display_name[0] : 'P'}
                           </div>
                         )}
-                        <span style={{ color: 'var(--accent-gold)' }}>{pi.display_name}</span>
-                        {pi.nickname && pi.nickname !== pi.display_name && (
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>"{pi.nickname}"</span>
-                        )}
+                        <span title={pi.nickname && pi.nickname !== pi.display_name ? `${pi.display_name} ("${pi.nickname}")` : pi.display_name} style={{ color: 'var(--accent-gold)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                          {pi.display_name}
+                        </span>
                       </div>
                     </td>
-                    <td style={{ fontWeight: 700, color: 'var(--accent-gold)' }}>Lv. {pi.level}</td>
-                    <td>
+                    <td style={{ fontWeight: 700, color: 'var(--accent-gold)', whiteSpace: 'nowrap', padding: '0.25rem 0.25rem', fontSize: '0.78rem' }}>Lv.{pi.level}</td>
+                    <td style={{ whiteSpace: 'nowrap', padding: '0.25rem 0.25rem' }}>
                       <span className="badge" style={{
                         background: pi.gender === 'Male' ? 'rgba(59, 130, 246, 0.2)' : 'rgba(236, 72, 153, 0.2)',
                         color: pi.gender === 'Male' ? '#60a5fa' : '#f472b6',
                         border: `1px solid ${pi.gender === 'Male' ? 'rgba(59, 130, 246, 0.4)' : 'rgba(236, 72, 153, 0.4)'}`,
-                        fontSize: '0.75rem'
+                        fontSize: '0.68rem',
+                        padding: '0.05rem 0.25rem',
                       }}>
-                        {pi.gender === 'Male' ? '♂ Male' : pi.gender === 'Female' ? '♀ Female' : pi.gender || 'Unknown'}
+                        {pi.gender === 'Male' ? '♂ M' : pi.gender === 'Female' ? '♀ F' : pi.gender || '?'}
                       </span>
                     </td>
-                    <td style={{ color: 'var(--accent-gold)', whiteSpace: 'nowrap' }}>
+                    <td style={{ color: 'var(--accent-gold)', whiteSpace: 'nowrap', padding: '0.25rem 0.25rem', fontSize: '0.72rem' }}>
                       {pi.rank ? '⭐'.repeat(pi.rank) : '-'}
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem' }}>
-                        {displayCats.map(cat => (
-                          <span
-                            key={cat.id}
-                            className="badge"
-                            style={{
-                              background: 'rgba(99, 102, 241, 0.15)',
-                              color: '#a5b4fc',
-                              border: '1px solid rgba(99, 102, 241, 0.3)',
-                              fontSize: '0.68rem',
-                              padding: '0.05rem 0.3rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.15rem'
-                            }}
-                          >
-                            <span>{cat.icon}</span>
-                            <span>{cat.name}</span>
-                          </span>
-                        ))}
+                    <td style={{ padding: '0.25rem 0.35rem' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.15rem', maxWidth: '110px' }}>
+                        {validCats.map(cat => {
+                          const shortName = SHORT_CATEGORY_NAMES[cat.id] || cat.name?.replace(/ Boosters| & Environmental Protection| & Weapons| & Life-Steal| Capacity| & Helpers| & Egg/g, '') || cat.name;
+                          return (
+                            <span
+                              key={cat.id}
+                              className="badge"
+                              title={cat.description ? `${cat.name}: ${cat.description}` : cat.name}
+                              style={{
+                                background: 'rgba(99, 102, 241, 0.15)',
+                                color: '#a5b4fc',
+                                border: '1px solid rgba(99, 102, 241, 0.3)',
+                                fontSize: '0.62rem',
+                                padding: '0.02rem 0.22rem',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.1rem',
+                                whiteSpace: 'nowrap',
+                                cursor: 'help'
+                              }}
+                            >
+                              <span>{cat.icon}</span>
+                              <span>{shortName}</span>
+                            </span>
+                          );
+                        })}
+                        {validCats.length === 0 && (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>-</span>
+                        )}
                       </div>
                     </td>
-                    <td>
+                    <td style={{ whiteSpace: 'nowrap', padding: '0.25rem 0.25rem' }}>
                       {pi.current_speed || pi.base_speed ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <span style={{ fontWeight: 700, color: (pi.speed_modifier_pct > 0) ? '#34d399' : 'var(--text-primary)' }}>
-                              💨 {pi.current_speed || pi.base_speed}
-                            </span>
-                            {pi.speed_modifier_pct > 0 && (
-                              <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.4)', fontSize: '0.68rem', padding: '0.05rem 0.3rem' }}>
-                                +{pi.speed_modifier_pct}%
-                              </span>
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                            Base: {pi.base_speed}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '0.78rem', color: (pi.speed_modifier_pct > 0) ? '#34d399' : 'var(--text-primary)' }}>
+                            💨 {pi.current_speed || pi.base_speed}
                           </span>
+                          {pi.speed_modifier_pct > 0 && (
+                            <span className="badge" style={{ background: 'rgba(52, 211, 153, 0.2)', color: '#34d399', border: '1px solid rgba(52, 211, 153, 0.4)', fontSize: '0.6rem', padding: '0.01rem 0.2rem' }}>
+                              +{pi.speed_modifier_pct}%
+                            </span>
+                          )}
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>-</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>-</span>
                       )}
                     </td>
-                    <td>{pi.iv_hp} / {pi.iv_melee} / {pi.iv_defense}</td>
-                    <td>
-                      <span className="badge" style={{
+                    <td style={{ whiteSpace: 'nowrap', padding: '0.25rem 0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                      <span style={{ color: '#f8fafc', fontWeight: 600 }}>{pi.iv_hp ?? '-'}</span>/<span style={{ color: '#f8fafc', fontWeight: 600 }}>{pi.iv_melee ?? '-'}</span>/<span style={{ color: '#f8fafc', fontWeight: 600 }}>{pi.iv_defense ?? '-'}</span>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', padding: '0.25rem 0.35rem' }}>
+                      <span className="badge" title={pi.location_details_base_camp_name ? `Base: ${pi.location_details_base_camp_name}` : ''} style={{
                         background: pi.location === 'party' ? 'rgba(59, 130, 246, 0.2)' :
                                     pi.location === 'dps' ? 'rgba(168, 85, 247, 0.2)' :
                                     pi.location === 'base' ? 'rgba(245, 158, 11, 0.2)' :
@@ -276,28 +305,22 @@ export function SaveGameExplorerView({
                                pi.location === 'base' ? '#fbbf24' :
                                '#e2e8f0',
                         border: pi.location === 'dps' ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid var(--border-color)',
-                        fontSize: '0.75rem'
+                        fontSize: '0.68rem',
+                        padding: '0.08rem 0.35rem',
                       }}>
-                        {pi.location === 'dps' ? '🔮 Dimensional Storage' :
+                        {pi.location === 'dps' ? '🔮 Storage' :
                          pi.location === 'palbox' ? '📦 Palbox' :
                          pi.location === 'party' ? '⚔️ Party' :
-                         pi.location === 'base' ? `🏰 Base${pi.location_details_base_camp_name ? ` (${pi.location_details_base_camp_name})` : ''}` :
+                         pi.location === 'base' ? '🏰 Base' :
                          (pi.location || 'STORAGE').toUpperCase()}
                       </span>
                     </td>
-                    <td>
-                      <div className="badge-container" onClick={e => e.stopPropagation()}>
-                        {(pi.passives || []).map((pass, pIdx) => {
-                          const passObj = typeof pass === 'string' ? { id: pass, name: pass } : pass;
-                          return (
-                            <SkillBadgeWithTooltip key={passObj.id || pIdx} skill={passObj}>
-                              <span className="badge badge-element" style={{ cursor: 'pointer' }}>
-                                {passObj.name || passObj.id}
-                              </span>
-                            </SkillBadgeWithTooltip>
-                          );
-                        })}
-                        {(!pi.passives || pi.passives.length === 0) && <span style={{ color: 'var(--text-secondary)' }}>None</span>}
+                    <td style={{ padding: '0.25rem 0.35rem' }}>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                        {(pi.passives || []).map((pass, pIdx) => (
+                          <PassiveBadge key={pIdx} skill={pass} size="sm" />
+                        ))}
+                        {(!pi.passives || pi.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>None</span>}
                       </div>
                     </td>
                   </tr>
@@ -316,3 +339,4 @@ export function SaveGameExplorerView({
 }
 
 export default SaveGameExplorerView;
+

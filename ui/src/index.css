@@ -163,7 +163,7 @@ body {
 .main-content {
   flex: 1;
   margin-left: 280px;
-  padding: 0.85rem 1.5rem 0 1.5rem;
+  padding: 0.85rem 1rem 0 1rem;
   min-width: 0;
   width: calc(100% - 280px);
   max-width: calc(100% - 280px);
@@ -791,15 +791,16 @@ td {
 }
 
 .pal-badge-legend {
-  background: rgba(234, 179, 8, 0.2) !important;
-  color: #fde047 !important;
-  border: 1px solid rgba(250, 204, 21, 0.6) !important;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.25)) !important;
+  color: #f472b6 !important;
+  border: 1px solid rgba(236, 72, 153, 0.55) !important;
   font-weight: 700 !important;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.2) !important;
 }
 
 .pal-badge-gold {
   background: rgba(245, 158, 11, 0.18) !important;
-  color: #fcd34d !important;
+  color: #fbbf24 !important;
   border: 1px solid rgba(245, 158, 11, 0.5) !important;
   font-weight: 600 !important;
 }
@@ -819,11 +820,20 @@ td {
   font-weight: 600 !important;
 }
 
+.pal-badge-tier2 {
+  background: rgba(148, 163, 184, 0.15) !important;
+  color: #93c5fd !important;
+  border: 1px solid rgba(147, 197, 253, 0.35) !important;
+  font-weight: 500 !important;
+}
+
 .pal-badge-white {
   background: rgba(255, 255, 255, 0.08) !important;
   color: #f1f5f9 !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  font-weight: 500 !important;
 }
+
 
 
 

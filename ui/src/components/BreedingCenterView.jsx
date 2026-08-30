@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { PassiveBadge } from './common/PassiveBadge';
 
 export function BreedingCenterView({
   pals = [],
@@ -733,13 +734,11 @@ export function BreedingCenterView({
                                       📍 {step.parent1_location_details?.base_camp_name ? `Base: ${step.parent1_location_details.base_camp_name}` : (step.parent1_location || 'Palbox')}
                                     </div>
                                     {step.parent1_passives && step.parent1_passives.length > 0 ? (
-                                      <div className="badge-container" style={{ gap: '0.2rem' }}>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', alignItems: 'center' }}>
                                         {step.parent1_passives.map((pName, pIdx) => {
                                           const isMatched = step.parent1_matched_passives && step.parent1_matched_passives.includes(pName);
                                           return (
-                                            <span key={pIdx} className={`badge ${isMatched ? 'badge-matched' : 'badge-element'}`} style={{ fontSize: '0.68rem', padding: '0.05rem 0.3rem' }}>
-                                              {isMatched ? `✨ ${pName}` : pName}
-                                            </span>
+                                            <PassiveBadge key={pIdx} skill={pName} isMatched={isMatched} size="sm" />
                                           );
                                         })}
                                       </div>
@@ -778,13 +777,11 @@ export function BreedingCenterView({
                                       📍 {step.parent2_location_details?.base_camp_name ? `Base: ${step.parent2_location_details.base_camp_name}` : (step.parent2_location || 'Palbox')}
                                     </div>
                                     {step.parent2_passives && step.parent2_passives.length > 0 ? (
-                                      <div className="badge-container" style={{ gap: '0.2rem' }}>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', alignItems: 'center' }}>
                                         {step.parent2_passives.map((pName, pIdx) => {
                                           const isMatched = step.parent2_matched_passives && step.parent2_matched_passives.includes(pName);
                                           return (
-                                            <span key={pIdx} className={`badge ${isMatched ? 'badge-matched' : 'badge-element'}`} style={{ fontSize: '0.68rem', padding: '0.05rem 0.3rem' }}>
-                                              {isMatched ? `✨ ${pName}` : pName}
-                                            </span>
+                                            <PassiveBadge key={pIdx} skill={pName} isMatched={isMatched} size="sm" />
                                           );
                                         })}
                                       </div>

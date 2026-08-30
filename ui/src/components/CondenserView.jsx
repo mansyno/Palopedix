@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { PassiveBadge } from './common/PassiveBadge';
 
 export function CondenserView() {
   const [candidates, setCandidates] = useState([]);
@@ -120,9 +121,9 @@ export function CondenserView() {
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.2rem' }}>
                       Passives & Partner Groups:
                     </div>
-                    <div className="badge-container" style={{ margin: 0, marginBottom: '0.3rem', flexWrap: 'wrap', gap: '0.3rem' }}>
+                    <div className="badge-container" style={{ margin: 0, marginBottom: '0.3rem', flexWrap: 'wrap', gap: '0.3rem', alignItems: 'center' }}>
                       {c.passives && c.passives.length > 0 ? c.passives.map((p, idx) => (
-                        <span key={idx} className="badge badge-element" style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem' }}>{p}</span>
+                        <PassiveBadge key={idx} skill={p} size="sm" />
                       )) : <span style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>None</span>}
                       {c.partner_skill_categories && c.partner_skill_categories.map(cat => (
                         <span key={cat.id} className="badge" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)', fontSize: '0.72rem', padding: '0.15rem 0.45rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>

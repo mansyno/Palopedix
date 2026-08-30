@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BASE_CATEGORY_MAP } from '../constants/gameData';
 import { useTableSort } from '../hooks/useTableSort';
+import { PassiveBadge } from './common/PassiveBadge';
 
 export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstances }) {
   return (
@@ -208,15 +209,11 @@ export function BaseCampCard({ base = {}, onBaseRenamed }) {
                     <td>{w.gender}</td>
                     <td>{w.rank ? '⭐'.repeat(w.rank) : '-'}</td>
                     <td>
-                      <div className="badge-container">
-                        {(w.passives || []).map((pass, pIdx) => {
-                          const pName = typeof pass === 'string' ? pass : (pass.name || pass.id || '');
-                          return (
-                            <span key={pIdx} className="badge badge-element">
-                              {pName}
-                            </span>
-                          );
-                        })}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                        {(w.passives || []).map((pass, pIdx) => (
+                          <PassiveBadge key={pIdx} skill={pass} size="sm" />
+                        ))}
+                        {(!w.passives || w.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
                       </div>
                     </td>
                   </tr>

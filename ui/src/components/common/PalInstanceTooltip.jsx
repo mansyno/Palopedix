@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LEGEND_PASSIVES, GOLD_PASSIVES, NEGATIVE_PASSIVES } from '../../constants/gameData';
+import { PassiveBadge } from './PassiveBadge';
 
 export function PalInstanceTooltip({ instance, children }) {
   const [pos, setPos] = useState(null);
@@ -97,33 +97,9 @@ export function PalInstanceTooltip({ instance, children }) {
                   const pName = typeof p === 'string' ? p : p.name || p.id || '';
                   const pLower = pName.toLowerCase().trim();
                   const isMatched = instance.matched_passives && instance.matched_passives.some(m => String(m).toLowerCase() === pLower);
-                  const isNeg = NEGATIVE_PASSIVES.has(pLower);
-                  const isLegend = LEGEND_PASSIVES.has(pLower);
-                  const isGold = GOLD_PASSIVES.has(pLower);
-
-                  let badgeClass = 'pal-badge-white';
-                  let prefix = '';
-                  if (isMatched) {
-                    badgeClass = 'pal-badge-target';
-                    prefix = '✨ ';
-                  } else if (isNeg) {
-                    badgeClass = 'pal-badge-negative';
-                    prefix = '⛔ ';
-                  } else if (isLegend) {
-                    badgeClass = 'pal-badge-legend';
-                    prefix = '👑 ';
-                  } else if (isGold) {
-                    badgeClass = 'pal-badge-gold';
-                  }
 
                   return (
-                    <span 
-                      key={idx} 
-                      className={`badge ${badgeClass}`}
-                      style={{ fontSize: '0.68rem', padding: '0.08rem 0.35rem', borderRadius: '4px' }}
-                    >
-                      {prefix}{pName}
-                    </span>
+                    <PassiveBadge key={idx} skill={p} isMatched={isMatched} size="sm" />
                   );
                 })}
               </div>

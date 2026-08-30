@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
+import { PassiveBadge } from './common/PassiveBadge';
 
 export function SkillsCatalogView() {
   const [skills, setSkills] = useState([]);
@@ -151,14 +152,18 @@ export function SkillsCatalogView() {
                 return (
                   <tr key={`${sk.id}-${sk.pal_id || idx}`}>
                     <td style={{ fontWeight: 600 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                        {sk.pal_icon || sk.icon_path ? (
-                          <img src={sk.pal_icon || sk.icon_path} alt={sk.pal_name || sk.name} style={{ width: '26px', height: '26px', objectFit: 'contain', borderRadius: '4px', background: 'rgba(0,0,0,0.2)' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                        ) : (
-                          <span style={{ fontSize: '1rem' }}>⚡</span>
-                        )}
-                        <span style={{ color: 'var(--text-primary)' }}>{sk.name}</span>
-                      </div>
+                      {sk.type === 'Passive' ? (
+                        <PassiveBadge skill={sk} size="md" />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                          {sk.pal_icon || sk.icon_path ? (
+                            <img src={sk.pal_icon || sk.icon_path} alt={sk.pal_name || sk.name} style={{ width: '26px', height: '26px', objectFit: 'contain', borderRadius: '4px', background: 'rgba(0,0,0,0.2)' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <span style={{ fontSize: '1rem' }}>⚡</span>
+                          )}
+                          <span style={{ color: 'var(--text-primary)' }}>{sk.name}</span>
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span className="badge" style={{ background: typeBg, color: typeColor, fontSize: '0.7rem' }}>

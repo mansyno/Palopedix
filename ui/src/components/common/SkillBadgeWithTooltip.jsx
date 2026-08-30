@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { getPassiveMeta } from './PassiveBadge';
 
 export function SkillBadgeWithTooltip({ skill, children }) {
   const [pos, setPos] = useState(null);
@@ -28,9 +29,15 @@ export function SkillBadgeWithTooltip({ skill, children }) {
     setPos(null);
   };
 
-  const skillName = typeof skill === 'string' ? skill : (skill.name || skill.id || 'Skill');
-  const skillDesc = typeof skill === 'object' ? (skill.stat_modifier || skill.description || '') : '';
-  const skillRank = typeof skill === 'object' && skill.rank !== undefined ? skill.rank : null;
+  const meta = getPassiveMeta(skill) || {
+    name: typeof skill === 'string' ? skill : (skill.name || skill.id || 'Skill'),
+    color: 'var(--accent-gold)',
+    prefix: '✨',
+    badgeClass: 'pal-badge-white',
+    label: 'Skill',
+    statModifier: typeof skill === 'object' ? (skill.stat_modifier || skill.description || '') : '',
+    description: typeof skill === 'object' ? (skill.description || '') : '',
+  };
 
   return (
     <span
@@ -51,21 +58,34 @@ export function SkillBadgeWithTooltip({ skill, children }) {
             pointerEvents: 'none',
             minWidth: '220px',
             maxWidth: '320px',
+            background: 'rgba(15, 23, 42, 0.95)',
+            backdropFilter: 'blur(12px)',
+            border: `1px solid ${meta.nature === 'negative' ? 'rgba(239, 68, 68, 0.5)' : meta.nature === 'gold' ? 'rgba(245, 158, 11, 0.5)' : meta.nature === 'legend' ? 'rgba(236, 72, 153, 0.5)' : 'var(--border-color)'}`,
+            borderRadius: '10px',
+            padding: '0.65rem 0.85rem',
+            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
           }}
         >
-          <div className="pal-tooltip-header">
-            <span style={{ fontWeight: 800, color: 'var(--accent-gold)' }}>✨ {skillName}</span>
-            {skillRank !== null && (
-              <span className="badge" style={{ background: 'rgba(234, 179, 8, 0.2)', color: 'var(--accent-gold)', fontSize: '0.7rem' }}>
-                Rank {skillRank}
+          <div className="pal-tooltip-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <span style={{ fontWeight: 800, color: meta.color, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+              <span>{meta.prefix}</span>
+              <span>{meta.name}</span>
+            </span>
+            {meta.label && (
+              <span className={`badge ${meta.badgeClass}`} style={{ fontSize: '0.68rem', padding: '0.05rem 0.35rem', borderRadius: '4px', textTransform: 'none' }}>
+                {meta.label}
               </span>
             )}
           </div>
-          {skillDesc && (
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-primary)', marginTop: '0.4rem', lineHeight: 1.4 }}>
-              {skillDesc}
+          {meta.statModifier ? (
+            <div style={{ fontSize: '0.78rem', color: meta.nature === 'negative' ? '#f87171' : 'var(--accent-green)', fontWeight: 600, marginTop: '0.3rem', lineHeight: 1.35 }}>
+              ✨ {meta.statModifier}
             </div>
-          )}
+          ) : meta.description ? (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.3rem', lineHeight: 1.35 }}>
+              {meta.description}
+            </div>
+          ) : null}
         </div>,
         document.body
       )}
@@ -74,3 +94,4 @@ export function SkillBadgeWithTooltip({ skill, children }) {
 }
 
 export default SkillBadgeWithTooltip;
+

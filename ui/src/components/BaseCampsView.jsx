@@ -3,7 +3,7 @@ import { BASE_CATEGORY_MAP } from '../constants/gameData';
 import { useTableSort } from '../hooks/useTableSort';
 import { PassiveBadge } from './common/PassiveBadge';
 
-export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstances }) {
+export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstances, pals = [], setSelectedPal }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
@@ -17,6 +17,8 @@ export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstanc
               <BaseCampCard
                 key={base.base_camp_id}
                 base={base}
+                pals={pals}
+                setSelectedPal={setSelectedPal}
                 onBaseRenamed={() => {
                   fetchBases();
                   fetchInstances();
@@ -31,7 +33,7 @@ export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstanc
   );
 }
 
-export function BaseCampCard({ base = {}, onBaseRenamed }) {
+export function BaseCampCard({ base = {}, pals = [], setSelectedPal, onBaseRenamed }) {
   const [workerSearch, setWorkerSearch] = useState('');
   const [structSearch, setStructSearch] = useState('');
 
@@ -202,22 +204,51 @@ export function BaseCampCard({ base = {}, onBaseRenamed }) {
                 </tr>
               </thead>
               <tbody>
-                {sortedWorkers.map((w, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: 600 }}>{w.display_name || w.species}</td>
-                    <td>Lv. {w.level}</td>
-                    <td>{w.gender}</td>
-                    <td>{w.rank ? '⭐'.repeat(w.rank) : '-'}</td>
-                    <td>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
-                        {(w.passives || []).map((pass, pIdx) => (
-                          <PassiveBadge key={pIdx} skill={pass} size="sm" />
-                        ))}
-                        {(!w.passives || w.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {sortedWorkers.map((w, idx) => {
+                  const handleWorkerClick = () => {
+                    if (!setSelectedPal) return;
+                    const masterPal = pals.find(p => 
+                      (p.internal_name && (p.internal_name === w.character_id || p.internal_name === w.character_id_raw || p.internal_name === w.species)) ||
+                      (p.id && (p.id === w.character_id || p.id === w.character_id_raw || p.id === w.species)) ||
+                      (p.display_name && p.display_name.toLowerCase() === (w.display_name || w.species || '').toLowerCase())
+                    );
+                    setSelectedPal({
+                      ...(masterPal || {}),
+                      ...w,
+                      isInstance: true,
+                      display_name: w.display_name || w.species || masterPal?.display_name,
+                      paldex_number: masterPal?.paldex_number || w.paldex_number,
+                      partner_skill: masterPal?.partner_skill || w.partner_skill,
+                      partner_skill_categories: (w.partner_skill_categories && w.partner_skill_categories.length > 0) ? w.partner_skill_categories : (masterPal?.partner_skill_categories || []),
+                      passives: w.passives || [],
+                      equip_waza: w.equip_waza || [],
+                    });
+                  };
+
+                  return (
+                    <tr key={idx} onClick={handleWorkerClick} style={{ cursor: setSelectedPal ? 'pointer' : 'default' }}>
+                      <td style={{ fontWeight: 600 }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {w.icon_path && (
+                            <img src={w.icon_path} alt={w.display_name || w.species} style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          )}
+                          <span style={{ color: 'var(--accent-gold)' }}>{w.display_name || w.species}</span>
+                        </div>
+                      </td>
+                      <td style={{ fontWeight: 700, color: 'var(--accent-gold)' }}>Lv. {w.level}</td>
+                      <td>{w.gender}</td>
+                      <td>{w.rank ? '⭐'.repeat(w.rank) : '-'}</td>
+                      <td>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                          {(w.passives || []).map((pass, pIdx) => (
+                            <PassiveBadge key={pIdx} skill={pass} size="sm" />
+                          ))}
+                          {(!w.passives || w.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {sortedWorkers.length === 0 && (
                   <tr>
                     <td colSpan="5" style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '1rem' }}>No workers assigned.</td>

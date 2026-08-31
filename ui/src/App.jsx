@@ -528,14 +528,26 @@ function App() {
                 saveLoaded={saveLoaded}
                 fetchBases={fetchBases}
                 fetchInstances={fetchInstances}
+                pals={pals}
+                setSelectedPal={setSelectedPal}
               />
             )}
 
             {/* ⚡ Base Pal Optimizer Tab */}
-            {activeTab === 'base_optimizer' && <BaseOptimizerView />}
+            {activeTab === 'base_optimizer' && (
+              <BaseOptimizerView
+                pals={pals}
+                setSelectedPal={setSelectedPal}
+              />
+            )}
 
             {/* ⭐ Condenser Tab */}
-            {activeTab === 'condenser' && <CondenserView />}
+            {activeTab === 'condenser' && (
+              <CondenserView
+                pals={pals}
+                setSelectedPal={setSelectedPal}
+              />
+            )}
 
             {/* 📜 Sub-Missions Tab */}
             {activeTab === 'missions' && <SubMissionsView />}

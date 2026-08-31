@@ -3,7 +3,7 @@ import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
 import { WORK_TYPE_ASSET_MAP, CATEGORY_STYLES } from '../constants/gameData';
 
-export default function BaseOptimizerView() {
+export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
   const [baseCamps, setBaseCamps] = useState([]);
   const [selectedBaseId, setSelectedBaseId] = useState('');
   const [targetTeamSize, setTargetTeamSize] = useState('max'); // 'max', 'current', or custom number
@@ -340,21 +340,42 @@ export default function BaseOptimizerView() {
                 </tr>
               </thead>
               <tbody>
-                {sortedTeam.map((pal) => (
-                  <tr key={pal.instance_id || pal._origRank}>
-                    <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                      {pal._origRank}
-                    </td>
-                    <td>
-                      <PalInstanceTooltip instance={pal}>
-                        <div className="pal-avatar-container" style={{ cursor: 'help' }}>
-                          {pal.icon_path && (
-                            <img src={pal.icon_path} alt={pal.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
-                          )}
-                          <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.display_name}</span>
-                        </div>
-                      </PalInstanceTooltip>
-                    </td>
+                {sortedTeam.map((pal) => {
+                  const handlePalClick = () => {
+                    if (!setSelectedPal) return;
+                    const masterPal = pals.find(p => 
+                      (p.internal_name && (p.internal_name === pal.character_id || p.internal_name === pal.character_id_raw || p.internal_name === pal.species)) ||
+                      (p.id && (p.id === pal.character_id || p.id === pal.character_id_raw || p.id === pal.species)) ||
+                      (p.display_name && p.display_name.toLowerCase() === (pal.display_name || pal.species || '').toLowerCase())
+                    );
+                    setSelectedPal({
+                      ...(masterPal || {}),
+                      ...pal,
+                      isInstance: true,
+                      display_name: pal.display_name || pal.species || masterPal?.display_name,
+                      paldex_number: masterPal?.paldex_number || pal.paldex_number,
+                      partner_skill: masterPal?.partner_skill || pal.partner_skill,
+                      partner_skill_categories: (pal.partner_skill_categories && pal.partner_skill_categories.length > 0) ? pal.partner_skill_categories : (masterPal?.partner_skill_categories || []),
+                      passives: pal.passives || [],
+                      equip_waza: pal.equip_waza || [],
+                    });
+                  };
+
+                  return (
+                    <tr key={pal.instance_id || pal._origRank} onClick={handlePalClick} style={{ cursor: setSelectedPal ? 'pointer' : 'default' }}>
+                      <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+                        {pal._origRank}
+                      </td>
+                      <td>
+                        <PalInstanceTooltip instance={pal}>
+                          <div className="pal-avatar-container">
+                            {pal.icon_path && (
+                              <img src={pal.icon_path} alt={pal.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />
+                            )}
+                            <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.display_name}</span>
+                          </div>
+                        </PalInstanceTooltip>
+                      </td>
                     <td style={{ whiteSpace: 'nowrap' }}>Lv. {pal.level}</td>
                     <td style={{ whiteSpace: 'nowrap' }}>
                       {pal.nocturnal ? (
@@ -401,7 +422,8 @@ export default function BaseOptimizerView() {
                       {pal.total_score} pts
                     </td>
                   </tr>
-                ))}
+                );
+              })}
               </tbody>
             </table>
           </div>

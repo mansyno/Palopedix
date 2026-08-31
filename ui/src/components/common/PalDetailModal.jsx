@@ -107,10 +107,15 @@ export function PalDetailModal({ pal, onClose }) {
                 <span style={{ color: 'var(--text-secondary)' }}>Breeding Power</span>
                 <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{pal.breeding_power}</span>
               </div>
-              {pal.rarity && (
+              {pal.rarity !== undefined && pal.rarity !== null && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>Rarity</span>
-                  <span style={{ fontWeight: 600, color: 'var(--accent-gold)' }}>{'⭐'.repeat(Math.min(pal.rarity, 5))} ({pal.rarity})</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Species Rarity</span>
+                  <span style={{ fontWeight: 700, color: pal.rarity >= 20 ? '#f472b6' : pal.rarity >= 10 ? 'var(--accent-gold)' : pal.rarity >= 7 ? '#38bdf8' : 'var(--text-primary)' }}>
+                    {pal.rarity >= 20 ? `👑 Legendary (Tier ${pal.rarity})` :
+                     pal.rarity >= 10 ? `🔥 Boss / Alpha (Tier ${pal.rarity})` :
+                     pal.rarity >= 7 ? `⭐ Rare (Tier ${pal.rarity})` :
+                     `Tier ${pal.rarity}`}
+                  </span>
                 </div>
               )}
             </div>

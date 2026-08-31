@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
 
-export function CondenserView() {
+export function CondenserView({ pals = [], setSelectedPal }) {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterSpecies, setFilterSpecies] = useState('');
@@ -79,11 +79,32 @@ export function CondenserView() {
             rank: c.attainable_stars || 0,
             ivs: { hp: c.iv_hp, melee: c.iv_attack, defense: c.iv_defense },
           };
+
+          const handlePalClick = () => {
+            if (!setSelectedPal) return;
+            const masterPal = pals.find(p => 
+              (p.internal_name && (p.internal_name === c.character_id || p.internal_name === c.species)) ||
+              (p.id && (p.id === c.character_id || p.id === c.species)) ||
+              (p.display_name && p.display_name.toLowerCase() === (c.species || '').toLowerCase())
+            );
+            setSelectedPal({
+              ...(masterPal || {}),
+              ...candPal,
+              isInstance: true,
+              display_name: c.species || masterPal?.display_name,
+              paldex_number: masterPal?.paldex_number || c.paldex_number,
+              partner_skill: masterPal?.partner_skill,
+              partner_skill_categories: masterPal?.partner_skill_categories || [],
+              passives: c.passives || candPal.passives || [],
+              equip_waza: masterPal?.equip_waza || [],
+            });
+          };
+
           return (
             <div key={`${c.species}-${i}`} className="glass-card" style={{ display: 'flex', gap: '1rem', padding: '0.75rem 1.1rem', alignItems: 'center' }}>
-              <div style={{ flex: '0 0 76px', textAlign: 'center' }}>
+              <div style={{ flex: '0 0 76px', textAlign: 'center', cursor: setSelectedPal ? 'pointer' : 'default' }} onClick={handlePalClick}>
                 <PalInstanceTooltip instance={candPal}>
-                  <div style={{ cursor: 'help' }}>
+                  <div>
                     {c.icon_path ? (
                       <img src={c.icon_path} alt={c.species} style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
                     ) : (
@@ -91,7 +112,7 @@ export function CondenserView() {
                         {c.species ? c.species[0] : '⭐'}
                       </div>
                     )}
-                    <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.2, wordBreak: 'break-word' }}>{c.species}</div>
+                    <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', fontWeight: 700, lineHeight: 1.2, wordBreak: 'break-word', color: 'var(--accent-gold)' }}>{c.species}</div>
                   </div>
                 </PalInstanceTooltip>
                 <div style={{ color: 'var(--accent-gold)', fontWeight: 700, fontSize: '0.82rem', marginTop: '0.1rem' }}>

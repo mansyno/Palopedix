@@ -37,14 +37,28 @@ export function SaveGameExplorerView({
   const [specFilter, setSpecFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('');
   const [minLvlFilter, setMinLvlFilter] = useState('');
+  const [rarityFilter, setRarityFilter] = useState('');
   const [passiveFilter, setPassiveFilter] = useState('');
+
+  const speciesOptions = useMemo(() => {
+    const counts = new Map();
+    instances.forEach(inst => {
+      const name = inst.display_name || inst.species;
+      if (name) {
+        counts.set(name, (counts.get(name) || 0) + 1);
+      }
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }));
+  }, [instances]);
 
   const filteredInstances = useMemo(() => {
     return instances.filter(pi => {
       if (locFilter && pi.location !== locFilter) return false;
       if (genderFilter && pi.gender !== genderFilter) return false;
       if (minLvlFilter && (pi.level || 0) < parseInt(minLvlFilter, 10)) return false;
-      if (specFilter && !(pi.display_name || pi.species || '').toLowerCase().includes(specFilter.toLowerCase())) return false;
+      if (specFilter && (pi.display_name || pi.species || '').toLowerCase() !== specFilter.toLowerCase()) return false;
       if (passiveFilter && !(pi.passives || []).some(p => ((typeof p === 'string' ? p : p.name || p.id) || '').toLowerCase().includes(passiveFilter.toLowerCase()))) return false;
       if (instCategoryFilter) {
         const cats = (pi.partner_skill_categories && pi.partner_skill_categories.length > 0)
@@ -54,9 +68,18 @@ export function SaveGameExplorerView({
           return false;
         }
       }
+      if (rarityFilter) {
+        const palRarity = pi.rarity ?? (pals.find(p => p.display_name?.toLowerCase() === (pi.display_name || '').toLowerCase())?.rarity);
+        if (rarityFilter === 'legendary' && palRarity !== 20) return false;
+        if (rarityFilter === 'boss' && palRarity !== 10) return false;
+        if (rarityFilter === 'rare' && (palRarity < 7 || palRarity > 9)) return false;
+        if (rarityFilter === 'mid' && (palRarity < 4 || palRarity > 6)) return false;
+        if (rarityFilter === 'common' && (palRarity < 1 || palRarity > 3)) return false;
+        if (!isNaN(parseInt(rarityFilter, 10)) && palRarity !== parseInt(rarityFilter, 10)) return false;
+      }
       return true;
     });
-  }, [instances, locFilter, genderFilter, minLvlFilter, specFilter, passiveFilter, instCategoryFilter, pals]);
+  }, [instances, locFilter, genderFilter, minLvlFilter, specFilter, passiveFilter, instCategoryFilter, rarityFilter, pals]);
 
   const {
     sortedData: sortedInstances,
@@ -81,90 +104,93 @@ export function SaveGameExplorerView({
         </div>
 
         {saveLoaded && (
-          <>
-            <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 700 }}>🤝 Partner Skill Group</label>
-                <select value={instCategoryFilter} onChange={e => setInstCategoryFilter(e.target.value)} style={{ borderColor: 'var(--accent-gold)' }}>
-                  <option value="">All Partner Groups</option>
-                  <option value="flying_mount">🦅 Flying Mounts</option>
-                  <option value="ground_mount">🐎 Ground Mounts</option>
-                  <option value="swimming_mount">🌊 Swimming Mounts</option>
-                  <option value="glider">🪂 Gliders</option>
-                  <option value="ranch_producer">🚜 Ranch Producers</option>
-                  <option value="player_element_infusion">⚡ Player Element Infusion</option>
-                  <option value="player_combat_buffer">⚔️ Player Combat Buffers</option>
-                  <option value="party_pal_buffer">🛡️ Pal / Party Combat Buffers</option>
-                  <option value="heavy_artillery">💥 Heavy Artillery & Weapons</option>
-                  <option value="coop_attacker">👥 Autonomous Co-Op</option>
-                  <option value="healer_lifesteal">💖 Healers & Life-Steal</option>
-                  <option value="carrying_capacity">🎒 Carrying Capacity</option>
-                  <option value="drop_loot_booster">🎁 Drop & Loot Boosters</option>
-                  <option value="resource_gathering">⛏️ Resource Gathering</option>
-                  <option value="breeding_egg_booster">🥚 Breeding & Egg Boosters</option>
-                  <option value="fishing_helper">🎣 Fishing & Helpers</option>
-                  <option value="exploration_survival">🧭 Exploration & Survival</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Location</label>
-                <select value={locFilter} onChange={e => setLocFilter(e.target.value)}>
-                  <option value="">All Locations</option>
-                  <option value="party">Player Party</option>
-                  <option value="palbox">Palbox Storage</option>
-                  <option value="base">Base Camp Workers</option>
-                  <option value="dps">Dimensional Storage</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Species</label>
-                <input type="text" placeholder="Filter by species..." value={specFilter} onChange={e => setSpecFilter(e.target.value)} />
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Gender</label>
-                <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)}>
-                  <option value="">All Genders</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Min Level</label>
-                <input type="text" placeholder="Min level..." value={minLvlFilter} onChange={e => setMinLvlFilter(e.target.value)} />
-              </div>
+          <div className="filter-bar glass-card" style={{ marginBottom: '0.5rem', display: 'flex', flexWrap: 'nowrap', gap: '0.5rem', alignItems: 'flex-end', overflowX: 'auto', padding: '0.6rem 0.85rem' }}>
+            <div style={{ flex: '1 1 auto', minWidth: '135px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--accent-gold)', fontSize: '0.7rem', fontWeight: 700 }}>🤝 Partner Group</label>
+              <select value={instCategoryFilter} onChange={e => setInstCategoryFilter(e.target.value)} style={{ borderColor: 'var(--accent-gold)', width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}>
+                <option value="">All Partner Groups</option>
+                <option value="flying_mount">🦅 Flying Mounts</option>
+                <option value="ground_mount">🐎 Ground Mounts</option>
+                <option value="swimming_mount">🌊 Swimming Mounts</option>
+                <option value="glider">🪂 Gliders</option>
+                <option value="ranch_producer">🚜 Ranch Producers</option>
+                <option value="player_element_infusion">⚡ Player Element Infusion</option>
+                <option value="player_combat_buffer">⚔️ Player Combat Buffers</option>
+                <option value="party_pal_buffer">🛡️ Pal / Party Combat Buffers</option>
+                <option value="heavy_artillery">💥 Heavy Artillery & Weapons</option>
+                <option value="coop_attacker">👥 Autonomous Co-Op</option>
+                <option value="healer_lifesteal">💖 Healers & Life-Steal</option>
+                <option value="carrying_capacity">🎒 Carrying Capacity</option>
+                <option value="drop_loot_booster">🎁 Drop & Loot Boosters</option>
+                <option value="resource_gathering">⛏️ Resource Gathering</option>
+                <option value="breeding_egg_booster">🥚 Breeding & Egg Boosters</option>
+                <option value="fishing_helper">🎣 Fishing & Helpers</option>
+                <option value="exploration_survival">🧭 Exploration & Survival</option>
+              </select>
+            </div>
+            <div style={{ flex: '0 0 auto', minWidth: '105px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Location</label>
+              <select value={locFilter} onChange={e => setLocFilter(e.target.value)} style={{ width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}>
+                <option value="">All Locations</option>
+                <option value="party">Player Party</option>
+                <option value="palbox">Palbox Storage</option>
+                <option value="base">Base Workers</option>
+                <option value="dps">Dimensional Storage</option>
+              </select>
             </div>
 
-            {/* Quick Category Filter Pills for Caught Save Pals */}
-            <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.35rem', marginBottom: '0.5rem', scrollbarWidth: 'thin' }}>
-              <button
-                className={`btn ${!instCategoryFilter ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setInstCategoryFilter('')}
-                style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
+            {/* Species Dropdown List */}
+            <div style={{ flex: '1 1 auto', minWidth: '135px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Species</label>
+              <select
+                value={specFilter}
+                onChange={e => setSpecFilter(e.target.value)}
+                style={{ width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}
               >
-                All ({instances.length})
-              </button>
-              {[
-                { id: 'flying_mount', icon: '🦅', name: 'Flying Mounts' },
-                { id: 'ground_mount', icon: '🐎', name: 'Ground Mounts' },
-                { id: 'ranch_producer', icon: '🚜', name: 'Ranch Producers' },
-                { id: 'player_element_infusion', icon: '⚡', name: 'Infusions' },
-                { id: 'player_combat_buffer', icon: '⚔️', name: 'Player Buffs' },
-                { id: 'heavy_artillery', icon: '💥', name: 'Artillery' },
-                { id: 'healer_lifesteal', icon: '💖', name: 'Healers' },
-                { id: 'carrying_capacity', icon: '🎒', name: 'Weight' },
-                { id: 'resource_gathering', icon: '⛏️', name: 'Gatherers' },
-              ].map(c => (
-                <button
-                  key={c.id}
-                  className={`btn ${instCategoryFilter === c.id ? 'btn-primary' : 'btn-secondary'}`}
-                  onClick={() => setInstCategoryFilter(instCategoryFilter === c.id ? '' : c.id)}
-                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
-                >
-                  {c.icon} {c.name}
-                </button>
-              ))}
+                <option value="">All Species ({instances.length})</option>
+                {speciesOptions.map(s => (
+                  <option key={s.name} value={s.name}>
+                    {s.name} ({s.count})
+                  </option>
+                ))}
+              </select>
             </div>
-          </>
+
+            <div style={{ flex: '0 0 auto', minWidth: '95px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Gender</label>
+              <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)} style={{ width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}>
+                <option value="">All Genders</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div style={{ flex: '0 0 auto', width: '70px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Min Level</label>
+              <input type="text" placeholder="Min Lv" value={minLvlFilter} onChange={e => setMinLvlFilter(e.target.value)} style={{ width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.35rem' }} />
+            </div>
+            <div style={{ flex: '0 0 auto', minWidth: '115px' }}>
+              <label style={{ display: 'block', marginBottom: '0.2rem', color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Rarity Tier</label>
+              <select value={rarityFilter} onChange={e => setRarityFilter(e.target.value)} style={{ width: '100%', fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}>
+                <option value="">All Rarities</option>
+                <option value="legendary">👑 Legendary (Tier 20)</option>
+                <option value="boss">🔥 Alpha / Boss (Tier 10)</option>
+                <option value="rare">⭐ Rare (Tier 7–9)</option>
+                <option value="mid">🔷 Mid-Tier (Tier 4–6)</option>
+                <option value="common">⚪ Common (Tier 1–3)</option>
+                <option value="20">Tier 20</option>
+                <option value="10">Tier 10</option>
+                <option value="9">Tier 9</option>
+                <option value="8">Tier 8</option>
+                <option value="7">Tier 7</option>
+                <option value="6">Tier 6</option>
+                <option value="5">Tier 5</option>
+                <option value="4">Tier 4</option>
+                <option value="3">Tier 3</option>
+                <option value="2">Tier 2</option>
+                <option value="1">Tier 1</option>
+              </select>
+            </div>
+          </div>
         )}
       </div>
 

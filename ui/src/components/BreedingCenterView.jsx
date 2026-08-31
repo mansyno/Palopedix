@@ -53,6 +53,29 @@ export function BreedingCenterView({
   const [uncaughtTableSortDesc, setUncaughtTableSortDesc] = useState(false);
   const [fallbackGlobalOptions, setFallbackGlobalOptions] = useState([]);
 
+  const openPalDetails = (palOrName) => {
+    if (!palOrName || !setSelectedPal) return;
+    if (typeof palOrName === 'object' && palOrName !== null) {
+      const name = palOrName.display_name || palOrName.species || palOrName.name;
+      const master = pals.find(p => p.display_name?.toLowerCase() === name?.toLowerCase() || p.id === palOrName.id) ||
+                     allMasterPals.find(p => p.display_name?.toLowerCase() === name?.toLowerCase() || p.id === palOrName.id);
+      setSelectedPal({
+        ...(master || {}),
+        ...palOrName,
+        display_name: name || master?.display_name,
+      });
+    } else if (typeof palOrName === 'string') {
+      const name = palOrName.trim();
+      const master = pals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase()) ||
+                     allMasterPals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase());
+      if (master) {
+        setSelectedPal(master);
+      } else {
+        setSelectedPal({ display_name: name });
+      }
+    }
+  };
+
   React.useEffect(() => {
     if ((!availablePalOptions || availablePalOptions.length === 0) && palSourceMode === 'global') {
       fetch('/api/pals')
@@ -330,7 +353,11 @@ export function BreedingCenterView({
           </div>
 
           {breedResult && (
-            <div className="glass-card" style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)', borderRadius: '12px' }}>
+            <div 
+              className="glass-card" 
+              style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)', borderRadius: '12px', cursor: 'pointer' }}
+              onClick={() => openPalDetails(breedResult)}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
                 {breedResult.icon_path ? (
                   <img src={breedResult.icon_path} alt={breedResult.display_name} style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
@@ -340,7 +367,7 @@ export function BreedingCenterView({
                   </div>
                 )}
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Offspring Result:</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Offspring Result (Click for Bio & Stats):</div>
                   <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#34d399' }}>{breedResult.display_name}</h3>
                   <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                     <span>Breeding Power: <strong style={{ color: 'var(--accent-gold)' }}>{breedResult.breeding_power}</strong></span>
@@ -356,7 +383,7 @@ export function BreedingCenterView({
                 <button 
                   className="btn btn-secondary" 
                   style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }} 
-                  onClick={() => setSelectedPal(breedResult)}
+                  onClick={(e) => { e.stopPropagation(); openPalDetails(breedResult); }}
                 >
                   Inspect Pal in Paldex →
                 </button>
@@ -415,9 +442,15 @@ export function BreedingCenterView({
                     {parentCombos.map((combo, idx) => (
                       <tr key={idx}>
                         <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{combo[0]}</td>
-                        <td style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{combo[1]}</td>
-                        <td style={{ textAlign: 'center', color: '#34d399', fontWeight: 700 }}>{reverseSearchTerm}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[0])}>
+                          {combo[0]}
+                        </td>
+                        <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[1])}>
+                          {combo[1]}
+                        </td>
+                        <td style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, cursor: 'pointer' }} onClick={() => openPalDetails(reverseSearchTerm)}>
+                          {reverseSearchTerm}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -481,7 +514,7 @@ export function BreedingCenterView({
                   </thead>
                   <tbody>
                     {offspringResults.map((pal, idx) => (
-                      <tr key={idx}>
+                      <tr key={idx} onClick={() => openPalDetails(pal)} style={{ cursor: 'pointer' }}>
                         <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -490,11 +523,11 @@ export function BreedingCenterView({
                             ) : (
                               <span style={{ fontSize: '1rem' }}>🐾</span>
                             )}
-                            <span style={{ color: 'var(--text-primary)' }}>{pal.display_name}</span>
+                            <span style={{ color: 'var(--accent-gold)' }}>{pal.display_name}</span>
                           </div>
                         </td>
                         <td>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                             {pal.other_parents && pal.other_parents.length > 0 ? (
                               pal.other_parents.map((parentName, pIdx) => (
                                 <span 
@@ -506,7 +539,12 @@ export function BreedingCenterView({
                                     background: 'rgba(99, 102, 241, 0.15)', 
                                     color: '#a5b4fc', 
                                     border: '1px solid rgba(99, 102, 241, 0.3)',
-                                    borderRadius: '4px'
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                  }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openPalDetails(parentName);
                                   }}
                                 >
                                   {parentName}
@@ -528,7 +566,10 @@ export function BreedingCenterView({
                           <button 
                             className="btn btn-secondary" 
                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.72rem', borderRadius: '6px' }}
-                            onClick={() => setSelectedPal(pal)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPalDetails(pal);
+                            }}
                           >
                             Paldex →
                           </button>
@@ -683,26 +724,40 @@ export function BreedingCenterView({
                               {idx + 1}
                             </div>
                             <div className="step-details" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.95rem', fontWeight: 600, flexWrap: 'wrap', flexGrow: 1 }}>
-                              <span style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                {step.parent1}
+                              <span 
+                                style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                                onClick={() => openPalDetails(step.parent1)}
+                                title="Inspect Pal in Paldex"
+                              >
+                                <span style={{ textDecoration: 'underline' }}>{step.parent1}</span>
                                 {step.parent1_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
                                 {step.parent1_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
                               </span>
                               <span style={{ color: 'var(--text-secondary)' }}>+</span>
-                              <span style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                                {step.parent2}
+                              <span 
+                                style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                                onClick={() => openPalDetails(step.parent2)}
+                                title="Inspect Pal in Paldex"
+                              >
+                                <span style={{ textDecoration: 'underline' }}>{step.parent2}</span>
                                 {step.parent2_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
                                 {step.parent2_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
                               </span>
                               <span style={{ color: 'var(--text-secondary)' }}>➔</span>
-                              <span style={{ color: '#34d399', fontWeight: 800 }}>{step.child}</span>
+                              <span 
+                                style={{ color: '#34d399', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                                onClick={() => openPalDetails(step.child)}
+                                title="Inspect Pal in Paldex"
+                              >
+                                {step.child}
+                              </span>
                             </div>
                           </div>
 
                           {(step.parent1_score !== undefined || step.parent2_score !== undefined) && (
                             <div style={{ marginLeft: '2.5rem', background: 'rgba(0,0,0,0.25)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                               <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                <span>⭐ Recommended Save Parent Candidates (Hover for Full In-Game Stats):</span>
+                                <span>⭐ Recommended Save Parent Candidates (Click to Inspect Full Bio & Passives):</span>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.82rem' }}>
                                 <PalInstanceTooltip instance={{
@@ -717,7 +772,18 @@ export function BreedingCenterView({
                                   location_details: step.parent1_location_details,
                                   ivs: step.parent1_ivs,
                                 }}>
-                                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'help', width: '100%' }}>
+                                  <div 
+                                    style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', width: '100%' }}
+                                    onClick={() => openPalDetails({
+                                      display_name: step.parent1,
+                                      gender: step.parent1_gender,
+                                      level: step.parent1_level,
+                                      rank: step.parent1_rank,
+                                      passives: step.parent1_passives,
+                                      location: step.parent1_location,
+                                      ivs: step.parent1_ivs,
+                                    })}
+                                  >
                                     <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                         <span>{step.parent1}</span>
@@ -760,7 +826,18 @@ export function BreedingCenterView({
                                   location_details: step.parent2_location_details,
                                   ivs: step.parent2_ivs,
                                 }}>
-                                  <div style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'help', width: '100%' }}>
+                                  <div 
+                                    style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', width: '100%' }}
+                                    onClick={() => openPalDetails({
+                                      display_name: step.parent2,
+                                      gender: step.parent2_gender,
+                                      level: step.parent2_level,
+                                      rank: step.parent2_rank,
+                                      passives: step.parent2_passives,
+                                      location: step.parent2_location,
+                                      ivs: step.parent2_ivs,
+                                    })}
+                                  >
                                     <div style={{ fontWeight: 600, color: '#a5b4fc', marginBottom: '0.2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                                         <span>{step.parent2}</span>
@@ -919,15 +996,11 @@ export function BreedingCenterView({
                                 cursor: 'pointer',
                                 padding: '0.2rem 0.4rem',
                                 borderRadius: '8px',
-                                transition: 'background 0.15s'
                               }}
                               title="Click to view full Master Paldex stats, skills, and drops"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const palObj = allMasterPals.find(p => p.display_name?.toLowerCase() === item.species.toLowerCase()) || 
-                                               pals.find(p => p.display_name?.toLowerCase() === item.species.toLowerCase()) || 
-                                               { display_name: item.species, paldex_number: item.paldex_number, icon_path: item.icon_path, element_1: item.element_1, element_2: item.element_2 };
-                                setSelectedPal(palObj);
+                                openPalDetails(item.species);
                               }}
                             >
                               {item.icon_path ? (
@@ -1043,7 +1116,7 @@ export function BreedingCenterView({
                                   <tbody>
                                     {sortedPairs.map((p, pIdx) => (
                                       <tr 
-                                        key={pIdx}
+                                        key={pIdx} 
                                         style={{ cursor: 'pointer', transition: 'background 0.15s' }}
                                         onClick={() => {
                                           setParent1(p.parent1);
@@ -1053,14 +1126,30 @@ export function BreedingCenterView({
                                         title="Click to load pair into Direct Pair Calculator"
                                       >
                                         <td style={{ padding: '0.55rem 1rem', fontWeight: 600, color: '#e2e8f0' }}>
-                                          {p.parent1}
+                                          <span 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openPalDetails(p.parent1);
+                                            }}
+                                            style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
+                                          >
+                                            {p.parent1}
+                                          </span>
                                         </td>
                                         <td style={{ padding: '0.55rem 1rem', fontWeight: 600, color: '#e2e8f0' }}>
-                                          {p.parent2}
+                                          <span 
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              openPalDetails(p.parent2);
+                                            }}
+                                            style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
+                                          >
+                                            {p.parent2}
+                                          </span>
                                         </td>
                                         <td style={{ padding: '0.4rem 1rem', textAlign: 'center' }}>
                                           <button 
-                                            className="btn btn-secondary"
+                                            className="btn btn-secondary" 
                                             style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
                                             onClick={(e) => {
                                               e.stopPropagation();

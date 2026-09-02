@@ -68,18 +68,18 @@ def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
             if belong_base_id_str == "00000000-0000-0000-0000-000000000000":
                 continue
 
-            # Check if this object is a natural resource node
-            cm = cast(dict[str, Any], obj.get("ConcreteModel", {}).get("value", {}))
-            cm_raw = cm.get("RawData", {}).get("value")
+            # Check if this object is a natural resource node (only for Damagable terrain rocks or Trees)
             node_key = object_id
-
-            if isinstance(cm_raw, dict):
-                vals = cm_raw.get("values", ())
-                b = bytes(vals)
-                matches = re.findall(b"CopperOre|Coal|Sulfur|Quartz|Stone|Wood_Fine|Wood", b)
-                if matches:
-                    raw_sub = matches[0].decode("ascii")
-                    node_key = f"Natural_{raw_sub}"
+            if object_id.startswith("Damagable") or object_id.startswith("Tree"):
+                cm = cast(dict[str, Any], obj.get("ConcreteModel", {}).get("value", {}))
+                cm_raw = cm.get("RawData", {}).get("value")
+                if isinstance(cm_raw, dict):
+                    vals = cm_raw.get("values", ())
+                    b = bytes(vals)
+                    matches = re.findall(b"CopperOre|Coal|Sulfur|Quartz|Stone|Wood_Fine|Wood", b)
+                    if matches:
+                        raw_sub = matches[0].decode("ascii")
+                        node_key = f"Natural_{raw_sub}"
 
             # Ensure the base camp entry exists
             if belong_base_id_str not in base_camps:

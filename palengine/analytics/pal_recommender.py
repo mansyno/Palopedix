@@ -85,9 +85,9 @@ CATEGORY_FOCUS_MAP: Dict[str, Dict[str, Any]] = {
 
 def normalize_suitability(name: str) -> str:
     if not name:
-        return name
-    clean = name.strip().lower().replace(" ", "").replace("_", "")
-    return SUITABILITY_ALIAS_MAP.get(clean, name)
+        return ""
+    clean = str(name).strip().lower().replace(" ", "").replace("_", "")
+    return SUITABILITY_ALIAS_MAP.get(clean, clean)
 
 
 class PalRecommender:
@@ -96,18 +96,25 @@ class PalRecommender:
     def __init__(self, db_engine: SQLiteEngine):
         self.db_engine = db_engine
         self.optimizer = BaseOptimizer(db_engine)
+        self._load_database_passives()
         self._load_database_categories()
 
-    def _load_database_categories(self) -> None:
-        """Dynamically loads partner categories and ranch producers directly from SQLite."""
-        self.ranch_producers: set[str] = set()
+    def _load_database_passives(self) -> None:
+        """Dynamically loads passive skill modifiers directly from SQLite."""
         try:
-            rows = self.db_engine.conn.execute(
-                "SELECT LOWER(pal_internal_name) as p_name FROM pal_partner_skill_categories WHERE category_id = 'ranch_producer'"
-            ).fetchall()
-            self.ranch_producers = {r["p_name"] for r in rows if r["p_name"]}
+            self.passive_modifiers = self.db_engine.get_passive_skill_modifiers()
         except Exception:
-            pass
+            self.passive_modifiers = {}
+
+    def _load_database_categories(self) -> None:
+        """Dynamically loads partner skill categories and pal mappings directly from SQLite."""
+        try:
+            self.partner_category_pals = self.db_engine.get_partner_skill_categories_map()
+        except Exception:
+            self.partner_category_pals = {}
+        self.ranch_producers = self.partner_category_pals.get("ranch_producer", set())
+        self.breeding_boosters = self.partner_category_pals.get("breeding_egg_booster", set())
+        self.resource_gatherers = self.partner_category_pals.get("resource_gathering", set())
 
     def calculate_pal_base_score(
         self,
@@ -122,27 +129,25 @@ class PalRecommender:
             for k, v in pal.get("suitabilities", {}).items()
         }
 
-        # Calculate Work Speed Multiplier
+        # Calculate Work Speed, Movement Speed, SAN, and Hunger Modifiers from Database
         work_speed_mult = 1.0
-        all_passives = [
-            str(p.get("name") or p.get("id") or "").lower() if isinstance(p, dict) else str(p).lower()
-            for p in pal.get("passives", [])
-        ]
+        move_speed_mult = 1.0
+        san_bonus = 0.0
+        food_bonus = 0.0
 
-        if any(p in all_passives for p in ["artisan", "pal_passive_workspeed_up_3"]):
-            work_speed_mult += 0.50
-        if any(p in all_passives for p in ["work slave", "pal_passive_workspeed_up_2"]):
-            work_speed_mult += 0.30
-        if any(p in all_passives for p in ["lucky", "pal_passive_rare"]):
-            work_speed_mult += 0.15
-        if any(p in all_passives for p in ["serious", "pal_passive_workspeed_up_1"]):
-            work_speed_mult += 0.20
-        if any(p in all_passives for p in ["slacker", "pal_passive_workspeed_down_2"]):
-            work_speed_mult -= 0.30
-        if any(p in all_passives for p in ["clumsy", "pal_passive_workspeed_down_1"]):
-            work_speed_mult -= 0.10
+        for p in pal.get("passives", []):
+            p_key = (p.get("id") or p.get("name") or str(p) if isinstance(p, dict) else str(p)).lower().strip()
+            mod = self.passive_modifiers.get(p_key)
+            if not mod and isinstance(p, dict) and p.get("name"):
+                mod = self.passive_modifiers.get(str(p["name"]).lower().strip())
+            if mod:
+                work_speed_mult += mod.get("work_speed_mod", 0.0)
+                move_speed_mult += mod.get("move_speed_mod", 0.0)
+                san_bonus += mod.get("san_decay_pts", 0.0)
+                food_bonus += mod.get("hunger_rate_pts", 0.0)
 
-        work_speed_mult = max(0.2, work_speed_mult)
+        work_speed_mult = max(0.10, work_speed_mult)
+        move_speed_mult = max(0.10, move_speed_mult)
 
         # Base role focus configuration
         focus_config = CATEGORY_FOCUS_MAP.get(base_category, CATEGORY_FOCUS_MAP["Balanced"])
@@ -165,10 +170,18 @@ class PalRecommender:
 
                 # Exponential tier scaling: Tier 4 is drastically better than Tier 1
                 base_tier_score = (level ** 2.2) * 12.0
-                role_score = base_tier_score * work_speed_mult
+
+                # Role-specific speed scaling:
+                # Transporters and Gatherers rely heavily on movement speed to ferry items across base
+                clean_ws = norm_req.lower().replace(" ", "").replace("_", "")
+                if clean_ws in ["transporting", "transport", "gathering", "collection"]:
+                    effective_speed_mult = (0.4 * work_speed_mult) + (0.6 * move_speed_mult)
+                else:
+                    effective_speed_mult = work_speed_mult
+
+                role_score = base_tier_score * effective_speed_mult
 
                 # Specialization priority bonus
-                clean_ws = norm_req.lower().replace(" ", "").replace("_", "")
                 if any(pr.lower().replace(" ", "").replace("_", "") == clean_ws for pr in primary_roles):
                     role_score *= primary_mult
                 elif any(sr.lower().replace(" ", "").replace("_", "") == clean_ws for sr in secondary_roles):
@@ -198,14 +211,17 @@ class PalRecommender:
                 if elec_lvl > 0:
                     total_suitability_score += (elec_lvl ** 2) * 25.0 * elec_deficit
 
-        # Database-Driven Ranch Specialist Bonus
+        # Database-Driven Partner Skill Synergies
         disp_clean = (pal.get("display_name") or "").lower().strip()
         species_clean = (pal.get("species") or "").lower().strip()
         if species_clean.startswith("boss_"):
             species_clean = species_clean[5:]
         
-        pipeline_bonus = 0.0
-        if base_category in ("Breeding & Food", "Ranching"):
+        partner_synergy_bonus = 0.0
+        
+        # 1. Ranch material producer synergy
+        ranch_count = (base_audit or {}).get("ranch_count") or (base_audit or {}).get("ranching_count") or 0
+        if ranch_count > 0 or base_category in ("Breeding & Food", "Ranching"):
             is_ranch_producer = (
                 species_clean in self.ranch_producers
                 or disp_clean in self.ranch_producers
@@ -214,22 +230,37 @@ class PalRecommender:
             )
             if is_ranch_producer:
                 farm_lvl = max(norm_pal_suitabilities.get("farming", 0), norm_pal_suitabilities.get("monsterfarm", 0), 1)
-                pipeline_bonus += 80.0 + (farm_lvl * 20.0)
-                # Extra synergy bonus if pal has Work Slave or Artisan
-                if any(p in all_passives for p in ["artisan", "work slave"]):
-                    pipeline_bonus += 25.0
+                # Cake ingredient pipeline bonus (Milk from Mozzarina/CowPal, Honey from Beegarde/SoldierBee, Eggs from Chikipi/ChickenPal)
+                is_cake = any(k in species_clean or k in disp_clean for k in ["cow", "mozzarina", "soldierbee", "beegarde", "chicken", "chikipi"])
+                if base_category == "Breeding & Food" and is_cake:
+                    partner_synergy_bonus += 150.0
+                if work_speed_mult > 1.2:
+                    partner_synergy_bonus += 25.0
 
-        # Food & SAN penalties/bonuses
+        # 2. Breeding & Egg incubation booster synergy
+        breeding_pens = (base_audit or {}).get("breeding_farm_count") or 0
+        if breeding_pens > 0 or base_category == "Breeding & Food":
+            is_breeding_booster = (
+                species_clean in self.breeding_boosters
+                or disp_clean in self.breeding_boosters
+            )
+            if is_breeding_booster:
+                partner_synergy_bonus += 50.0
+
+        # 3. Resource extraction / gathering enhancer synergy
+        extraction_facilities = (base_audit or {}).get("extraction_count") or 0
+        if extraction_facilities > 0 or base_category == "Extraction":
+            is_resource_gatherer = (
+                species_clean in self.resource_gatherers
+                or disp_clean in self.resource_gatherers
+            )
+            if is_resource_gatherer:
+                partner_synergy_bonus += 35.0
+
+        # Food & SAN Stability Score (combining database passives with base food rating)
         food_req = pal.get("food_requirement") or 3
         food_penalty = food_req * 3.0
-        
-        bonus_points = pipeline_bonus
-        if any(p in all_passives for p in ["diet lover", "pal_fullstomach_down_2"]):
-            bonus_points += 15.0
-        if any(p in all_passives for p in ["workaholic", "pal_san_down_2"]):
-            bonus_points += 15.0
-        if any(p in all_passives for p in ["positive thinker", "pal_san_down_1"]):
-            bonus_points += 10.0
+        stability_score = san_bonus + food_bonus - food_penalty
 
         level_bonus = (pal.get("level") or 1) * 0.5
 
@@ -237,7 +268,7 @@ class PalRecommender:
         if not matching_roles:
             final_score = 0.0
         else:
-            final_score = max(0.0, total_suitability_score + level_bonus + bonus_points - food_penalty)
+            final_score = max(0.0, total_suitability_score + level_bonus + partner_synergy_bonus + stability_score)
 
         return {
             "instance_id": pal.get("instance_id"),
@@ -258,6 +289,9 @@ class PalRecommender:
             "food_requirement": food_req,
             "passives": pal.get("passives", []),
             "work_speed_mult": round(work_speed_mult, 2),
+            "move_speed_mult": round(move_speed_mult, 2),
+            "san_bonus": round(san_bonus, 1),
+            "food_bonus": round(food_bonus, 1),
             "matching_roles": matching_roles,
             "total_score": round(final_score, 1),
             "icon_path": pal.get("icon_path"),
@@ -277,29 +311,24 @@ class PalRecommender:
 
         for req_ws, info in demand_map.items():
             f_count = info.get("facility_count", 1)
-            urgency_wt = info.get("urgency_weight", 1.0)
             clean_ws = req_ws.lower().replace(" ", "").replace("_", "")
 
             if req_ws in ["GeneratingElectricity", "Electricity"]:
                 base_q = max(1, electric_deficit + 1 if electric_deficit > 0 else 1)
             elif req_ws in ["Planting", "Watering", "Gathering"]:
-                base_q = max(2, min(5, f_count))
+                base_q = max(2, min(4, f_count))
             elif req_ws in ["Mining", "Lumbering"]:
-                base_q = max(2, min(5, f_count * 2))
+                base_q = max(1, min(4, f_count))
             elif req_ws in ["Transporting", "Transport"]:
                 base_q = max(2, min(4, f_count + 1))
             elif req_ws in ["MonsterFarm", "Farming"]:
-                # Guaranteed ranch slots only if non-zero breeder selected or ranching active
-                if reserved_breeding > 0 or base_category in ["Breeding & Food", "Ranching"]:
-                    base_q = max(2, min(4, f_count * 2))
-                else:
-                    base_q = max(1, min(2, f_count))
+                base_q = max(1, min(4, f_count * 2))
             elif req_ws in ["Kindling", "EmitFlame"]:
-                base_q = max(1, min(4, f_count))
+                base_q = max(1, min(3, f_count))
             elif req_ws in ["Medicine", "MedicineProduction"]:
                 base_q = max(1, min(2, f_count))
             elif req_ws in ["Handcraft"]:
-                base_q = max(1, min(4, f_count))
+                base_q = max(1, min(3, f_count))
             else:
                 base_q = max(1, min(3, f_count))
 
@@ -324,6 +353,9 @@ class PalRecommender:
         total_utility = 0.0
 
         for pal in team:
+            if not pal.get("matching_roles") or pal.get("total_score", 0.0) <= 0:
+                total_utility -= 500.0
+                continue
             total_utility += pal.get("total_score", 0.0)
             for r in pal.get("matching_roles", []):
                 wt = r["work_type"]
@@ -336,10 +368,6 @@ class PalRecommender:
                     # Diminishing utility for excess workers on already satiated role
                     total_utility -= r["role_score"] * 0.35
                 role_counts[wt] = curr_count + 1
-
-        san_summary = self.optimizer.calculate_team_food_and_san(team)
-        if san_summary.get("san_stability_status") == "Warning":
-            total_utility -= 50.0
 
         return total_utility
 
@@ -365,7 +393,11 @@ class PalRecommender:
         if not base_camps:
             return {}
 
-        owned_pals = self.db_engine.query_instances({})
+        owned_pals = self.db_engine.get_owned_pals_with_suitabilities()
+        if not owned_pals:
+            # Fallback to query_instances if suitabilities view isn't populated
+            owned_pals = [p for p in self.db_engine.query_instances({}) if p.get("location") in ("palbox", "base", "party")]
+
         if not owned_pals:
             results = {}
             for bc in base_camps:
@@ -411,8 +443,8 @@ class PalRecommender:
             if reserved_breeding_slots and bid in reserved_breeding_slots:
                 breeding_reserved = reserved_breeding_slots[bid]
             else:
-                # Default to 2 slots (1 breeding pair) when breeding infrastructure exists
-                breeding_reserved = 2 if audit.get("breeding_farm_count", 0) > 0 else 0
+                # Default to 2 slots per breeding farm (1 breeding pair per farm)
+                breeding_reserved = 2 * audit.get("breeding_farm_count", 0) if audit.get("breeding_farm_count", 0) > 0 else 0
 
             base_quotas[bid] = self._calculate_target_quotas(
                 audit["demand_by_suitability"],
@@ -448,9 +480,11 @@ class PalRecommender:
         assigned_instance_ids: set[str] = set()
 
         # 3. Phase 1: Critical Ranch Producers & Specialist Allocation
-        # 3a. In Breeding & Food or Ranching bases, allocate distinct Ranch Producers from the database
+        # 3a. In bases with built Ranch facilities (MonsterFarm), allocate up to physical ranch capacity
         for bid, audit in base_audits.items():
-            if audit["base_category"] in ("Breeding & Food", "Ranching"):
+            ranch_count = audit.get("ranch_count") or audit.get("ranching_count") or 0
+            if ranch_count > 0:
+                max_ranch_slots = min(4 * ranch_count, base_quotas[bid].get("Farming", base_quotas[bid].get("MonsterFarm", 2 * ranch_count)), base_effective_caps[bid])
                 ranch_cands = [
                     p for p in owned_pals
                     if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
@@ -462,12 +496,21 @@ class PalRecommender:
                     )
                 ]
                 assigned_ranch_species: set[str] = set()
+                is_breeding_base = audit.get("base_category") == "Breeding & Food"
+                def _is_cake_cand(p):
+                    sp = (p.get("species") or "").lower()
+                    disp = (p.get("display_name") or "").lower()
+                    return any(k in sp or k in disp for k in ["cow", "mozzarina", "soldierbee", "beegarde", "chicken", "chikipi"])
+
                 ranch_cands.sort(
-                    key=lambda p: scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                    key=lambda p: (
+                        1 if is_breeding_base and _is_cake_cand(p) else 0,
+                        scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                    ),
                     reverse=True,
                 )
                 for cand in ranch_cands:
-                    if len(assigned_teams[bid]) >= base_effective_caps[bid]:
+                    if len(assigned_ranch_species) >= max_ranch_slots or len(assigned_teams[bid]) >= base_effective_caps[bid]:
                         break
                     cand_sp = (cand.get("species") or "").lower().replace("boss_", "")
                     if cand_sp not in assigned_ranch_species:
@@ -522,10 +565,13 @@ class PalRecommender:
                         wt = r["work_type"]
                         c_cnt = role_counts[bid].get(wt, 0)
                         tgt = base_quotas[bid].get(wt, 2)
-                        if c_cnt < tgt:
+                        if c_cnt == 0:
+                            # Critical coverage bonus for uncovered demanded role
+                            gain += r["role_score"] * 3.0 + 150.0
+                        elif c_cnt < tgt:
                             gain += r["role_score"] * 1.5
                         else:
-                            gain -= r["role_score"] * 0.35
+                            gain -= r["role_score"] * 0.5
 
                     if gain > best_gain:
                         best_gain = gain
@@ -585,6 +631,23 @@ class PalRecommender:
 
                             new_pal_u_for_v = scored_matrix[iid_u][bv]
                             new_pal_v_for_u = scored_matrix[iid_v][bu]
+
+                            # Never swap a Pal to a base where it has no matching roles or zero score
+                            if not new_pal_u_for_v.get("matching_roles") or new_pal_u_for_v.get("total_score", 0.0) <= 0:
+                                continue
+                            if not new_pal_v_for_u.get("matching_roles") or new_pal_v_for_u.get("total_score", 0.0) <= 0:
+                                continue
+
+                            # Never swap a dedicated Ranch worker from a Ranch base to a non-Ranch base
+                            u_is_ranch = any(r.get("work_type") in ("MonsterFarm", "Farming") for r in pal_u.get("matching_roles", []))
+                            v_has_ranch = (base_audits[bv].get("ranch_count") or base_audits[bv].get("ranching_count") or 0) > 0
+                            if u_is_ranch and not v_has_ranch:
+                                continue
+
+                            v_is_ranch = any(r.get("work_type") in ("MonsterFarm", "Farming") for r in pal_v.get("matching_roles", []))
+                            u_has_ranch = (base_audits[bu].get("ranch_count") or base_audits[bu].get("ranching_count") or 0) > 0
+                            if v_is_ranch and not u_has_ranch:
+                                continue
 
                             swapped_u = team_u[:idx_u] + team_u[idx_u + 1:] + [new_pal_v_for_u]
                             swapped_v = team_v[:idx_v] + team_v[idx_v + 1:] + [new_pal_u_for_v]

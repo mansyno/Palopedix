@@ -77,12 +77,13 @@ MOUNT_CONVERTERS: dict[str, dict[str, Any]] = {
 # ==============================================================================
 
 BOSS_REGISTRY: dict[str, dict[str, Any]] = {
-    # 1. Tower Bosses
+    # 1. Tower Bosses (10-minute arena time limit = 600s)
     "zoe & grizzbolt": {
         "canonical_name": "Zoe & Grizzbolt",
         "location": "Rayne Syndicate Tower (Isolated Island: 112, -434)",
         "level": 10,
         "hp": 30550,
+        "time_limit_sec": 600,
         "elements": ["Electric"],
         "weaknesses": ["Ground"],
         "dangerous_moves": ["Lightning Claw", "Lock-on Laser", "Shockwave"],
@@ -93,6 +94,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Free Pal Alliance Tower (Verdant Brook: 181, 28)",
         "level": 25,
         "hp": 69375,
+        "time_limit_sec": 600,
         "elements": ["Grass"],
         "weaknesses": ["Fire"],
         "dangerous_moves": ["Seed Mine", "Hurricane Slice", "Healing Bloom"],
@@ -103,6 +105,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Brothers of the Eternal Pyre Tower (Mount Obsidian: -587, -517)",
         "level": 40,
         "hp": 130700,
+        "time_limit_sec": 600,
         "elements": ["Dragon", "Electric"],
         "weaknesses": ["Ice", "Ground"],
         "dangerous_moves": ["Kerauno", "Lightning Strike", "Dragon Meteor"],
@@ -113,6 +116,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "PIDF Tower (Dessicated Dunes: 561, 334)",
         "level": 45,
         "hp": 146975,
+        "time_limit_sec": 600,
         "elements": ["Fire"],
         "weaknesses": ["Water"],
         "dangerous_moves": ["Ignis Rage", "Fire Ball", "Phoenix Flare"],
@@ -123,6 +127,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "PAL Genetic Research Unit Tower (Astral Mountains: -148, 447)",
         "level": 50,
         "hp": 200750,
+        "time_limit_sec": 600,
         "elements": ["Dark"],
         "weaknesses": ["Dragon"],
         "dangerous_moves": ["Divine Disaster", "Nightmare Ball", "Dark Laser"],
@@ -133,18 +138,20 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Moonflower Tower (Sakurajima: -600, 180)",
         "level": 55,
         "hp": 258000,
+        "time_limit_sec": 600,
         "elements": ["Dark", "Neutral"],
         "weaknesses": ["Dragon", "Dark"],
         "dangerous_moves": ["Star Fall", "Lunar Beam", "Dark Blast"],
         "tactics": "Selyne has rapid laser sweeps. Bring Dragon/Dark tanks and stagger her with heavy artillery.",
     },
 
-    # 2. Alpha Legendaries & Major Field Alphas
+    # 2. Alpha Legendaries & Major Field Alphas (Open world - no hard arena timer)
     "jetragon": {
         "canonical_name": "Jetragon (Alpha Legendary)",
         "location": "Mount Obsidian (-845, -450)",
         "level": 50,
         "hp": 11500,
+        "time_limit_sec": None,
         "elements": ["Dragon"],
         "weaknesses": ["Ice"],
         "dangerous_moves": ["Beam Slicer", "Dragon Meteor", "Fire Ball"],
@@ -155,6 +162,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Astral Mountains (-357, 508)",
         "level": 50,
         "hp": 14500,
+        "time_limit_sec": None,
         "elements": ["Ice"],
         "weaknesses": ["Fire"],
         "dangerous_moves": ["Crystal Wing", "Blizzard Spike", "Iceberg"],
@@ -165,6 +173,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Dessicated Dunes (285, 655)",
         "level": 50,
         "hp": 13000,
+        "time_limit_sec": None,
         "elements": ["Dark"],
         "weaknesses": ["Dragon"],
         "dangerous_moves": ["Twin Spears", "Shadow Burst", "Dark Ball"],
@@ -175,6 +184,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Dessicated Dunes (285, 655)",
         "level": 50,
         "hp": 13000,
+        "time_limit_sec": None,
         "elements": ["Neutral"],
         "weaknesses": ["Dark"],
         "dangerous_moves": ["Spear Thrust", "Holy Beam", "Iceberg"],
@@ -185,6 +195,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Mount Obsidian Mineshaft (-434, -531)",
         "level": 49,
         "hp": 10500,
+        "time_limit_sec": None,
         "elements": ["Fire"],
         "weaknesses": ["Water"],
         "dangerous_moves": ["Magma Burst", "Fire Ball", "Rock Burst"],
@@ -195,6 +206,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
         "location": "Destroyed Mineshaft (-615, -429)",
         "level": 48,
         "hp": 9800,
+        "time_limit_sec": None,
         "elements": ["Dragon", "Dark"],
         "weaknesses": ["Ice", "Dragon"],
         "dangerous_moves": ["Dragon Breath", "Dragon Meteor", "Dark Laser"],
@@ -216,13 +228,23 @@ class BossPartyRecommender:
         # Direct match from registry
         for key, profile in BOSS_REGISTRY.items():
             if key in cleaned or cleaned in key:
-                return profile
+                profile_copy = dict(profile)
+                if profile_copy.get("time_limit_sec"):
+                    profile_copy["required_dps"] = round(profile_copy["hp"] / profile_copy["time_limit_sec"], 1)
+                else:
+                    profile_copy["required_dps"] = None
+                return profile_copy
                 
         # Keyword checks (e.g. "victor", "faleris", "grizzbolt")
         for key, profile in BOSS_REGISTRY.items():
             words = re.findall(r"\w+", key)
             if any(w in cleaned for w in words if len(w) > 3):
-                return profile
+                profile_copy = dict(profile)
+                if profile_copy.get("time_limit_sec"):
+                    profile_copy["required_dps"] = round(profile_copy["hp"] / profile_copy["time_limit_sec"], 1)
+                else:
+                    profile_copy["required_dps"] = None
+                return profile_copy
 
         # Fallback: Query static SQLite Paldex for any Alpha/Pal species
         cursor = self.engine.conn.cursor()
@@ -244,12 +266,15 @@ class BossPartyRecommender:
             for el in elems:
                 weaknesses.extend(ELEMENT_WEAKNESSES.get(el, []))
             weaknesses = list(dict.fromkeys(weaknesses))
+            est_hp = row["hp"] * 100 if row["hp"] else 10000
 
             return {
                 "canonical_name": f"Alpha {row['display_name'] or row['name']}",
                 "location": "Palpagos Islands (Wild / Dungeon Encounter)",
                 "level": 50,
-                "hp": row["hp"] * 100 if row["hp"] else 10000,
+                "hp": est_hp,
+                "time_limit_sec": None,
+                "required_dps": None,
                 "elements": elems,
                 "weaknesses": weaknesses,
                 "dangerous_moves": ["Elemental Signature Skill", "Charge Attack"],
@@ -273,7 +298,6 @@ class BossPartyRecommender:
 
         return f"{species} {gender_str} (Lv.{level}, {rank_str}) {pass_str} | {loc_str}".replace("  ", " ")
 
-
     def _format_location(self, pal_instance: dict[str, Any]) -> str:
         loc = (pal_instance.get("location") or "palbox").lower()
         if loc == "party":
@@ -288,12 +312,72 @@ class BossPartyRecommender:
             return f"Base: {base_name}" if base_name and base_name != "None" else "Base Camp"
         return "Palbox"
 
+    def evaluate_encounter_readiness(
+        self,
+        boss: dict[str, Any],
+        party: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Evaluates player party readiness, level gap, and time limit viability against the boss."""
+        boss_level = boss.get("level", 50)
+        party_levels = [p.get("level", 1) for p in party]
+        highest_lvl = max(party_levels) if party_levels else 1
+        avg_lvl = round(sum(party_levels) / len(party_levels), 1) if party_levels else 1
+        level_gap = highest_lvl - boss_level
+
+        # Elemental counter count
+        weaknesses = set(boss.get("weaknesses", []))
+        counter_count = 0
+        for p in party:
+            e1 = p.get("element_1") or ""
+            e2 = p.get("element_2") or ""
+            if e1 in weaknesses or e2 in weaknesses:
+                counter_count += 1
+
+        time_limit_sec = boss.get("time_limit_sec")
+        req_dps = boss.get("required_dps")
+
+        if level_gap >= 0 and counter_count >= 1:
+            status = "FAVORED"
+            verdict = f"Encounter is favored. Lead Pal (Lv.{highest_lvl}) matches or exceeds Boss level (Lv.{boss_level}) with {counter_count} super-effective counter(s)."
+        elif level_gap >= -5 and counter_count >= 1:
+            status = "CHALLENGING"
+            verdict = f"Viable but challenging (Level gap: {level_gap}). Stagger rotation and careful dodging required."
+        elif level_gap >= -9:
+            status = "HIGH DIFFICULTY"
+            verdict = f"High difficulty (Level gap: {level_gap}). Boss inflicts severe level-scaling damage penalties against your party."
+        else:
+            status = "UNLIKELY / NOT RECOMMENDED"
+            verdict = f"Encounter unlikely to succeed with current roster (Level gap: {level_gap}). Leveling to at least Lv.{max(1, boss_level - 5)} is strongly advised."
+
+        # Time constraint notes
+        if time_limit_sec:
+            time_mins = time_limit_sec // 60
+            if status in ("HIGH DIFFICULTY", "UNLIKELY / NOT RECOMMENDED"):
+                timer_note = f"[HIGH TIMEOUT RISK] Must output {req_dps:,} DPS to burn {boss['hp']:,} HP within the strict {time_mins}-minute arena limit. Underleveled damage penalties make this timeout very likely."
+            else:
+                timer_note = f"Arena Time Limit: {time_mins} minutes ({time_limit_sec}s). Minimum sustained DPS threshold: {req_dps:,} DPS."
+        else:
+            timer_note = "Open Field / Dungeon Encounter: No hard arena timer. Prioritize kiting and Pal recall dodging."
+
+        return {
+            "status": status,
+            "highest_pal_level": highest_lvl,
+            "average_party_level": avg_lvl,
+            "boss_level": boss_level,
+            "level_gap": level_gap,
+            "counter_elements_in_party": counter_count,
+            "time_limit": f"{time_limit_sec // 60} min ({time_limit_sec}s)" if time_limit_sec else "No Timer (Open Field)",
+            "required_dps": req_dps,
+            "verdict": verdict,
+            "timer_note": timer_note,
+        }
+
     def recommend_party_for_boss(
         self,
         boss_query: str,
         save_path: Optional[str] = None,
     ) -> dict[str, Any]:
-        """Calculates 3 optimal 5-Pal party archetypes for the specified boss."""
+        """Calculates the single best 5-Pal party for the specified boss encounter."""
         boss = self.resolve_boss(boss_query)
         if not boss:
             raise ValueError(
@@ -312,7 +396,6 @@ class BossPartyRecommender:
                 except Exception:
                     pass
             all_instances = self.engine.query_instances({})
-
 
         # Static definitions lookup
         static_pals: dict[str, Any] = {}
@@ -338,16 +421,13 @@ class BossPartyRecommender:
 
         weaknesses = boss["weaknesses"]
 
-        # ----------------------------------------------------------------------
-        # Archetype 1: Pure Pal Elemental DPS (Direct Counters)
-        # ----------------------------------------------------------------------
-        counter_pals = []
+        # Score combat potential of each Pal instance against this boss
+        scored_pals = []
         for p in enriched:
             e1 = p.get("element_1")
             e2 = p.get("element_2")
             is_counter = e1 in weaknesses or e2 in weaknesses
             
-            # Compute score
             lvl = p.get("level", 1)
             rank = p.get("rank", 0)
             atk_iv = p.get("iv_melee", 0)
@@ -363,8 +443,8 @@ class BossPartyRecommender:
             if "Burly Body" in passives: pass_score += 15
             if "Aggressive" in passives: pass_score += 10
             if "Brave" in passives: pass_score += 10
-            if "Vanguard" in passives: pass_score += 15
-            if "Stronghold Strategist" in passives: pass_score += 15
+            if "Vanguard" in passives: pass_score += 20
+            if "Stronghold Strategist" in passives: pass_score += 20
             if any("cheery" in p_name.lower() for p_name in passives) and "Dark" in boss["elements"]: pass_score += 15
             if any("heatproof" in p_name.lower() or "suntan" in p_name.lower() for p_name in passives) and "Fire" in boss["elements"]: pass_score += 15
 
@@ -379,152 +459,124 @@ class BossPartyRecommender:
 
             p["combat_score"] = round(base_score, 1)
             p["is_counter"] = is_counter
-            counter_pals.append(p)
+            scored_pals.append(p)
 
-        counter_pals.sort(key=lambda x: x["combat_score"], reverse=True)
-
-        # Build 5-Pal Option A (Top Counter Combat Team)
-        team_a = counter_pals[:5]
+        scored_pals.sort(key=lambda x: x["combat_score"], reverse=True)
 
         # ----------------------------------------------------------------------
-        # Archetype 2: Mounted Player-DPS Build (Infusion Mount + Gobfin Stack)
+        # Synthesize Single Best 5-Pal Counter Team
         # ----------------------------------------------------------------------
-        # Find best mount converter matching boss weakness
+        best_party_instances: list[dict[str, Any]] = []
+        party_roles: list[str] = []
+
+        # 1. Lead DPS: Check for Weakness Infusion Mount first, or top counter
         best_mount = None
-        for p in counter_pals:
+        for p in scored_pals:
             disp_name = p.get("display_name") or p.get("species")
             if disp_name in MOUNT_CONVERTERS:
                 mount_elem = MOUNT_CONVERTERS[disp_name]["element"]
                 if mount_elem in weaknesses:
                     best_mount = p
                     break
-        
-        # If no weakness mount found, pick highest level mount
-        if not best_mount:
-            for p in counter_pals:
-                disp_name = p.get("display_name") or p.get("species")
-                if disp_name in MOUNT_CONVERTERS:
-                    best_mount = p
-                    break
 
-        # If still none, fallback to top Pal
-        if not best_mount and counter_pals:
-            best_mount = counter_pals[0]
+        lead_pal = best_mount if (best_mount and best_mount.get("combat_score", 0) >= 200) else (scored_pals[0] if scored_pals else None)
+        if lead_pal:
+            best_party_instances.append(lead_pal)
+            disp_name = lead_pal.get("display_name") or lead_pal.get("species")
+            if disp_name in MOUNT_CONVERTERS and MOUNT_CONVERTERS[disp_name]["element"] in weaknesses:
+                party_roles.append("Lead DPS & Elemental Infusion Mount")
+            else:
+                party_roles.append("Lead Elemental DPS")
 
-        # Find Gobfins & Gobfin Ignis
+        # 2. Secondary Attacker / Tough Combatant
+        for p in scored_pals:
+            if p not in best_party_instances:
+                best_party_instances.append(p)
+                party_roles.append("Secondary Elemental DPS / Aggro Switch")
+                break
+
+        # 3. Synergy Buffers (Gobfins for player attack or Vanguard/Stronghold Pals)
         gobbfin_pals = [
             p for p in enriched
             if "gobfin" in (p.get("display_name") or "").lower()
-            and p.get("instance_id") != (best_mount.get("instance_id") if best_mount else None)
+            and p not in best_party_instances
         ]
         gobbfin_pals.sort(key=lambda x: (x.get("rank", 0), x.get("level", 0)), reverse=True)
 
-        # Find Vanguard / Stronghold pals if not enough Gobfins
         vanguard_pals = [
             p for p in enriched
             if any("vanguard" in (p_obj.get("name") if isinstance(p_obj, dict) else str(p_obj)).lower() for p_obj in p.get("passives", []))
-            and p.get("instance_id") != (best_mount.get("instance_id") if best_mount else None)
+            and p not in best_party_instances
             and p not in gobbfin_pals
         ]
         vanguard_pals.sort(key=lambda x: x.get("level", 0), reverse=True)
 
-        team_b: list[dict[str, Any]] = [best_mount] if best_mount else []
-        needed = 5 - len(team_b)
-        team_b.extend(gobbfin_pals[:needed])
-        if len(team_b) < 5:
-            team_b.extend(vanguard_pals[: 5 - len(team_b)])
-        if len(team_b) < 5:
-            for p in counter_pals:
-                if p not in team_b:
-                    team_b.append(p)
-                if len(team_b) == 5:
-                    break
-
-        # ----------------------------------------------------------------------
-        # Archetype 3: Balanced Hybrid & Survival Team
-        # ----------------------------------------------------------------------
-        # Slot 1: Highest Level Boss Counter DPS
-        # Slot 2: Highest Defense/HP Tank (for swapping aggro)
-        # Slot 3: Vanguard / Player Attack Buffer
-        # Slot 4: Stronghold / Defense Buffer or High Level Pal
-        # Slot 5: Fast Stagger / Secondary Attacker
-        team_c: list[dict[str, Any]] = []
-        if team_a:
-            team_c.append(team_a[0])  # Main DPS
-
-        # High HP/Def Tank
-        tanks = sorted(enriched, key=lambda x: (x.get("base_hp", 0) + x.get("base_def", 0), x.get("level", 0)), reverse=True)
-        for t in tanks:
-            if t not in team_c:
-                team_c.append(t)
-                break
-
-        # Vanguard Buffer
-        for v in vanguard_pals:
-            if v not in team_c:
-                team_c.append(v)
-                break
-
-        # Secondary DPS / Gobfin
+        # Add up to 2 Gobfins if player has them and is using mounted/player combat
         for g in gobbfin_pals:
-            if g not in team_c:
-                team_c.append(g)
+            if len(best_party_instances) < 5:
+                best_party_instances.append(g)
+                party_roles.append("Player Attack Buffer (Gobfin Synergy)")
+            if len(best_party_instances) == 4:
                 break
 
-        # Fill remaining slots with next best combat pals
-        for p in counter_pals:
-            if p not in team_c:
-                team_c.append(p)
-            if len(team_c) == 5:
+        # Add Vanguard/Stronghold buffers
+        for v in vanguard_pals:
+            if len(best_party_instances) < 5 and v not in best_party_instances:
+                best_party_instances.append(v)
+                party_roles.append("Player & Party Combat Buffer (Vanguard)")
+
+        # Fill remaining slots with next top combat score counters/tanks
+        for p in scored_pals:
+            if p not in best_party_instances:
+                best_party_instances.append(p)
+                party_roles.append("Elemental Attacker / Tank Support")
+            if len(best_party_instances) == 5:
                 break
 
-        # ----------------------------------------------------------------------
-        # Breeding Fallbacks (Tier 3)
-        # ----------------------------------------------------------------------
-        breeding_suggestions = []
-        owned_species = list(set([p.get("display_name") or p.get("species") for p in enriched if p.get("display_name") or p.get("species")]))
-        
-        # Best counter target species for this boss weakness
-        target_counter_candidates = []
-        for name, sp in static_pals.items():
-            if sp.get("element_1") in weaknesses or sp.get("element_2") in weaknesses:
-                if (sp.get("attack_melee") or 0) >= 100:
-                    target_counter_candidates.append(sp.get("display_name") or sp.get("name"))
-        target_counter_candidates = list(dict.fromkeys(target_counter_candidates))[:5]
+        # Format party with tailored movesets and role-specific passive priorities
+        formatted_team = []
+        for p, role in zip(best_party_instances, party_roles):
+            formatted_team.append(self._format_team_member_with_waza(p, role, weaknesses))
 
-        for target in target_counter_candidates:
-            # Check if player already has high level one
-            has_high_lvl = any(p.get("level", 0) >= 40 and (p.get("display_name") == target or p.get("species") == target) for p in enriched)
-            if not has_high_lvl:
-                path = self.engine.find_breeding_path(owned_species, target)
-                if path:
-                    breeding_suggestions.append({
-                        "target_pal": target,
-                        "element": f"{static_pals.get(target.lower(), {}).get('element_1')}/{static_pals.get(target.lower(), {}).get('element_2') or ''}".rstrip('/'),
-                        "path": path,
-                        "warning": "[Level 1 Warning] Hatches at Level 1 (Requires EXP training / manuals before boss battle)",
-                    })
+        # Evaluate encounter readiness
+        readiness = self.evaluate_encounter_readiness(boss, best_party_instances)
 
-                    if len(breeding_suggestions) >= 2:
-                        break
-
-        # Format output payload
         return {
             "boss_profile": boss,
-            "team_a_pal_dps": [self._format_team_member(p, "Primary Elemental DPS / Tank") for p in team_a],
-            "team_b_mounted_player_dps": [self._format_team_member(p, "Mounted Infusion / Player Buff") for p in team_b],
-            "team_c_balanced_hybrid": [self._format_team_member(p, "Balanced DPS / Utility") for p in team_c],
-            "recommended_waza": self._recommend_active_skills(weaknesses),
-            "breeding_projects": breeding_suggestions,
+            "encounter_readiness": readiness,
+            "recommended_party": formatted_team,
             "tactics": boss.get("tactics", ""),
         }
 
-    def _format_team_member(self, pal: dict[str, Any], role_hint: str) -> dict[str, Any]:
+    def _format_team_member_with_waza(
+        self,
+        pal: dict[str, Any],
+        role_hint: str,
+        weaknesses: list[str],
+    ) -> dict[str, Any]:
         passives = [p["name"] if isinstance(p, dict) else str(p) for p in pal.get("passives", [])]
         elem = f"{pal.get('element_1') or '?'}/{pal.get('element_2') or ''}".rstrip('/')
         gender = pal.get("gender") or "None"
         rank = pal.get("rank", 0)
         
+        # Determine tailored active waza (moveset)
+        pal_elements = [pal.get("element_1"), pal.get("element_2")]
+        pal_elements = [e for e in pal_elements if e]
+        # Prefer moves matching boss weakness first, then Pal's STAB element
+        target_elements = [e for e in weaknesses if e in pal_elements]
+        if not target_elements:
+            target_elements = weaknesses + pal_elements
+        
+        assigned_waza = self._get_tailored_waza_for_pal(target_elements)
+
+        # Determine optimal target passives based on role
+        if "Buffer" in role_hint or "Gobfin" in role_hint:
+            optimal_passives = ["Vanguard", "Stronghold Strategist", "Noble", "Fine Coat"]
+        elif "Tank" in role_hint:
+            optimal_passives = ["Burly Body", "Hard Skin", "Legend", "Masochist"]
+        else:
+            optimal_passives = ["Ferocious", "Musclehead", "Legend", "Serenity"]
+
         return {
             "species": pal.get("display_name") or pal.get("species"),
             "gender": gender,
@@ -536,67 +588,97 @@ class BossPartyRecommender:
             "ivs": f"{pal.get('iv_hp', 0)}/{pal.get('iv_melee', 0)}/{pal.get('iv_defense', 0)}",
             "human_label": self.get_human_pal_representation(pal),
             "role": role_hint,
+            "recommended_waza": assigned_waza,
+            "optimal_passives": optimal_passives,
         }
 
-
-    def _recommend_active_skills(self, weaknesses: list[str]) -> list[dict[str, Any]]:
-        """Finds recommended active skill movesets matching weakness elements."""
+    def _get_tailored_waza_for_pal(self, elements: list[str]) -> list[dict[str, Any]]:
+        """Finds 3 tailored active skills (1 low CT, 1 mid CT, 1 high CT) for a Pal."""
         cursor = self.engine.conn.cursor()
-        results = []
-        for elem in weaknesses:
+        candidate_skills = []
+
+        norm_elements = []
+        for e in elements:
+            if not e:
+                continue
+            e_str = str(e).strip()
+            norm_elements.append(e_str)
+            if e_str.lower() in ("ground", "earth"):
+                norm_elements.extend(["Ground", "Earth"])
+            elif e_str.lower() in ("grass", "leaf"):
+                norm_elements.extend(["Grass", "Leaf"])
+            elif e_str.lower() in ("electricity", "electric"):
+                norm_elements.extend(["Electric", "Electricity"])
+        norm_elements = list(dict.fromkeys(norm_elements))
+
+        for elem in norm_elements:
             try:
                 cursor.execute(
                     """
-                    SELECT name, element, power, coalesce(cooldown_sec, cool_time, 10) as ct
+                    SELECT name, element, power, coalesce(cooldown_sec, 10) as ct
                     FROM active_skills
-                    WHERE element = ?
+                    WHERE LOWER(element) = LOWER(?)
                     ORDER BY power ASC
                     """,
                     (elem,),
                 )
                 skills = cursor.fetchall()
+                if skills:
+                    candidate_skills.extend(skills)
             except Exception:
                 try:
                     cursor.execute(
                         """
-                        SELECT name, element, power, 10 as ct
-                        FROM active_skills
-                        WHERE element = ?
+                        SELECT name, element, power, coalesce(cooldown, 10) as ct
+                        FROM palworld_master.skills
+                        WHERE LOWER(type) = 'active' AND LOWER(element) = LOWER(?)
                         ORDER BY power ASC
                         """,
                         (elem,),
                     )
                     skills = cursor.fetchall()
+                    if skills:
+                        candidate_skills.extend(skills)
                 except Exception:
-                    skills = []
+                    pass
 
-            if skills:
-                def _get_ct(item: Any) -> int:
-                    if isinstance(item, dict):
-                        return int(item.get("ct") or item.get("cooldown_sec") or item.get("cool_time") or 10)
-                    try:
-                        return int(item["ct"])
-                    except Exception:
-                        return 10
+        if not candidate_skills:
+            return [
+                {"name": "Power Shot", "element": "Neutral", "power": 35, "ct": "4s"},
+                {"name": "Power Bomb", "element": "Neutral", "power": 70, "ct": "15s"},
+                {"name": "Pal Blast", "element": "Neutral", "power": 150, "ct": "55s"},
+            ]
 
-                # Pick 1 low cooldown (CT <= 7), 1 mid burst (CT 8-25), 1 nuke (CT >= 26)
-                low_ct = next((s for s in skills if _get_ct(s) <= 7), skills[0])
-                mid_ct = next((s for s in skills if 8 <= _get_ct(s) <= 25), skills[len(skills)//2])
-                nuke_ct = next((s for s in reversed(skills) if _get_ct(s) >= 26), skills[-1])
-                
-                seen_names = set()
-                for s in [low_ct, mid_ct, nuke_ct]:
-                    s_name = s.get("name") if isinstance(s, dict) else s["name"]
-                    s_elem = s.get("element") if isinstance(s, dict) else s["element"]
-                    s_pwr = s.get("power") if isinstance(s, dict) else s["power"]
-                    if s_name not in seen_names:
-                        seen_names.add(s_name)
-                        results.append({
-                            "name": s_name,
-                            "element": s_elem,
-                            "power": s_pwr,
-                            "ct": f"{_get_ct(s)}s",
-                        })
-        return results[:6]
+        def _get_ct(item: Any) -> int:
+            if isinstance(item, dict):
+                return int(item.get("ct") or item.get("cooldown_sec") or item.get("cooldown") or item.get("cool_time") or 10)
+            try:
+                return int(item["ct"])
+            except Exception:
+                try:
+                    return int(item["cooldown_sec"])
+                except Exception:
+                    return 10
+
+        low_ct = next((s for s in candidate_skills if _get_ct(s) <= 7), candidate_skills[0])
+        mid_ct = next((s for s in candidate_skills if 8 <= _get_ct(s) <= 25), candidate_skills[len(candidate_skills)//2])
+        nuke_ct = next((s for s in reversed(candidate_skills) if _get_ct(s) >= 26), candidate_skills[-1])
+
+        results = []
+        seen = set()
+        for s in [low_ct, mid_ct, nuke_ct]:
+            s_name = s.get("name") if isinstance(s, dict) else s["name"]
+            s_elem = s.get("element") if isinstance(s, dict) else s["element"]
+            s_pwr = s.get("power") if isinstance(s, dict) else s["power"]
+            if s_name not in seen:
+                seen.add(s_name)
+                results.append({
+                    "name": s_name,
+                    "element": s_elem,
+                    "power": s_pwr,
+                    "ct": f"{_get_ct(s)}s",
+                })
+        return results
+
 
 

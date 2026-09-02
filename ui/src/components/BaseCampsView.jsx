@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BASE_CATEGORY_MAP } from '../constants/gameData';
 import { useTableSort } from '../hooks/useTableSort';
 import { PassiveBadge } from './common/PassiveBadge';
+import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 
 export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstances, pals = [], setSelectedPal }) {
   return (
@@ -228,12 +229,14 @@ export function BaseCampCard({ base = {}, pals = [], setSelectedPal, onBaseRenam
                   return (
                     <tr key={idx} onClick={handleWorkerClick} style={{ cursor: setSelectedPal ? 'pointer' : 'default' }}>
                       <td style={{ fontWeight: 600 }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                          {w.icon_path && (
-                            <img src={w.icon_path} alt={w.display_name || w.species} style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                          )}
-                          <span style={{ color: 'var(--accent-gold)' }}>{w.display_name || w.species}</span>
-                        </div>
+                        <PalInstanceTooltip instance={w}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            {w.icon_path && (
+                              <img src={w.icon_path} alt={w.display_name || w.species} style={{ width: '20px', height: '20px', borderRadius: '4px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                            )}
+                            <span style={{ color: 'var(--accent-gold)' }}>{w.display_name || w.species}</span>
+                          </div>
+                        </PalInstanceTooltip>
                       </td>
                       <td style={{ fontWeight: 700, color: 'var(--accent-gold)' }}>Lv. {w.level}</td>
                       <td>{w.gender}</td>

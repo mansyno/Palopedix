@@ -105,9 +105,9 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
           valA = a.nocturnal ? 1 : 0;
           valB = b.nocturnal ? 1 : 0;
           break;
-        case 'score':
-          valA = a.total_score || 0;
-          valB = b.total_score || 0;
+        case 'location':
+          valA = (a.location_details_base_camp_name || a.location_details?.base_camp_name || a.location || 'palbox').toLowerCase();
+          valB = (b.location_details_base_camp_name || b.location_details?.base_camp_name || b.location || 'palbox').toLowerCase();
           break;
         default:
           valA = a._origRank;
@@ -334,8 +334,8 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
                   </th>
                   <th>Work Suitability Roles</th>
                   <th>Passives</th>
-                  <th onClick={() => handleSort('score')} style={{ textAlign: 'right', cursor: 'pointer' }}>
-                    Score{sortCol === 'score' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                  <th onClick={() => handleSort('location')} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    Location{sortCol === 'location' ? (sortDesc ? ' ▼' : ' ▲') : ''}
                   </th>
                 </tr>
               </thead>
@@ -418,8 +418,46 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
                         {(!pal.passives || pal.passives.length === 0) && <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>None</span>}
                       </div>
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--accent-gold)', whiteSpace: 'nowrap' }}>
-                      {pal.total_score} pts
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {(() => {
+                        const loc = pal.location || 'palbox';
+                        const baseName = pal.location_details_base_camp_name || pal.location_details?.base_camp_name;
+                        const isParty = loc === 'party';
+                        const isBase = loc === 'base' || !!baseName;
+                        const isDps = loc === 'dps';
+
+                        let bg = 'rgba(100, 116, 139, 0.2)';
+                        let color = 'var(--text-secondary)';
+                        let border = '1px solid var(--border-color)';
+                        let label = '📦 Palbox';
+
+                        if (isParty) {
+                          bg = 'rgba(59, 130, 246, 0.2)';
+                          color = '#60a5fa';
+                          border = '1px solid rgba(59, 130, 246, 0.4)';
+                          label = '⚔️ Party';
+                        } else if (isBase) {
+                          bg = 'rgba(245, 158, 11, 0.2)';
+                          color = '#fbbf24';
+                          border = '1px solid rgba(245, 158, 11, 0.4)';
+                          label = baseName ? `🏰 ${baseName}` : '🏰 Base';
+                        } else if (isDps) {
+                          bg = 'rgba(168, 85, 247, 0.2)';
+                          color = '#c084fc';
+                          border = '1px solid rgba(168, 85, 247, 0.4)';
+                          label = baseName ? `🔮 Storage (${baseName})` : '🔮 Storage';
+                        }
+
+                        return (
+                          <span 
+                            className="badge" 
+                            style={{ background: bg, color: color, border: border, padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}
+                            title={baseName ? `Base: ${baseName}` : `Location: ${loc}`}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );

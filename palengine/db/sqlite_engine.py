@@ -278,6 +278,51 @@ PARTNER_SKILL_CATEGORY_DEFS: list[dict[str, Any]] = [
     },
 ]
 
+PASSIVE_SKILL_MODIFIER_DEFS: list[dict[str, Any]] = [
+    # ── Work Speed Modifiers ──
+    {"passive_id": "WorldTree_CraftSpeed", "name": "Demon's Hand", "work_speed_mod": 0.90, "san_decay_pts": -15.0},
+    {"passive_id": "CraftSpeed_up3", "name": "Remarkable Craftsmanship", "work_speed_mod": 0.75},
+    {"passive_id": "CraftSpeed_up2", "name": "Artisan", "work_speed_mod": 0.50},
+    {"passive_id": "PAL_CorporateSlave", "name": "Work Slave", "work_speed_mod": 0.30},
+    {"passive_id": "WorkSpeed_ACC_up4", "name": "Speedy Worker Lv. 4", "work_speed_mod": 0.25},
+    {"passive_id": "CraftSpeed_up1", "name": "Serious", "work_speed_mod": 0.20},
+    {"passive_id": "Rare", "name": "Lucky", "work_speed_mod": 0.20},
+    {"passive_id": "WorkSpeed_ACC_up3", "name": "Speedy Worker Lv. 3", "work_speed_mod": 0.20},
+    {"passive_id": "WorkSpeed_ACC_up2", "name": "Speedy Worker Lv. 2", "work_speed_mod": 0.15},
+    {"passive_id": "PAL_conceited", "name": "Conceited", "work_speed_mod": 0.10},
+    {"passive_id": "WorkSpeed_ACC_up1", "name": "Speedy Worker Lv. 1", "work_speed_mod": 0.10},
+    {"passive_id": "CraftSpeed_down1", "name": "Clumsy", "work_speed_mod": -0.10},
+    {"passive_id": "PAL_rude", "name": "Hooligan", "work_speed_mod": -0.10},
+    {"passive_id": "PAL_SpiritualInst", "name": "Mentally unstable", "work_speed_mod": -0.10},
+    {"passive_id": "WorldTree_Sanity", "name": "Hermit Sage", "work_speed_mod": -0.20, "san_decay_pts": 25.0},
+    {"passive_id": "CraftSpeed_down2", "name": "Slacker", "work_speed_mod": -0.30},
+    {"passive_id": "Noukin", "name": "Musclehead", "work_speed_mod": -0.50},
+
+    # ── Movement Speed Modifiers (Logistics / Transporters & Gatherers) ──
+    {"passive_id": "WorldTree_MoveSpeed", "name": "Dimensional Leap", "move_speed_mod": 0.50, "hunger_rate_pts": -15.0},
+    {"passive_id": "MoveSpeed_up_3", "name": "Swift", "move_speed_mod": 0.30},
+    {"passive_id": "MoveSpeed_up_2", "name": "Runner", "move_speed_mod": 0.20},
+    {"passive_id": "Legend", "name": "Legend", "move_speed_mod": 0.20},
+    {"passive_id": "MoveSpeed_up_1", "name": "Nimble", "move_speed_mod": 0.10},
+    {"passive_id": "GYM_NAME_Meadow", "name": "Rayne Syndicate Boss", "move_speed_mod": 0.10},
+
+    # ── Hunger / Satiety Modifiers (Eating Breaks vs Active Uptime) ──
+    {"passive_id": "WorldTree_FullStomach", "name": "World Tree Seedbed", "hunger_rate_pts": 30.0},
+    {"passive_id": "PAL_FullStomach_Down_3", "name": "Mastery of Fasting", "hunger_rate_pts": 20.0},
+    {"passive_id": "PAL_FullStomach_Down_2", "name": "Diet Lover", "hunger_rate_pts": 15.0},
+    {"passive_id": "PAL_FullStomach_Down_1", "name": "Dainty Eater", "hunger_rate_pts": 10.0},
+    {"passive_id": "FullStomach_Down_1_BossDefeat", "name": "FullStomach_Down_1_BossDefeat", "hunger_rate_pts": 10.0},
+    {"passive_id": "PAL_FullStomach_Up_1", "name": "Glutton", "hunger_rate_pts": -15.0},
+    {"passive_id": "PAL_FullStomach_Up_2", "name": "Bottomless Stomach", "hunger_rate_pts": -25.0},
+
+    # ── SAN Degradation vs Preservation (Slacking, Injuries, Refusal) ──
+    {"passive_id": "PAL_Sanity_Down_3", "name": "Heart of the Immovable King", "san_decay_pts": 20.0},
+    {"passive_id": "PAL_Sanity_Down_2", "name": "Workaholic", "san_decay_pts": 15.0},
+    {"passive_id": "PAL_Sanity_Down_1", "name": "Positive Thinker", "san_decay_pts": 10.0},
+    {"passive_id": "PAL_Sanity_Up_1", "name": "Unstable", "san_decay_pts": -15.0},
+    {"passive_id": "PAL_Sanity_Up_2", "name": "Destructive", "san_decay_pts": -25.0},
+]
+
 
 def classify_pal_partner_categories(
     pal_name: str, partner_skill_name: Optional[str], partner_skill_desc: Optional[str]
@@ -917,51 +962,94 @@ class SQLiteEngine:
                     (p1, p2, ch),
                 )
 
-            cursor.execute("DROP TABLE IF EXISTS main.work_suitabilities")
             cursor.execute(
                 """
-                CREATE TABLE work_suitabilities AS
-                SELECT DISTINCT
-                    work_type AS id,
-                    work_type AS name,
-                    '' AS description
-                FROM palworld_master.work_suitability
+                CREATE TABLE IF NOT EXISTS work_suitabilities (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    description TEXT
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO work_suitabilities (id, name, description)
+                SELECT DISTINCT work_type, work_type, '' FROM palworld_master.work_suitability
             """
             )
 
-            cursor.execute("DROP TABLE IF EXISTS main.building_work_types")
             cursor.execute(
                 """
-                CREATE TABLE building_work_types AS
-                SELECT building_id, work_type, is_automated, work_amount_modifier
-                FROM palworld_master.building_work_types
+                CREATE TABLE IF NOT EXISTS building_work_types (
+                    building_id TEXT,
+                    work_type TEXT,
+                    is_automated INTEGER,
+                    work_amount_modifier REAL
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                SELECT building_id, work_type, is_automated, work_amount_modifier FROM palworld_master.building_work_types
             """
             )
 
-            cursor.execute("DROP TABLE IF EXISTS main.food_satiety_rates")
             cursor.execute(
                 """
-                CREATE TABLE food_satiety_rates AS
-                SELECT
-                    food_tier AS food_rating,
-                    satiety_drain_per_min AS satiety_amount,
-                    base_san_drain_per_min AS san_decay_multiplier
-                FROM palworld_master.food_satiety_rates
+                CREATE TABLE IF NOT EXISTS food_satiety_rates (
+                    food_rating INTEGER PRIMARY KEY,
+                    satiety_amount REAL,
+                    san_recovery REAL,
+                    san_decay_multiplier REAL
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO food_satiety_rates (food_rating, satiety_amount, san_decay_multiplier)
+                SELECT food_tier, AVG(satiety_drain_per_min), AVG(base_san_drain_per_min) 
+                FROM palworld_master.food_satiety_rates 
+                GROUP BY food_tier
             """
             )
 
-            cursor.execute("DROP TABLE IF EXISTS main.sub_missions")
             cursor.execute(
                 """
-                CREATE TABLE sub_missions AS
+                CREATE TABLE IF NOT EXISTS sub_missions (
+                    id TEXT PRIMARY KEY,
+                    category TEXT,
+                    title TEXT,
+                    npc_name TEXT,
+                    objective TEXT,
+                    start_dialogue TEXT,
+                    in_progress_dialogue TEXT,
+                    completed_dialogue TEXT,
+                    target_type TEXT,
+                    target_id TEXT,
+                    target_count INTEGER
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO sub_missions
                 SELECT * FROM palworld_master.sub_missions
             """
             )
 
-            cursor.execute("DROP TABLE IF EXISTS main.sub_mission_rewards")
             cursor.execute(
                 """
-                CREATE TABLE sub_mission_rewards AS
+                CREATE TABLE IF NOT EXISTS sub_mission_rewards (
+                    sub_mission_id TEXT,
+                    item_id TEXT,
+                    item_count INTEGER
+                )
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO sub_mission_rewards
                 SELECT * FROM palworld_master.sub_mission_rewards
             """
             )
@@ -1379,6 +1467,36 @@ class SQLiteEngine:
                     )
         except Exception as e:
             print(f"Warning populating partner skill categories: {e}")
+
+        # ---------- Passive Skill Modifiers Table Setup & Population ----------
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS passive_skill_modifiers (
+                passive_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                work_speed_mod REAL DEFAULT 0.0,
+                move_speed_mod REAL DEFAULT 0.0,
+                san_decay_pts REAL DEFAULT 0.0,
+                hunger_rate_pts REAL DEFAULT 0.0
+            )
+            """
+        )
+        for pmod in PASSIVE_SKILL_MODIFIER_DEFS:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO passive_skill_modifiers 
+                (passive_id, name, work_speed_mod, move_speed_mod, san_decay_pts, hunger_rate_pts)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    pmod["passive_id"],
+                    pmod["name"],
+                    pmod.get("work_speed_mod", 0.0),
+                    pmod.get("move_speed_mod", 0.0),
+                    pmod.get("san_decay_pts", 0.0),
+                    pmod.get("hunger_rate_pts", 0.0),
+                ),
+            )
 
         # Seed structure aliases and friendly display names into SQLite structure_aliases table
         aliases_path = os.path.join(self.data_dir, "structure_aliases.json")
@@ -3875,7 +3993,16 @@ class SQLiteEngine:
     def get_food_satiety_rates(self) -> list[dict[str, Any]]:
         """Returns satiety and SAN decay rates across food ratings 1-10."""
         cursor = self.conn.cursor()
-        rows = cursor.execute("SELECT * FROM food_satiety_rates ORDER BY food_rating ASC").fetchall()
+        rows = cursor.execute(
+            """
+            SELECT food_rating, 
+                   AVG(satiety_amount) as satiety_amount, 
+                   AVG(san_decay_multiplier) as san_decay_multiplier
+            FROM food_satiety_rates 
+            GROUP BY food_rating 
+            ORDER BY food_rating ASC
+            """
+        ).fetchall()
         return [dict(r) for r in rows]
 
     def get_world_settings(self) -> dict[str, Any]:
@@ -3974,20 +4101,27 @@ class SQLiteEngine:
                    COALESCE(sa.display_name, bs.name, bsi.structure_name) as display_name
             FROM base_structures_instances bsi
             LEFT JOIN structure_aliases sa ON LOWER(bsi.structure_name) = LOWER(sa.alias)
+                                           OR LOWER(REPLACE(bsi.structure_name, '_', ' ')) = LOWER(sa.alias)
+                                           OR LOWER(REPLACE(bsi.structure_name, ' ', '')) = LOWER(REPLACE(sa.alias, ' ', ''))
             LEFT JOIN building_work_types bwt ON LOWER(bsi.structure_name) = LOWER(bwt.building_id)
                                               OR LOWER(sa.canonical_name) = LOWER(bwt.building_id)
+                                              OR LOWER(REPLACE(bsi.structure_name, '_', '')) = LOWER(REPLACE(bwt.building_id, '_', ''))
             LEFT JOIN base_structures bs ON LOWER(bsi.structure_name) = LOWER(bs.id)
             WHERE bsi.base_camp_id = ?
             """,
             (base_camp_id,),
         ).fetchall()
         
-        # Group by structure_name
+        # Group by structure_name (ignoring natural clutter, terrain nodes, and drop items)
         structures_map: dict[str, dict[str, Any]] = {}
         for r in rows:
             s_name = r["structure_name"]
             count = r["count"]
             disp_name = r["display_name"]
+            s_lower = s_name.lower().replace(" ", "").replace("_", "")
+            if s_lower.startswith("natural") or "damagable" in s_lower or "dropitem" in s_lower or s_lower in ("tree", "treenode", "rock"):
+                continue
+
             if s_name not in structures_map:
                 structures_map[s_name] = {
                     "structure_name": s_name,
@@ -4004,9 +4138,9 @@ class SQLiteEngine:
 
         result_list = list(structures_map.values())
 
-        # If base has automated production structures (farms/pits), ensure Transporting is included in work demand
+        # If base has automated production structures (farms/pits/ranches), ensure Transporting is included in work demand
         has_logistics_demand = any(
-            any(wt["work_type"] in ["Planting", "Mining", "Lumbering", "Watering"] for wt in item.get("work_types", []))
+            any(wt["work_type"] in ["Planting", "Mining", "Lumbering", "Watering", "Farming", "MonsterFarm", "Kindling", "Handcraft"] for wt in item.get("work_types", []))
             for item in result_list
         )
         if has_logistics_demand:
@@ -4030,7 +4164,10 @@ class SQLiteEngine:
             """
             SELECT pi.*, p.display_name, p.paldex_number, p.food_requirement, p.nocturnal, p.icon_path
             FROM pal_instances pi
-            LEFT JOIN pals p ON LOWER(pi.species) = LOWER(p.internal_name) OR LOWER(pi.species) = LOWER(p.display_name)
+            LEFT JOIN pals p ON LOWER(REPLACE(pi.species, 'BOSS_', '')) = LOWER(p.internal_name)
+                             OR LOWER(pi.species) = LOWER(p.internal_name)
+                             OR LOWER(pi.species) = LOWER(p.display_name)
+            WHERE pi.location IN ('palbox', 'base', 'party', 'dps')
             """
         ).fetchall()
 
@@ -4059,19 +4196,64 @@ class SQLiteEngine:
                 pass_lookup[iid] = []
             pass_lookup[iid].append({"name": r["name"], "id": r["id"]})
 
+        custom_names_map = self.get_base_camp_custom_names()
+
         results = []
         for inst in instances:
             d = dict(inst)
             inst_id = d["instance_id"]
-            species_k = (d.get("species") or "").lower()
+            base_id = d.get("location_details_base_camp_id")
+            if base_id and base_id in custom_names_map:
+                d["location_details_base_camp_name"] = custom_names_map[base_id]
 
-            d["suitabilities"] = ws_lookup.get(species_k, {})
+            species_clean = (d.get("species") or "").lower().replace("boss_", "")
+            species_raw = (d.get("species") or "").lower()
+
+            d["suitabilities"] = ws_lookup.get(species_clean) or ws_lookup.get(species_raw, {})
             pass_list = pass_lookup.get(inst_id, [])
             d["passives"] = [p["name"] for p in pass_list]
             d["raw_passives"] = [p["id"] for p in pass_list]
             d["icon_path"] = transform_icon_path(d.get("icon_path"))
             results.append(d)
         return results
+
+    def get_passive_skill_modifiers(self) -> dict[str, dict[str, float]]:
+        """Returns mapping of passive skill modifiers from SQLite keyed by lowercase id and name."""
+        try:
+            cursor = self.conn.cursor()
+            rows = cursor.execute(
+                "SELECT passive_id, name, work_speed_mod, move_speed_mod, san_decay_pts, hunger_rate_pts FROM passive_skill_modifiers"
+            ).fetchall()
+            mod_map: dict[str, dict[str, float]] = {}
+            for r in rows:
+                entry = {
+                    "work_speed_mod": float(r["work_speed_mod"] or 0.0),
+                    "move_speed_mod": float(r["move_speed_mod"] or 0.0),
+                    "san_decay_pts": float(r["san_decay_pts"] or 0.0),
+                    "hunger_rate_pts": float(r["hunger_rate_pts"] or 0.0),
+                }
+                if r["passive_id"]:
+                    mod_map[r["passive_id"].lower().strip()] = entry
+                if r["name"]:
+                    mod_map[r["name"].lower().strip()] = entry
+            return mod_map
+        except Exception:
+            return {}
+
+    def get_partner_skill_categories_map(self) -> dict[str, set[str]]:
+        """Returns mapping of category_id -> set of lowercase pal internal names from SQLite."""
+        try:
+            cursor = self.conn.cursor()
+            rows = cursor.execute(
+                "SELECT category_id, LOWER(pal_internal_name) as p_name FROM pal_partner_skill_categories"
+            ).fetchall()
+            cat_map: dict[str, set[str]] = defaultdict(set)
+            for r in rows:
+                if r["category_id"] and r["p_name"]:
+                    cat_map[r["category_id"]].add(r["p_name"])
+            return cat_map
+        except Exception:
+            return defaultdict(set)
 
     def get_active_missions(self, save_path: Optional[str] = None) -> list[dict[str, Any]]:
         """Evaluates active uncompleted NPC sub-missions against targeted inventory items and caught Pals."""

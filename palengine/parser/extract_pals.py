@@ -627,20 +627,43 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
                 player_uid_stem = dps_path.stem.replace("_dps", "")
                 spa = gvas_dps.properties.get("SaveParameterArray", {}).get("value", {}).get("values", [])
                 for idx, slot_entry in enumerate(spa):
-                    save_param = cast(dict[str, Any], slot_entry.get("SaveParameter", {}).get("value") or {})
-                    character_id = clean_value(save_param.get("CharacterID", {}).get("value"))
-                    if not character_id:
+                    save_param_obj = slot_entry.get("SaveParameter", {})
+                    if not save_param_obj or not save_param_obj.get("value"):
+                        continue
+                    save_param = cast(dict[str, Any], save_param_obj.get("value"))
+                    char_id_val = save_param.get("CharacterID", {})
+                    if not char_id_val or not char_id_val.get("value"):
+                        continue
+                    character_id = clean_value(char_id_val.get("value"))
+                    if not character_id or str(character_id).lower() in ("none", ""):
                         continue
 
-                    inst_id = clean_value(slot_entry.get("InstanceId", {}).get("value")) or clean_value(save_param.get("InstanceId", {}).get("value"))
+                    raw_inst_id = clean_value(slot_entry.get("InstanceId", {}).get("value")) or clean_value(save_param.get("InstanceId", {}).get("value"))
+                    if isinstance(raw_inst_id, dict):
+                        inst_id = str(raw_inst_id.get("ID") or raw_inst_id.get("InstanceId") or f"dps_{player_uid_stem}_{idx}")
+                    elif raw_inst_id:
+                        inst_id = str(raw_inst_id)
+                    else:
+                        inst_id = f"dps_{player_uid_stem}_{idx}"
+
                     owner_uid = clean_value(save_param.get("OwnerPlayerUId", {}).get("value")) or player_uid_stem
+                    slot_number = idx + 1
+                    box_num = (idx // 30) + 1
+                    box_slot = (idx % 30) + 1
+                    storage_label = f"Slot {slot_number} (Box {box_num}-{box_slot})"
 
                     pal_info = _parse_pal_data(
                         save_param=save_param,
                         instance_id=inst_id,
-                        owner_player_uid=owner_uid,
+                        owner_player_uid=str(owner_uid),
                         location_type="dps",
-                        location_details={"slot_index": idx, "player_uid": player_uid_stem},
+                        location_details={
+                            "slot_index": slot_number,
+                            "box": box_num,
+                            "box_slot": box_slot,
+                            "base_camp_name": storage_label,
+                            "player_uid": player_uid_stem,
+                        },
                     )
                     pals.append(pal_info)
             except Exception:

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
+import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 
 export function PaldexMasterView({
   pals = [],
@@ -220,16 +221,18 @@ export function PaldexMasterView({
                   #{String(p.paldex_number || 0).padStart(3, '0')}
                 </td>
                 <td style={{ fontWeight: 600 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    {p.icon_path ? (
-                      <img src={p.icon_path} alt={p.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                    ) : (
-                      <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
-                        {p.display_name ? p.display_name[0] : 'P'}
-                      </div>
-                    )}
-                    <span style={{ color: 'var(--accent-gold)' }}>{p.display_name}</span>
-                  </div>
+                  <PalInstanceTooltip instance={p}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      {p.icon_path ? (
+                        <img src={p.icon_path} alt={p.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                      ) : (
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.8rem' }}>
+                          {p.display_name ? p.display_name[0] : 'P'}
+                        </div>
+                      )}
+                      <span style={{ color: 'var(--accent-gold)' }}>{p.display_name}</span>
+                    </div>
+                  </PalInstanceTooltip>
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>

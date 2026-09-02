@@ -76,6 +76,23 @@ export function BreedingCenterView({
     }
   };
 
+  const resolvePalForTooltip = (palOrName) => {
+    if (!palOrName) return null;
+    if (typeof palOrName === 'object' && palOrName !== null) {
+      const name = palOrName.display_name || palOrName.species || palOrName.name;
+      const master = pals.find(p => p.display_name?.toLowerCase() === name?.toLowerCase() || p.id === palOrName.id) ||
+                     allMasterPals.find(p => p.display_name?.toLowerCase() === name?.toLowerCase() || p.id === palOrName.id);
+      return { ...(master || {}), ...palOrName, display_name: name || master?.display_name };
+    }
+    if (typeof palOrName === 'string') {
+      const name = palOrName.trim();
+      const master = pals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase()) ||
+                     allMasterPals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase());
+      return master || { display_name: name };
+    }
+    return null;
+  };
+
   React.useEffect(() => {
     if ((!availablePalOptions || availablePalOptions.length === 0) && palSourceMode === 'global') {
       fetch('/api/pals')
@@ -724,33 +741,39 @@ export function BreedingCenterView({
                               {idx + 1}
                             </div>
                             <div className="step-details" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.95rem', fontWeight: 600, flexWrap: 'wrap', flexGrow: 1 }}>
-                              <span 
-                                style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
-                                onClick={() => openPalDetails(step.parent1)}
-                                title="Inspect Pal in Paldex"
-                              >
-                                <span style={{ textDecoration: 'underline' }}>{step.parent1}</span>
-                                {step.parent1_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
-                                {step.parent1_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
-                              </span>
+                              <PalInstanceTooltip instance={resolvePalForTooltip(step.parent1)}>
+                                <span 
+                                  style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                                  onClick={() => openPalDetails(step.parent1)}
+                                  title="Inspect Pal in Paldex"
+                                >
+                                  <span style={{ textDecoration: 'underline' }}>{step.parent1}</span>
+                                  {step.parent1_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
+                                  {step.parent1_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
+                                </span>
+                              </PalInstanceTooltip>
                               <span style={{ color: 'var(--text-secondary)' }}>+</span>
-                              <span 
-                                style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
-                                onClick={() => openPalDetails(step.parent2)}
-                                title="Inspect Pal in Paldex"
-                              >
-                                <span style={{ textDecoration: 'underline' }}>{step.parent2}</span>
-                                {step.parent2_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
-                                {step.parent2_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
-                              </span>
+                              <PalInstanceTooltip instance={resolvePalForTooltip(step.parent2)}>
+                                <span 
+                                  style={{ color: '#a5b4fc', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', cursor: 'pointer' }}
+                                  onClick={() => openPalDetails(step.parent2)}
+                                  title="Inspect Pal in Paldex"
+                                >
+                                  <span style={{ textDecoration: 'underline' }}>{step.parent2}</span>
+                                  {step.parent2_gender === 'Male' && <span style={{ color: '#60a5fa', background: 'rgba(96, 165, 250, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♂ Male</span>}
+                                  {step.parent2_gender === 'Female' && <span style={{ color: '#f472b6', background: 'rgba(244, 114, 182, 0.15)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontSize: '0.75rem' }}>♀ Female</span>}
+                                </span>
+                              </PalInstanceTooltip>
                               <span style={{ color: 'var(--text-secondary)' }}>➔</span>
-                              <span 
-                                style={{ color: '#34d399', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
-                                onClick={() => openPalDetails(step.child)}
-                                title="Inspect Pal in Paldex"
-                              >
-                                {step.child}
-                              </span>
+                              <PalInstanceTooltip instance={resolvePalForTooltip(step.child)}>
+                                <span 
+                                  style={{ color: '#34d399', fontWeight: 800, cursor: 'pointer', textDecoration: 'underline' }}
+                                  onClick={() => openPalDetails(step.child)}
+                                  title="Inspect Pal in Paldex"
+                                >
+                                  {step.child}
+                                </span>
+                              </PalInstanceTooltip>
                             </div>
                           </div>
 

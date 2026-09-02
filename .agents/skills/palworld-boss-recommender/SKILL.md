@@ -1,14 +1,16 @@
 ---
 name: palworld-boss-recommender
 description: >
-  Recommends optimal 5-Pal counter-parties for any Palworld Boss encounter (Tower Bosses, Alpha Field Bosses / Legendaries, and Dungeon Alphas).
-  Analyzes player save game data, elemental advantages, mount damage infusion, player attack buffers (Gobbfin/Vanguard), and breeding fallbacks.
+  Recommends the single optimal 5-Pal counter-party for any Palworld Boss encounter (Tower Bosses, Alpha Field Bosses / Legendaries, and Dungeon Alphas).
+  Analyzes actual player save game data, elemental advantages, mount damage infusion, combat buffers (Gobfin/Vanguard), per-Pal active skill movesets, and evaluates encounter beatability / arena time limit viability.
   Trigger when the user asks for the best team, party, strategy, or counters to defeat a specific Palworld boss.
 ---
 
 # Palworld Boss Counter Party Recommender
 
-This skill enables Antigravity to analyze a player's actual save game data and static database to construct 3 optimized 5-Pal party archetypes for any 5-Pal Boss encounter.
+This skill enables Antigravity to analyze a player's actual save game database to determine encounter beatability, arena time limit viability, and construct the single optimal 5-Pal counter-party for any Boss encounter.
+
+---
 
 ## When to Use
 - User asks: "Help me make a party to beat [Boss Name]"
@@ -22,40 +24,74 @@ This skill enables Antigravity to analyze a player's actual save game data and s
 
 ---
 
-## Standard Workflow
+## Core Operating Rules for the Agent
 
-### Step 1: Execute Boss Party Analyzer
-Run the built-in CLI tool or import the module directly:
+### 1. Strict Tool-Only Data Gathering (Zero Ad-Hoc Scripts)
+- **Mandatory Tool Usage**: You MUST ALWAYS use the existing application CLI or Python engine methods to retrieve data.
+  ```bash
+  python -m palengine.cli.main --format json boss-party "<Boss Name>"
+  ```
+  Or to inspect caught instances directly:
+  ```bash
+  python -m palengine.cli.main --format json instances [-s Species] [-l party|palbox|base] [--min-level N]
+  ```
+- **Prohibited Actions**:
+  - NEVER write ad-hoc Python scripts or temporary scratch parsers in the workspace.
+  - NEVER attempt to decompress, parse, or extract `.sav` files manually. The SQLite database already contains all parsed and structured data.
+- **Missing Data Protocol**: If requested data (such as specific equipped weapons or armor tiers) is not populated or available in the SQLite database, you MUST explicitly state that this data is missing before presenting your report.
 
-```bash
-python -m palengine.cli.main boss-party "<Boss Name>"
-```
-Or for raw structured JSON output:
-```bash
-python -m palengine.cli.main --format json boss-party "<Boss Name>"
-```
+### 2. Strict Data Integrity & Zero Hallucination
+- Every single stat reported (Pal Species, Level, Star Rank, IVs, Passives, Mastered Waza, Location) MUST strictly match an exact queried record from the save database.
+- NEVER invent hypothetical or inflated levels (e.g., do NOT recommend a "Lv.55 Anubis" if the player's actual Anubis in SQLite is Lv.30 or if no Anubis is owned).
 
-### Step 2: Present the Recommendations Clearly
-When presenting the party recommendations to the user, ensure all of the following rules are respected:
+### 3. Boss Beatability & Arena Timer Viability Assessment
+- Boss encounters have distinct level requirements and arena timers (e.g. Tower Bosses enforce a strict 10-minute / 600s time limit):
+  - **Required DPS Check**: For timed encounters, compare Boss HP against the time limit (`Required DPS = Boss HP / Time Limit in Seconds`).
+  - **Level Scaling Assessment**: Calculate the level gap between the player's highest counter Pal and the Boss (`Level Gap = Pal Level - Boss Level`).
+  - **Readiness Classification**:
+    - 🟢 **FAVORED**: Lead Pal matches or exceeds Boss level (Level gap ≥ 0) with super-effective typing.
+    - 🟡 **CHALLENGING**: Lead Pal is within 1–5 levels below Boss. Viable with active staggering and manual dodging.
+    - 🟠 **HIGH DIFFICULTY**: Lead Pal is 6–9 levels below Boss. Severe damage reduction and incoming damage amplification.
+    - 🔴 **UNLIKELY / NOT RECOMMENDED**: Lead Pal is ≥10 levels below Boss, or lacks elemental advantage.
+- If the encounter is deemed **HIGH DIFFICULTY** or **UNLIKELY**, explicitly warn the user upfront:
+  > `⚠️ ENCOUNTER READINESS: NOT RECOMMENDED AT CURRENT PROGRESSION`
+  > State the exact level gap, the high risk of timing out during the DPS check, and the recommended level/condensing thresholds before attempting.
 
-1. **Human-Visible Identification**:
-   - Never output raw IDs or GUIDs.
-   - Always state: `Species`, `Gender (♂/♀)`, `Level`, `Rank (★)`, and `Passive Skills` so duplicates of the same level can be clearly differentiated.
+### 4. Single Optimal Party Recommendation (No Multi-Archetype Confusion)
+- Recommend exactly **ONE** optimal 5-Pal team composed of the best possible combination from the player's actual owned roster:
+  - **Slot 1 (Lead DPS & Elemental Infusion Mount)**: Best super-effective attacker or mount converter matching boss weakness.
+  - **Slot 2 (Secondary DPS / Aggro Switch)**: High combat score counter or resilient off-tank for swapping during boss cooldowns.
+  - **Slots 3–5 (Combat Buffers & Synergy)**: Best available Gobfins (player attack stack), Vanguard/Stronghold buffers, or secondary elemental counters.
 
-2. **Accurate Location Tagging**:
-   - State whether the Pal is in `Palbox`, `In Party`, or `Base: [Base Name]`.
+### 5. Per-Pal Tailored Movesets (Waza) & Optimal Passives
+- For each of the 5 recommended Pals in the party, provide:
+  - **Assigned Active Skills (Waza)**: 3 specific moves (1 low CT ≤7s for stagger, 1 mid CT 8–25s for sustained DPS, 1 high power nuke ≥26s matching the boss's weakness or Pal's STAB).
+  - **Target Passive Traits**: List the ideal passive loadout tailored to that specific Pal's role (e.g. `Ferocious, Musclehead, Legend, Burly Body` for Main DPS vs `Vanguard, Stronghold Strategist, Noble, Fine Coat` for Buffers).
 
-3. **Present 3 Distinct Archetypes**:
-   - **Option A: Pure Pal Elemental DPS** (Super-effective direct counters with high combat stats).
-   - **Option B: Mounted Player-DPS Build** (Elemental infusion mount matching boss weakness + Gobfin/Vanguard damage stack).
-   - **Option C: Balanced Hybrid & Survival** (Damage sponge tank + elemental attacker + Vanguard/Stronghold buffers).
+### 6. No Breeding Fallbacks
+- Do NOT output breeding project suggestions or multi-generation breeding paths. Recommendations must strictly focus on the player's current playable roster.
 
-4. **Movesets (Waza)**:
-   - Provide recommended active skills with low cooldowns (CT ≤ 5s for staggering) and high burst power.
+---
 
-5. **Breeding Fallbacks (Tier 3)**:
-   - If the player is missing high-level counters, show breeding paths from their owned stock, explicitly marked with:
-     `⚠️ Hatches at Level 1 (Requires EXP training / Training Manuals before the fight)`.
+## Standard Output Format
 
-6. **Tactical Strategy**:
-   - Highlight arena pillar line-of-sight mechanics, lethal boss telegraphs (e.g. Divine Disaster, Kerauno, Phoenix Flare), and pal recall dodge timing.
+When delivering boss counter recommendations to the user, follow this structure:
+
+1. **Boss Profile & Encounter Constraints**:
+   - Canonical Name, Location, Level, HP, Elements & Weaknesses.
+   - Arena Time Limit (e.g., 10 minutes) and Required Sustained DPS threshold.
+   - Dangerous attacks to watch out for.
+
+2. **Encounter Readiness & Viability Verdict**:
+   - Readiness status badge (🟢 FAVORED / 🟡 CHALLENGING / 🟠 HIGH DIFFICULTY / 🔴 UNLIKELY).
+   - Clear verdict on whether the boss is currently beatable with the player's progression.
+   - Timeout and DPS check analysis.
+
+3. **Optimal 5-Pal Counter Party Table**:
+   - Columns: `#`, `Role`, `Pal & Gender`, `Level & Rank`, `Element`, `Location`, `Current Passives`, `IVs (HP/Atk/Def)`.
+
+4. **Per-Pal Moveset (Waza) & Passive Strategy**:
+   - Detailed 3-skill active loadout (Name, Element, Power, Cooldown) and optimal target passives for each team member.
+
+5. **Tactical Strategy**:
+   - Pillar line-of-sight positioning, signature attack telegraphs, and Pal recall dodge timing.

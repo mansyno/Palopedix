@@ -26,7 +26,6 @@ def mock_engine():
         {"name": "Dragon Meteor", "element": "Dragon", "power": 150, "cool_time": 55},
     ]
     engine.conn.cursor.return_value = cursor
-    engine.find_breeding_path.return_value = [{"parent1": "Relaxaurus", "parent2": "Sparkit", "child": "Relaxaurus Lux"}]
     return engine
 
 
@@ -96,6 +95,8 @@ def test_resolve_boss_tower(mock_engine):
     assert boss["canonical_name"] == "Victor & Shadowbeak"
     assert "Dark" in boss["elements"]
     assert "Dragon" in boss["weaknesses"]
+    assert boss["time_limit_sec"] == 600
+    assert boss["required_dps"] == round(200750 / 600, 1)
 
 
 def test_resolve_boss_alpha(mock_engine):
@@ -104,6 +105,8 @@ def test_resolve_boss_alpha(mock_engine):
     assert boss is not None
     assert "Jetragon" in boss["canonical_name"]
     assert "Ice" in boss["weaknesses"]
+    assert boss["time_limit_sec"] is None
+    assert boss["required_dps"] is None
 
 
 def test_recommend_party_for_boss(mock_engine, mock_instances):
@@ -113,19 +116,26 @@ def test_recommend_party_for_boss(mock_engine, mock_instances):
     result = recommender.recommend_party_for_boss("Victor & Shadowbeak")
     
     assert "boss_profile" in result
-    assert "team_a_pal_dps" in result
-    assert "team_b_mounted_player_dps" in result
-    assert "team_c_balanced_hybrid" in result
+    assert "encounter_readiness" in result
+    assert "recommended_party" in result
     
-    # Check human-readable representation and no raw GUIDs
-    team_a = result["team_a_pal_dps"]
-    assert len(team_a) > 0
-    first_member = team_a[0]
+    readiness = result["encounter_readiness"]
+    assert readiness["status"] in ("FAVORED", "CHALLENGING", "HIGH DIFFICULTY", "UNLIKELY / NOT RECOMMENDED")
+    assert readiness["highest_pal_level"] >= 40
+    assert "verdict" in readiness
+    
+    # Check single recommended party structure
+    party = result["recommended_party"]
+    assert len(party) == 4  # 4 mock instances
+    first_member = party[0]
     assert "species" in first_member
     assert "gender" in first_member
     assert "rank" in first_member
     assert "location" in first_member
     assert "passives" in first_member
+    assert "recommended_waza" in first_member
+    assert "optimal_passives" in first_member
+    assert len(first_member["recommended_waza"]) > 0
 
 
 def test_cli_boss_party_command():
@@ -136,12 +146,23 @@ def test_cli_boss_party_command():
             "location": "Astral Mountains",
             "level": 50,
             "hp": 200750,
+            "time_limit_sec": 600,
+            "required_dps": 334.6,
             "elements": ["Dark"],
             "weaknesses": ["Dragon"],
             "dangerous_moves": ["Divine Disaster"],
             "tactics": "Use arena pillars.",
         },
-        "team_a_pal_dps": [{
+        "encounter_readiness": {
+            "status": "FAVORED",
+            "highest_pal_level": 55,
+            "average_party_level": 50.0,
+            "boss_level": 50,
+            "level_gap": 5,
+            "verdict": "Encounter is favored.",
+            "timer_note": "Arena Time Limit: 10 minutes (600s). Minimum sustained DPS threshold: 334.6 DPS.",
+        },
+        "recommended_party": [{
             "species": "Jormuntide Ignis",
             "gender": "Male",
             "level": 55,
@@ -150,12 +171,11 @@ def test_cli_boss_party_command():
             "location": "Palbox",
             "passives": ["Ferocious"],
             "ivs": "80/85/75",
+            "role": "Lead Elemental DPS",
+            "recommended_waza": [{"name": "Dragon Cannon", "element": "Dragon", "power": 30, "ct": "2s"}],
+            "optimal_passives": ["Ferocious", "Musclehead", "Legend"],
         }],
-
-        "team_b_mounted_player_dps": [],
-        "team_c_balanced_hybrid": [],
-        "recommended_waza": [{"name": "Dragon Cannon", "element": "Dragon", "power": 30, "ct": "2s"}],
-        "breeding_projects": [],
+        "tactics": "Use arena pillars.",
     }
     
     with patch("palengine.db.sqlite_engine.SQLiteEngine.__init__", return_value=None), \
@@ -166,4 +186,6 @@ def test_cli_boss_party_command():
         assert "Victor & Shadowbeak" in result.output
         assert "Jormuntide Ignis" in result.output
         assert "Dragon Cannon" in result.output
+        assert "FAVORED" in result.output
+
 

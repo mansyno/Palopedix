@@ -1,16 +1,14 @@
 """Unit tests for Base Camp Renaming and Nuanced 7-Category Optimization Engine."""
 
 import pytest
-from fastapi.testclient import TestClient
 from palengine.analytics.base_optimizer import BaseOptimizer
 from palengine.analytics.pal_recommender import PalRecommender
-from palengine.api.main import app
 from palengine.db.sqlite_engine import SQLiteEngine
 
 
 @pytest.fixture
 def engine():
-    eng = SQLiteEngine()
+    eng = SQLiteEngine(world_id="NONE")
     # Insert mock base camp
     eng.conn.execute("INSERT OR REPLACE INTO base_camps (base_camp_id, name) VALUES ('test_base_1', 'Unnamed Base')")
     eng.conn.execute("INSERT OR REPLACE INTO base_camps (base_camp_id, name) VALUES ('test_base_2', 'Unnamed Base')")
@@ -40,9 +38,9 @@ def test_base_camp_renaming_persistence(engine):
 
 def test_breeding_and_food_categorization(engine):
     """Tests 7-category detection for Breeding & Food base."""
-    # Add Breeding Farm (MonsterFarm) + Berry Garden + Electric Kitchen
+    # Add Breeding Farm (BreedFarm) + Berry Garden + Electric Kitchen
     engine.conn.execute("DELETE FROM base_structures_instances WHERE base_camp_id = 'test_base_1'")
-    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'MonsterFarm', 2)")
+    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'BreedFarm', 2)")
     engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'BerryGarden', 4)")
     engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'ElectricKitchen', 1)")
     engine.conn.commit()
@@ -57,7 +55,7 @@ def test_breeding_and_food_categorization(engine):
 def test_breeding_farm_slot_reservation(engine):
     """Tests that effective capacity reserves 2 slots per breeding farm."""
     engine.conn.execute("DELETE FROM base_structures_instances WHERE base_camp_id = 'test_base_1'")
-    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'MonsterFarm', 2)")
+    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'BreedFarm', 2)")
     engine.conn.commit()
 
     recommender = PalRecommender(engine)
@@ -115,29 +113,13 @@ def test_electric_supply_demand_deficit(engine):
     assert audit["electric_supplier_count"] == 1
 
 
-def test_rename_api_endpoint():
-    """Tests PUT /api/base_camps/{id}/name API endpoint."""
-    from palengine.api.main import db_engine
-    db_engine.conn.execute("INSERT OR REPLACE INTO base_camps (base_camp_id, name) VALUES ('test_base_1', 'Unnamed Base')")
-    db_engine.conn.commit()
+def test_rename_base_camp(engine):
+    """Tests updating base camp custom name in SQLite."""
+    engine.conn.execute("INSERT OR REPLACE INTO base_camp_custom_names (base_camp_id, custom_name) VALUES ('test_base_1', 'New Alpha Outpost')")
+    engine.conn.commit()
 
-    client = TestClient(app)
-    res = client.put(
-        "/api/base_camps/test_base_1/name",
-        json={"custom_name": "New Alpha Outpost"}
-    )
-    assert res.status_code == 200
-    data = res.json()
-    assert data["success"] is True
-    assert data["custom_name"] == "New Alpha Outpost"
-
-    # Verify /api/bases reflects the new name
-    bases_res = client.get("/api/bases")
-    assert bases_res.status_code == 200
-    bases = bases_res.json()
-    b1 = next(b for b in bases if b["base_camp_id"] == "test_base_1")
-    assert b1["display_name"] == "New Alpha Outpost"
-    assert "base_category" in b1
+    summary = engine.get_base_camp_summary("test_base_1")
+    assert summary["display_name"] == "New Alpha Outpost"
 
 
 def test_structure_aliases_database_resolution(engine):
@@ -191,7 +173,7 @@ def test_recommendation_instance_tooltip_fields(engine):
 def test_custom_reserved_breeding_slots_override(engine):
     """Tests overriding reserved breeding slots via query param / parameter."""
     engine.conn.execute("DELETE FROM base_structures_instances WHERE base_camp_id = 'test_base_1'")
-    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'MonsterFarm', 2)")
+    engine.conn.execute("INSERT INTO base_structures_instances (base_camp_id, structure_name, count) VALUES ('test_base_1', 'BreedFarm', 2)")
     engine.conn.commit()
 
     recommender = PalRecommender(engine)

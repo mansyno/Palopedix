@@ -146,13 +146,18 @@ class BaseOptimizer:
         for struct in structures:
             struct_name = struct["structure_name"]
             count = struct["count"]
-            total_structures += count
             s_lower = struct_name.lower().replace(" ", "").replace("_", "")
 
+            # Ignore raw natural terrain resource nodes, environmental clutter, and drop items
+            if s_lower.startswith("natural") or "damagable" in s_lower or "dropitem" in s_lower or s_lower in ("tree", "treenode", "rock"):
+                continue
+
+            total_structures += count
+
             # Classify specific structure types
-            if "breed" in s_lower or s_lower == "monsterfarm":
+            if "breed" in s_lower:
                 breeding_count += count
-            elif "ranch" in s_lower:
+            elif "ranch" in s_lower or "monsterfarm" in s_lower or "pasture" in s_lower:
                 ranching_count += count
 
             if any(crop in s_lower for crop in ["garden", "farmblock", "berry", "tomato", "lettuce", "wheat", "onion"]):
@@ -167,7 +172,8 @@ class BaseOptimizer:
             if any(craft in s_lower for craft in ["factory", "workbench", "assembly"]):
                 crafting_count += count
 
-            if any(ext in s_lower for ext in ["pit", "deforest", "ore", "coal", "stone", "quartz", "sulfur"]):
+            # Dedicated player-built mining / extraction facilities (e.g. Stonepit, OrePit, CopperPit, CoalPit, DeforestStation, Crusher)
+            if any(ext in s_lower for ext in ["stonepit", "orepit", "copperpit", "coalpit", "sulfurpit", "quartzpit", "deforest", "crusher", "oilpump", "miningpit"]):
                 extraction_count += count
 
             # Electric power check
@@ -208,18 +214,56 @@ class BaseOptimizer:
                 else:
                     player_initiated_demand[wt_name] = player_initiated_demand.get(wt_name, 0) + count
 
-        # Natural Terrain Resources Baseline:
-        # Natural ore nodes, coal, stone, trees exist in camp radius
-        for natural_role in ["Mining", "Lumbering", "Transporting"]:
-            if natural_role not in demand_by_suitability:
-                demand_by_suitability[natural_role] = {
-                    "work_type": natural_role,
-                    "facility_count": 1,
-                    "workload_units": 1.0,
+        # Natural Node Extraction Outpost:
+        # If extraction structures (e.g. Stonepit, OrePit) are NOT placed in the base,
+        # but natural resource nodes exist in the base camp perimeter,
+        # generate Mining and Transporting demand so workers are assigned to harvest the nodes!
+        if extraction_count == 0:
+            natural_mining_count = 0
+            for s in structures:
+                s_name_lower = s["structure_name"].lower().replace(" ", "").replace("_", "")
+                if s_name_lower.startswith("natural") or "damagable" in s_name_lower:
+                    if any(m in s_name_lower for m in ["ore", "coal", "quartz", "sulfur", "copper", "stone"]):
+                        natural_mining_count += s.get("count", 1)
+
+            if natural_mining_count > 0:
+                demand_by_suitability["Mining"] = {
+                    "work_type": "Mining",
+                    "facility_count": natural_mining_count,
+                    "workload_units": float(natural_mining_count * 2.0),
                     "is_automated": True,
-                    "urgency_weight": 1.0,
+                    "urgency_weight": 2.5,
                 }
-                automated_demand[natural_role] = automated_demand.get(natural_role, 0) + 1
+                automated_demand["Mining"] = automated_demand.get("Mining", 0) + natural_mining_count
+                extraction_count += natural_mining_count
+
+        # General Outpost Fallback:
+        # If a base has zero demand (no production buildings placed yet, but has an active Palbox),
+        # provide a baseline generalist demand (Mining, Lumbering, Handcraft, Transporting)
+        # so the base is staffed with useful all-rounders instead of returning 0 recommendations.
+        if not demand_by_suitability:
+            for def_suit, def_urgency in [("Mining", 2.0), ("Handcraft", 1.8), ("Transporting", 1.5), ("Lumbering", 1.2)]:
+                demand_by_suitability[def_suit] = {
+                    "work_type": def_suit,
+                    "facility_count": 1,
+                    "workload_units": 2.0,
+                    "is_automated": True,
+                    "urgency_weight": def_urgency,
+                }
+                automated_demand[def_suit] = automated_demand.get(def_suit, 0) + 1
+
+        # Logistics Transport Demand:
+        # If the base has production, farming, mining, or ranching facilities, ensure Transporting is demanded
+        has_production = any(wt in demand_by_suitability for wt in ["Planting", "Mining", "Lumbering", "Watering", "Farming", "MonsterFarm", "Kindling", "Handcraft", "OilExtraction"])
+        if has_production and "Transporting" not in demand_by_suitability:
+            demand_by_suitability["Transporting"] = {
+                "work_type": "Transporting",
+                "facility_count": 1,
+                "workload_units": 1.5,
+                "is_automated": True,
+                "urgency_weight": 1.2,
+            }
+            automated_demand["Transporting"] = automated_demand.get("Transporting", 0) + 1
 
         # Electric Supply-Demand Balance:
         # Only demand GeneratingElectricity if electric power generators are built in the base camp
@@ -277,7 +321,12 @@ class BaseOptimizer:
             "electric_supplier_count": electric_supplier_count,
             "electric_consumer_count": electric_consumer_count,
             "breeding_farm_count": breeding_count,
+            "ranch_count": ranching_count,
             "ranching_count": ranching_count,
+            "agriculture_count": agriculture_count,
+            "extraction_count": extraction_count,
+            "smelting_count": smelting_count,
+            "crafting_count": crafting_count,
         }
 
     def calculate_team_food_and_san(self, team_pals: List[Dict[str, Any]]) -> Dict[str, Any]:

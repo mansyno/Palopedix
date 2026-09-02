@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
 import { PassiveBadge } from './common/PassiveBadge';
+import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 
 const SHORT_CATEGORY_NAMES = {
   flying_mount: 'Fly',
@@ -241,18 +242,20 @@ export function SaveGameExplorerView({
                 return (
                   <tr key={pi.instance_id} onClick={handleRowClick} style={{ cursor: 'pointer' }}>
                     <td style={{ fontWeight: 600, whiteSpace: 'nowrap', padding: '0.25rem 0.4rem' }}>
-                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                        {pi.icon_path ? (
-                          <img src={pi.icon_path} alt={pi.display_name} style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }} onError={(e) => { e.target.style.display = 'none'; }} />
-                        ) : (
-                          <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.7rem', flexShrink: 0 }}>
-                            {pi.display_name ? pi.display_name[0] : 'P'}
-                          </div>
-                        )}
-                        <span title={pi.nickname && pi.nickname !== pi.display_name ? `${pi.display_name} ("${pi.nickname}")` : pi.display_name} style={{ color: 'var(--accent-gold)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
-                          {pi.display_name}
-                        </span>
-                      </div>
+                      <PalInstanceTooltip instance={pi}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          {pi.icon_path ? (
+                            <img src={pi.icon_path} alt={pi.display_name} style={{ width: '22px', height: '22px', borderRadius: '4px', objectFit: 'cover', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          ) : (
+                            <div style={{ width: '22px', height: '22px', borderRadius: '4px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.7rem', flexShrink: 0 }}>
+                              {pi.display_name ? pi.display_name[0] : 'P'}
+                            </div>
+                          )}
+                          <span title={pi.nickname && pi.nickname !== pi.display_name ? `${pi.display_name} ("${pi.nickname}")` : pi.display_name} style={{ color: 'var(--accent-gold)', fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                            {pi.display_name}
+                          </span>
+                        </div>
+                      </PalInstanceTooltip>
                     </td>
                     <td style={{ fontWeight: 700, color: 'var(--accent-gold)', whiteSpace: 'nowrap', padding: '0.25rem 0.25rem', fontSize: '0.78rem' }}>Lv.{pi.level}</td>
                     <td style={{ whiteSpace: 'nowrap', padding: '0.25rem 0.25rem' }}>

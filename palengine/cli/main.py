@@ -523,47 +523,55 @@ def boss_party(
         return
         
     boss = result["boss_profile"]
+    readiness = result.get("encounter_readiness", {})
+    
     click.echo(f"\n=======================================================")
     click.echo(f"  BOSS PROFILE: {boss['canonical_name']}")
     click.echo(f"=======================================================")
     click.echo(f"Location: {boss['location']}")
     click.echo(f"Level: {boss['level']} | Estimated HP: {boss['hp']:,}")
+    time_info = f"{boss['time_limit_sec'] // 60} min ({boss['time_limit_sec']}s)" if boss.get("time_limit_sec") else "No Timer (Open Field)"
+    dps_info = f"{boss['required_dps']:,} DPS" if boss.get("required_dps") else "N/A"
+    click.echo(f"Arena Timer: {time_info} | Required DPS Threshold: {dps_info}")
     click.echo(f"Elements: {'/'.join(boss['elements'])} | Weaknesses: {', '.join(boss['weaknesses'])}")
     click.echo(f"Dangerous Attacks: {', '.join(boss.get('dangerous_moves', []))}")
     click.echo(f"Tactics: {boss.get('tactics', '')}\n")
 
-    def _render_team_table(team: list[dict[str, Any]], title: str):
-        click.echo(f"--- {title} ---")
-        rows = []
-        for idx, p in enumerate(team, 1):
-            rows.append({
-                "#": idx,
-                "Pal": f"{p['species']} {p['gender']}",
-                "Level": f"Lv.{p['level']} ({p['rank']})",
-                "Element": p["element"],
-                "Location": p["location"],
-                "Passives": ", ".join(p["passives"]),
-                "IVs (HP/Atk/Def)": p["ivs"],
-            })
-        click.echo(tabulate(rows, headers="keys", tablefmt="github"))
-        click.echo("")
+    if readiness:
+        click.echo(f"--- Encounter Readiness: [{readiness['status']}] ---")
+        click.echo(f"Verdict: {readiness.get('verdict', '')}")
+        click.echo(f"Level Gap: {readiness.get('level_gap', 0):+d} (Lead Pal Lv.{readiness.get('highest_pal_level', 1)} vs Boss Lv.{readiness.get('boss_level', 50)})")
+        click.echo(f"Timer Assessment: {readiness.get('timer_note', '')}\n")
 
-    _render_team_table(result["team_a_pal_dps"], "Option A: Pure Pal Elemental DPS (Direct Counters)")
-    _render_team_table(result["team_b_mounted_player_dps"], "Option B: Mounted Player-DPS Build (Infusion + Gobfin Stack)")
-    _render_team_table(result["team_c_balanced_hybrid"], "Option C: Balanced Hybrid & Survival Team")
+    click.echo("--- Recommended Optimal 5-Pal Counter Party ---")
+    party_rows = []
+    waza_rows = []
+    for idx, p in enumerate(result.get("recommended_party", []), 1):
+        party_rows.append({
+            "#": idx,
+            "Role": p.get("role", "Combat"),
+            "Pal": f"{p['species']} {p['gender']}",
+            "Level": f"Lv.{p['level']} ({p['rank']})",
+            "Element": p["element"],
+            "Location": p["location"],
+            "Passives": ", ".join(p["passives"]),
+            "IVs (HP/Atk/Def)": p["ivs"],
+        })
 
-    if result.get("recommended_waza"):
-        click.echo("--- Recommended Counter Active Skills (Waza) ---")
-        waza_rows = [{"Skill": w["name"], "Element": w["element"], "Power": w["power"], "Cooldown": w["ct"]} for w in result["recommended_waza"]]
-        click.echo(tabulate(waza_rows, headers="keys", tablefmt="github"))
-        click.echo("")
+        moves_str = " | ".join([f"{w['name']} ({w['element']}, {w['power']}p, {w['ct']})" for w in p.get("recommended_waza", [])])
+        target_pass = ", ".join(p.get("optimal_passives", []))
+        waza_rows.append({
+            "#": idx,
+            "Pal": p["species"],
+            "Assigned Active Skills (Waza)": moves_str,
+            "Target Passives": target_pass,
+        })
 
-    if result.get("breeding_projects"):
-        click.echo("--- Tier 3: Breeding Projects (If Missing High-Level Counters) ---")
-        for proj in result["breeding_projects"]:
-            steps = " -> ".join([f"{s['parent1']} + {s['parent2']} = {s['child']}" for s in proj["path"]])
-            click.echo(f"Target: {proj['target_pal']} ({proj['element']}) | {proj['warning']}")
-            click.echo(f"  Breeding Path: {steps}\n")
+    click.echo(tabulate(party_rows, headers="keys", tablefmt="github"))
+    click.echo("")
+    click.echo("--- Tailored Active Movesets (Waza) & Target Passives ---")
+    click.echo(tabulate(waza_rows, headers="keys", tablefmt="github"))
+    click.echo("")
 
 
 @cli.command("missions")

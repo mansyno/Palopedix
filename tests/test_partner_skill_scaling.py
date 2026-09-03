@@ -152,7 +152,7 @@ def test_anubis_scaling():
 
 def test_pal_gear_enrichment():
     from palengine.db.sqlite_engine import SQLiteEngine
-    engine = SQLiteEngine()
+    engine = SQLiteEngine(world_id="test_static_pals")
 
     pals = engine.query_pals({})
     assert len(pals) > 0

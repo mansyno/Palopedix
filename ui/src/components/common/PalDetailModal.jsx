@@ -196,15 +196,38 @@ export function PalDetailModal({ pal, onClose }) {
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                     {pal.partner_skill.scaling_range && (
                       <span className="badge badge-subtle" style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                         📈 {pal.partner_skill.scaling_range}
                       </span>
                     )}
-                    {pal.partner_skill.unlock_item && (
-                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
-                    )}
+                    {(() => {
+                      const gear = pal.gear || pal.partner_skill.gear;
+                      if (gear && gear.requires_gear) {
+                        return gear.is_crafted ? (
+                          <span className="badge" style={{ fontSize: '0.75rem', background: 'rgba(34, 197, 94, 0.2)', color: '#86efac', border: '1px solid rgba(34, 197, 94, 0.4)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>🪖</span>
+                            <span>{gear.name}: <strong style={{ color: '#4ade80' }}>✅ Crafted & Ready</strong></span>
+                          </span>
+                        ) : (
+                          <span className="badge" style={{ fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.4)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <span>🔒</span>
+                            <span>{gear.name}: <strong style={{ color: '#f87171' }}>Not Crafted</strong></span>
+                          </span>
+                        );
+                      }
+                      if (pal.partner_skill.unlock_item) {
+                        return (
+                          <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
+                        );
+                      }
+                      return (
+                        <span className="badge badge-subtle" style={{ fontSize: '0.72rem', background: 'rgba(148, 163, 184, 0.15)', color: '#cbd5e1' }}>
+                          ✨ Inherent Ability
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
                 {pal.partner_skill.description && (

@@ -68,6 +68,14 @@ export const RARITY_OPTIONS = [
   { value: '1', label: 'Tier 1' },
 ];
 
+export const GEAR_STATUS_OPTIONS = [
+  { value: '', label: 'All Gear Statuses' },
+  { value: 'crafted', label: '✅ Crafted (Active)' },
+  { value: 'not_crafted', label: '🔒 Not Crafted' },
+  { value: 'no_gear', label: '✨ Inherent (No Gear)' },
+  { value: 'requires_gear', label: '🪖 Requires Gear (Any)' },
+];
+
 export function PalFilterModal({
   isOpen,
   onClose,
@@ -78,6 +86,7 @@ export function PalFilterModal({
     gender: '',
     minLevel: '',
     rarity: '',
+    gearStatus: '',
     passives: [],
     elements: [],
   },
@@ -92,6 +101,7 @@ export function PalFilterModal({
   const [gender, setGender] = useState(initialFilters.gender || '');
   const [minLevel, setMinLevel] = useState(initialFilters.minLevel || '');
   const [rarity, setRarity] = useState(initialFilters.rarity || '');
+  const [gearStatus, setGearStatus] = useState(initialFilters.gearStatus || '');
 
   // 4 discrete passive skill slots
   const [slot1, setSlot1] = useState('');
@@ -113,6 +123,7 @@ export function PalFilterModal({
       setGender(initialFilters.gender || '');
       setMinLevel(initialFilters.minLevel || '');
       setRarity(initialFilters.rarity || '');
+      setGearStatus(initialFilters.gearStatus || '');
 
       const pList = initialFilters.passives || [];
       setSlot1(pList[0] ? (typeof pList[0] === 'string' ? pList[0] : (pList[0].name || pList[0].id || '')) : '');
@@ -203,6 +214,7 @@ export function PalFilterModal({
     setGender('');
     setMinLevel('');
     setRarity('');
+    setGearStatus('');
     setSlot1('');
     setSlot2('');
     setSlot3('');
@@ -218,6 +230,7 @@ export function PalFilterModal({
       gender,
       minLevel,
       rarity,
+      gearStatus,
       passives: activeSelectedPassives,
       elements: selectedElements,
     });
@@ -232,7 +245,7 @@ export function PalFilterModal({
         className="modal-content" 
         onClick={e => e.stopPropagation()} 
         style={{ 
-          maxWidth: '1200px', 
+          maxWidth: '1240px', 
           width: '96%',
           display: 'flex', 
           flexDirection: 'column', 
@@ -256,7 +269,7 @@ export function PalFilterModal({
             </h2>
           </div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '0.2rem', marginBottom: 0 }}>
-            Configure any combination of general attributes, passive skills, and elemental types. All active filters are cumulative.
+            Configure any combination of general attributes, pal gear status, passive skills, and elemental types. All active filters are cumulative.
           </p>
         </div>
 
@@ -264,7 +277,7 @@ export function PalFilterModal({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
           
           {/* ========================================================================= */}
-          {/* SECTION 1: GENERAL ATTRIBUTES (PARTNER GROUP, LOCATION, SPECIES, GENDER, MIN LV, RARITY) */}
+          {/* SECTION 1: GENERAL ATTRIBUTES (PARTNER GROUP, LOCATION, SPECIES, GENDER, MIN LV, RARITY, GEAR) */}
           {/* ========================================================================= */}
           <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
@@ -273,7 +286,7 @@ export function PalFilterModal({
               </h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.45rem' }}>
               {/* Partner Group */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: partnerGroup ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
@@ -283,7 +296,7 @@ export function PalFilterModal({
                   value={partnerGroup}
                   onChange={setPartnerGroup}
                   options={PARTNER_GROUP_OPTIONS}
-                  placeholder="All Partner Groups"
+                  placeholder="All Groups"
                   accentColor="var(--accent-gold)"
                 />
               </div>
@@ -367,6 +380,20 @@ export function PalFilterModal({
                   onChange={setRarity}
                   options={RARITY_OPTIONS}
                   placeholder="All Rarities"
+                  accentColor="var(--accent-gold)"
+                />
+              </div>
+
+              {/* Pal Gear Status */}
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.2rem', color: gearStatus ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                  🪖 Pal Gear
+                </label>
+                <CustomSelect
+                  value={gearStatus}
+                  onChange={setGearStatus}
+                  options={GEAR_STATUS_OPTIONS}
+                  placeholder="All Gear"
                   accentColor="var(--accent-gold)"
                 />
               </div>

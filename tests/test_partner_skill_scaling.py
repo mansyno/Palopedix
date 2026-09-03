@@ -149,3 +149,24 @@ def test_anubis_scaling():
     assert res_4["level"] == 5
     assert "increases Attack by 50%" in res_4["description"]
 
+
+def test_pal_gear_enrichment():
+    from palengine.db.sqlite_engine import SQLiteEngine
+    engine = SQLiteEngine()
+
+    pals = engine.query_pals({})
+    assert len(pals) > 0
+
+    # Chillet requires gear (Chillet Saddle)
+    chillet = next((p for p in pals if p.get("internal_name") == "WeaselDragon" or p.get("display_name") == "Chillet"), None)
+    if chillet:
+        assert chillet.get("gear") is not None
+        assert chillet["gear"]["requires_gear"] is True
+        assert "Chillet Saddle" in chillet["gear"]["name"]
+
+    # Lamball does not require gear
+    lamball = next((p for p in pals if p.get("internal_name") == "SheepBall" or p.get("display_name") == "Lamball"), None)
+    if lamball:
+        assert lamball.get("gear") is not None
+        assert lamball["gear"]["requires_gear"] is False
+

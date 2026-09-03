@@ -6,7 +6,9 @@ Palopedix is an advanced save parser, analytics engine, and database viewer for 
 
 ## Key Features
 
-- **Paldex & Skills Catalog**: Explore stats, elements, partner skills, active skills, passives, work suitabilities, and **18 deterministic Partner Skill categories** (Flying Mounts, Ranch Producers, Player Infusions, Artillery, Healers, Combat Buffs, etc.).
+- **Paldex & Skills Catalog**: Explore stats, elements, partner skills, active skills, passives, work suitabilities, authentic condensation rank scaling (Lv 1–5), and **18 deterministic Partner Skill categories** (Flying Mounts, Ranch Producers, Player Infusions, Artillery, Healers, Combat Buffs, etc.).
+- **Pal Gear & Saddle Tracking**: Auto-detects crafted Key Items (`EssentialContainerId`) from save games, providing real-time crafted status badges (`✅ Crafted & Ready` vs `🔒 Not Crafted`) in Pal Tooltips, Detail Modals, and Explorer filters.
+- **Advanced Pal Explorer & Filter Modal**: Centralized 7-column filter modal with searchable dropdowns (`CustomSelect`), 4-slot passive combinations, element filters, removable filter chips, and full **Undo / Redo / Clear History** navigation.
 - **Save Game Parser & World Manager**: Auto-discovers Palworld save games (`Level.sav`), supports multi-world save switching, and decodes caught Pals, IVs, souls, ranks, and inventory.
 - **Base Camp Work Crew Optimizer**: Analyzes placed infrastructure in active base camps, calculates work suitability demand, balances food consumption and SAN decay, and recommends optimal 24/7 Pal crews.
 - **Multi-Generation Breeding Path Finder**: BFS pathfinding from owned Pals to any target Pal, complete with parent instance quality scoring, target passive skill preservation, and gender probability calculations.

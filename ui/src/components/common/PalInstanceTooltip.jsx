@@ -164,6 +164,24 @@ export function PalInstanceTooltip({ instance, children }) {
                     {instance.partner_skill.description}
                   </span>
                 )}
+                {(instance.gear || instance.partner_skill.gear)?.requires_gear && (() => {
+                  const gear = instance.gear || instance.partner_skill.gear;
+                  return (
+                    <div style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.72rem' }}>
+                      {gear.is_crafted ? (
+                        <span style={{ color: '#86efac', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span>🪖</span>
+                          <span>{gear.name}: <strong style={{ color: '#4ade80' }}>Crafted (Active)</strong></span>
+                        </span>
+                      ) : (
+                        <span style={{ color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                          <span>🔒</span>
+                          <span>{gear.name}: <strong style={{ color: '#f87171' }}>Not Crafted</strong></span>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

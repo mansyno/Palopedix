@@ -8,6 +8,7 @@ import {
   LOCATION_OPTIONS,
   GENDER_OPTIONS,
   RARITY_OPTIONS,
+  GEAR_STATUS_OPTIONS,
 } from './common/PalFilterModal';
 
 const SHORT_CATEGORY_NAMES = {
@@ -38,6 +39,7 @@ const DEFAULT_FILTERS = {
   gender: '',
   minLevel: '',
   rarity: '',
+  gearStatus: '',
   passives: [],
   elements: [],
 };
@@ -100,6 +102,7 @@ export function SaveGameExplorerView({
       (activeFilters.gender ? 1 : 0) +
       (activeFilters.minLevel ? 1 : 0) +
       (activeFilters.rarity ? 1 : 0) +
+      (activeFilters.gearStatus ? 1 : 0) +
       (activeFilters.passives?.length || 0) +
       (activeFilters.elements?.length || 0)
     );
@@ -151,6 +154,20 @@ export function SaveGameExplorerView({
         if (activeFilters.rarity === 'mid' && (palRarity < 4 || palRarity > 6)) return false;
         if (activeFilters.rarity === 'common' && (palRarity < 1 || palRarity > 3)) return false;
         if (!isNaN(parseInt(activeFilters.rarity, 10)) && palRarity !== parseInt(activeFilters.rarity, 10)) return false;
+      }
+
+      // Pal Gear Status Filter
+      if (activeFilters.gearStatus) {
+        const g = pi.gear || pi.partner_skill?.gear;
+        if (activeFilters.gearStatus === 'crafted') {
+          if (!g || !g.requires_gear || !g.is_crafted) return false;
+        } else if (activeFilters.gearStatus === 'not_crafted') {
+          if (!g || !g.requires_gear || g.is_crafted) return false;
+        } else if (activeFilters.gearStatus === 'no_gear') {
+          if (g && g.requires_gear) return false;
+        } else if (activeFilters.gearStatus === 'requires_gear') {
+          if (!g || !g.requires_gear) return false;
+        }
       }
 
       // Elemental Type Filter (Order-agnostic: matches Type1 or Type2 dynamically)
@@ -390,6 +407,19 @@ export function SaveGameExplorerView({
                 <span className="badge" style={{ ...chipBadgeStyle, background: 'rgba(245, 158, 11, 0.2)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fde68a' }}>
                   <span>{RARITY_OPTIONS.find(o => o.value === activeFilters.rarity)?.label || `Rarity: ${activeFilters.rarity}`}</span>
                   <button onClick={() => pushFilterState({ ...activeFilters, rarity: '' })} style={chipCloseBtnStyle} title="Remove filter">✕</button>
+                </span>
+              )}
+
+              {/* Pal Gear Status Chip */}
+              {activeFilters.gearStatus && (
+                <span className="badge" style={{ ...chipBadgeStyle, background: 'rgba(16, 185, 129, 0.2)', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#a7f3d0' }}>
+                  <span>🪖 {
+                    activeFilters.gearStatus === 'crafted' ? 'Gear: Crafted (Active)' :
+                    activeFilters.gearStatus === 'not_crafted' ? 'Gear: Not Crafted' :
+                    activeFilters.gearStatus === 'no_gear' ? 'Gear: Inherent (No Gear)' :
+                    'Gear: Requires Gear'
+                  }</span>
+                  <button onClick={() => pushFilterState({ ...activeFilters, gearStatus: '' })} style={chipCloseBtnStyle} title="Remove filter">✕</button>
                 </span>
               )}
 

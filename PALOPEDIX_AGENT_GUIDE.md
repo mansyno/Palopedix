@@ -87,9 +87,11 @@ if save_path:
     engine.load_save_data(save_path)
 
 # Built-in query methods:
-pals = engine.query_pals(filters)  # Supports element, size, nocturnal, work_suitability, partner_category
+pals = engine.query_pals(filters)  # Supports element, size, nocturnal, work_suitability, partner_category, and enriches gear & scaling
 categories = engine.get_partner_skill_categories()  # Returns all 18 Partner Skill categories with counts
-instances = engine.query_instances(filters)
+instances = engine.query_instances(filters)  # Returns instances with IVs, rank-scaled partner skills, and gear crafted status
+pal_gear_map = engine.get_pal_gear_map()  # Maps pal_id/internal_name -> {item_id, name, icon_path}
+crafted_gear = engine.get_crafted_palgear_set()  # Returns set of lowercase item IDs in player's Key Items
 condense_candidates = engine.get_condense_candidates()
 active_missions = engine.get_active_missions()
 base_camps = engine.get_base_camps()
@@ -107,9 +109,9 @@ breeding_paths = engine.find_all_breeding_paths(owned_list, target_species, targ
 FastAPI runs at `http://localhost:8000`:
 * `GET /api/worlds`: Discovered save game worlds.
 * `POST /api/worlds/select`: Switch active world database.
-* `GET /api/pals`: Query static Paldex with query params (`element`, `size`, `nocturnal`, `suitability`, `partner_category`).
+* `GET /api/pals`: Query static Paldex with query params (`element`, `size`, `nocturnal`, `suitability`, `partner_category`). Enriches each Pal with rank scaling and `gear` object.
 * `GET /api/pals/partner-skill-categories`: List all Partner Skill categories with metadata and Pal counts.
-* `GET /api/save/instances`: Query loaded save instances.
+* `GET /api/save/instances`: Query loaded save instances (includes `gear` with real-time `is_crafted` status).
 * `GET /api/save/condense`: Get condensing candidates with keeper & fodder breakdown.
 * `GET /api/save/missions`: Active uncompleted NPC sub-missions with inventory & Palbox fulfillment status.
 * `GET /api/bases` & `GET /api/bases/{id}`: Base camps & structures.

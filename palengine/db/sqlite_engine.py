@@ -2859,15 +2859,43 @@ class SQLiteEngine:
             except Exception:
                 pass
 
+        pal_gear_map = self.get_pal_gear_map()
+        crafted_gear_set = self.get_crafted_palgear_set()
+
         for r in rows:
             pal_dict = dict(r)
             pal_dict["icon_path"] = transform_icon_path(pal_dict.get("icon_path"))
             pal_dict["base_speed"] = pal_dict.get("run_speed") or pal_dict.get("speed") or 0
             pal_dict["run_speed"] = pal_dict.get("run_speed") or pal_dict.get("speed") or 0
 
+            pal_id = pal_dict.get("internal_name") or pal_dict.get("id")
+            pal_key = str(pal_dict.get("internal_name") or pal_dict.get("id") or "").lower().strip()
+
+            # Attach Pal Gear status
+            gear_data = pal_gear_map.get(pal_key) or pal_gear_map.get(str(pal_id).lower().strip())
+            if gear_data:
+                is_crafted = (
+                    gear_data["item_id"].lower() in crafted_gear_set
+                    or gear_data["name"].lower() in crafted_gear_set
+                )
+                gear_info = {
+                    "requires_gear": True,
+                    "item_id": gear_data["item_id"],
+                    "name": gear_data["name"],
+                    "icon_path": gear_data.get("icon_path"),
+                    "is_crafted": is_crafted,
+                }
+            else:
+                gear_info = {
+                    "requires_gear": False,
+                    "item_id": None,
+                    "name": None,
+                    "icon_path": None,
+                    "is_crafted": False,
+                }
+            pal_dict["gear"] = gear_info
+
             if use_palworld_db:
-                pal_id = pal_dict.get("internal_name") or pal_dict.get("id")
-                pal_key = str(pal_dict.get("internal_name") or pal_dict.get("id") or "").lower().strip()
                 # Attach skills from preloaded map
                 try:
                     s_rows = pal_skills_map.get(pal_key, []) or pal_skills_map.get(str(pal_id).lower(), [])
@@ -2877,7 +2905,7 @@ class SQLiteEngine:
                         s_type = s_dict.get("type")
                         s_cat = s_dict.get("category")
                         s_desc = clean_skill_text(s_dict.get("description"), pal_dict.get("display_name") or "Pal")
-                        s_item = s_dict.get("unlock_item")
+                        s_item = s_dict.get("unlock_item") or (gear_info["name"] if gear_info["requires_gear"] else None)
 
                         pal_skills_list.append({
                             "id": s_dict.get("id"),
@@ -2907,11 +2935,12 @@ class SQLiteEngine:
                             stars=0,
                             base_description=ps_raw.get("description"),
                             skill_name=ps_raw.get("name"),
-                            unlock_item=ps_raw.get("unlock_item"),
+                            unlock_item=ps_raw.get("unlock_item") or (gear_info["name"] if gear_info["requires_gear"] else None),
                         )
                         pal_dict["partner_skill"] = {
                             **ps_raw,
                             **scaled_ps,
+                            "gear": gear_info,
                         }
                     else:
                         pal_dict["partner_skill"] = None
@@ -3619,6 +3648,10 @@ class SQLiteEngine:
         # 5. Batch load custom base names
         custom_names_map = self.get_base_camp_custom_names()
 
+        # 6. Batch load Pal Gear mappings and player's crafted Key Items
+        pal_gear_map = self.get_pal_gear_map()
+        crafted_gear_set = self.get_crafted_palgear_set()
+
         results = []
         for r in rows:
             d = dict(r)
@@ -3687,6 +3720,30 @@ class SQLiteEngine:
             d["suitabilities"] = inst_ws
             d["work_suitabilities"] = inst_ws
 
+            # Pal Gear status
+            gear_data = pal_gear_map.get(pal_key) or pal_gear_map.get(clean_sp) or pal_gear_map.get(sp)
+            if gear_data:
+                is_crafted = (
+                    gear_data["item_id"].lower() in crafted_gear_set
+                    or gear_data["name"].lower() in crafted_gear_set
+                )
+                gear_info = {
+                    "requires_gear": True,
+                    "item_id": gear_data["item_id"],
+                    "name": gear_data["name"],
+                    "icon_path": gear_data.get("icon_path"),
+                    "is_crafted": is_crafted,
+                }
+            else:
+                gear_info = {
+                    "requires_gear": False,
+                    "item_id": None,
+                    "name": None,
+                    "icon_path": None,
+                    "is_crafted": False,
+                }
+            d["gear"] = gear_info
+
             # Attach rank-scaled partner skill
             ps_meta = skills_map.get(f"partnerskill_{pal_key}") or skills_map.get(f"partnerskill_{clean_sp}")
             if not ps_meta and use_palworld_db:
@@ -3702,12 +3759,13 @@ class SQLiteEngine:
                 stars=pal_rank,
                 base_description=ps_meta.get("description") if ps_meta else None,
                 skill_name=ps_meta.get("name") if ps_meta else None,
-                unlock_item=ps_meta.get("unlock_item") if ps_meta else None,
+                unlock_item=ps_meta.get("unlock_item") if ps_meta else (gear_info["name"] if gear_info["requires_gear"] else None),
             )
             if ps_meta or scaled_ps.get("description"):
                 d["partner_skill"] = {
                     **(ps_meta or {}),
                     **scaled_ps,
+                    "gear": gear_info,
                 }
             else:
                 d["partner_skill"] = None
@@ -3715,6 +3773,41 @@ class SQLiteEngine:
             results.append(d)
 
         return results
+
+    def get_crafted_palgear_set(self) -> set[str]:
+        """Returns set of lowercase item_ids present in the active player's Key Items container."""
+        try:
+            rows = self.conn.execute("""
+                SELECT DISTINCT LOWER(s.item_id) as item_id
+                FROM item_container_slots s
+                JOIN item_containers c ON s.container_id = c.container_id
+                WHERE c.container_type = 'Key Items' AND s.count > 0
+            """).fetchall()
+            return {r["item_id"] for r in rows if r["item_id"]}
+        except Exception:
+            return set()
+
+    def get_pal_gear_map(self) -> dict[str, dict[str, Any]]:
+        """Returns mapping of pal_id/internal_name (lowercase) -> {item_id, name, icon_path}."""
+        gear_map = {}
+        try:
+            rows = self.conn.execute("""
+                SELECT id, name, icon_path
+                FROM palworld_master.items
+                WHERE subcategory = 'Essential_PalGear'
+            """).fetchall()
+            for r in rows:
+                item_id = r["id"]
+                pal_key = item_id.replace("SkillUnlock_", "").strip().lower()
+                icon = transform_icon_path(r["icon_path"])
+                gear_map[pal_key] = {
+                    "item_id": item_id,
+                    "name": r["name"],
+                    "icon_path": icon,
+                }
+        except Exception:
+            pass
+        return gear_map
 
     def get_base_camp_summary(self, base_camp_id: str) -> Optional[dict[str, Any]]:
         """Returns details, workers, and structure counts for a given Base Camp."""

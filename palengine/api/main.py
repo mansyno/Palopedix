@@ -483,5 +483,141 @@ def get_world_settings() -> dict[str, Any]:
     return db_engine.get_world_settings()
 
 
+# ── Base-to-Base Container Migration & Logistics ──────────────────────────────
+class MigrationManifestRequest(BaseModel):
+    source_base_id: str
+    target_base_id: str
+    included_types: Optional[list[str]] = None
+
+
+class MigrationExecuteRequest(BaseModel):
+    source_base_id: str
+    target_base_id: str
+    included_types: Optional[list[str]] = None
+    force: bool = False
+
+
+def _get_active_save_path() -> Optional[str]:
+    from palengine.cli.main import discover_save_path
+    return getattr(db_engine, "current_save_path", None) or discover_save_path()
+
+
+@app.get("/api/migration/bases")
+def get_migration_bases() -> list[dict[str, Any]]:
+    """Returns all base camps with container type breakdown and item counts."""
+    from palengine.logistics.base_migration import CONTAINER_TYPE_INFO, inspect_base_containers
+
+    save_path = _get_active_save_path()
+    if not save_path or not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail="Save file Level.sav not found.")
+
+    all_containers = inspect_base_containers(save_path)
+    custom_names = db_engine.get_base_camp_custom_names()
+    base_camps_db = {b["base_camp_id"]: b for b in db_engine.get_base_camps()}
+
+    result = []
+    for b_id, c_list in all_containers.items():
+        db_base = base_camps_db.get(b_id, {})
+        display_name = (
+            custom_names.get(b_id)
+            or db_base.get("name")
+            or f"Base {b_id[:8]}"
+        )
+
+        type_counts: dict[str, dict[str, Any]] = {}
+        total_items = 0
+        named_containers = []
+
+        for c in c_list:
+            oid = c["map_object_id"]
+            type_name = CONTAINER_TYPE_INFO.get(oid, {}).get("name", oid)
+            if oid not in type_counts:
+                type_counts[oid] = {
+                    "type_id": oid,
+                    "name": type_name,
+                    "count": 0,
+                    "slots": CONTAINER_TYPE_INFO.get(oid, {}).get("slots", 32),
+                }
+            type_counts[oid]["count"] += 1
+            total_items += sum(i["count"] for i in c["items"])
+            if c.get("custom_name"):
+                named_containers.append({
+                    "custom_name": c["custom_name"],
+                    "map_object_id": oid,
+                    "type_name": type_name,
+                    "items_count": len(c["items"]),
+                })
+
+        result.append({
+            "base_camp_id": b_id,
+            "name": display_name,
+            "total_containers": len(c_list),
+            "total_items": total_items,
+            "container_types": list(type_counts.values()),
+            "named_containers": named_containers,
+        })
+
+    return result
+
+
+@app.post("/api/migration/manifest")
+def create_migration_manifest(req: MigrationManifestRequest) -> dict[str, Any]:
+    """Generates the Construction Manifest and Base 2 container readiness status."""
+    from palengine.logistics.base_migration import generate_construction_manifest
+
+    save_path = _get_active_save_path()
+    if not save_path or not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail="Save file Level.sav not found.")
+
+    try:
+        manifest = generate_construction_manifest(
+            save_path,
+            req.source_base_id,
+            req.target_base_id,
+            included_types=req.included_types,
+        )
+        return manifest
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/migration/execute")
+def execute_migration(req: MigrationExecuteRequest) -> dict[str, Any]:
+    """Executes the container item relocation into Base 2 and empties source containers."""
+    import psutil
+    from palengine.logistics.base_migration import execute_base_migration
+
+    # Safety check: ensure Palworld is not running
+    if not req.force:
+        for proc in psutil.process_iter(["name"]):
+            try:
+                if "palworld" in (proc.info["name"] or "").lower():
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "Palworld is currently running. Please save and exit the game to the title screen "
+                            "before transferring items to prevent file corruption or overwrite conflicts."
+                        ),
+                    )
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+
+    save_path = _get_active_save_path()
+    if not save_path or not os.path.exists(save_path):
+        raise HTTPException(status_code=404, detail="Save file Level.sav not found.")
+
+    try:
+        result = execute_base_migration(
+            save_path,
+            req.source_base_id,
+            req.target_base_id,
+            included_types=req.included_types,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+
 
 

@@ -98,6 +98,12 @@ def _tolerant_map_model_decode_bytes(parent_reader, m_bytes):
         data["instance_id"] = reader.guid()
         data["concrete_model_instance_id"] = reader.guid()
         data["base_camp_id_belong_to"] = reader.guid()
+        if len(m_bytes) >= 257:
+            reader.data.seek(245)
+            _ = reader.i64()
+            custom_name = reader.fstring()
+            if custom_name:
+                data["custom_name"] = custom_name
     except Exception:
         pass
     return data

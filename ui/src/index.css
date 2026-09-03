@@ -834,6 +834,24 @@ td {
   font-weight: 500 !important;
 }
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes sandclock-flip {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(0deg); }
+  55% { transform: rotate(180deg); }
+  95% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.anim-sandclock {
+  display: inline-block;
+  animation: sandclock-flip 2.4s ease-in-out infinite;
+}
+
 
 
 

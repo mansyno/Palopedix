@@ -13,6 +13,7 @@ import BreedingCenterView from './components/BreedingCenterView';
 import SettingsView from './components/SettingsView';
 import HomepageView from './components/HomepageView';
 import { WorldOverviewView, WelcomeView } from './components/WorldOverviewView';
+import BaseMigrationView from './components/BaseMigrationView';
 import PalDetailModal from './components/common/PalDetailModal';
 
 function App() {
@@ -380,6 +381,9 @@ function App() {
                 <div className={`nav-item ${activeTab === 'base_optimizer' ? 'active' : ''}`} onClick={() => setActiveTab('base_optimizer')}>
                   🏰 Base Optimizer
                 </div>
+                <div className={`nav-item ${activeTab === 'base_migration' ? 'active' : ''}`} onClick={() => setActiveTab('base_migration')}>
+                  🚚 Container Migration
+                </div>
                 <div className={`nav-item ${activeTab === 'condenser' ? 'active' : ''}`} onClick={() => setActiveTab('condenser')}>
                   ⭐ Condenser
                 </div>
@@ -540,6 +544,9 @@ function App() {
                 setSelectedPal={setSelectedPal}
               />
             )}
+
+            {/* 🚚 Base Container Migration Tab */}
+            {activeTab === 'base_migration' && <BaseMigrationView />}
 
             {/* ⭐ Condenser Tab */}
             {activeTab === 'condenser' && (

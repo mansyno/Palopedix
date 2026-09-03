@@ -55,7 +55,7 @@ export function HomepageView({ onSelectMode, currentWorld, instancesCount, bases
               <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Selected Active World:</div>
               <strong style={{ color: '#38bdf8', fontSize: '0.85rem' }}>{currentWorld ? currentWorld.display_name : 'No World Loaded'}</strong>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <button className="primary-btn" style={{ padding: '0.75rem 0.5rem', fontSize: '0.85rem', background: 'linear-gradient(135deg, #0284c7 0%, #06b6d4 100%)' }}>
                 World Data →
               </button>
@@ -67,6 +67,13 @@ export function HomepageView({ onSelectMode, currentWorld, instancesCount, bases
                 ⚡ Optimizer →
               </button>
             </div>
+            <button
+              className="btn btn-secondary"
+              onClick={(e) => { e.stopPropagation(); onSelectMode('world', 'base_migration'); }}
+              style={{ width: '100%', padding: '0.65rem', fontSize: '0.85rem', background: 'rgba(99, 102, 241, 0.15)', color: '#a5b4fc', border: '1px solid rgba(99, 102, 241, 0.3)', fontWeight: 700 }}
+            >
+              🚚 Moving Van (Container Migration) →
+            </button>
           </div>
         </div>
 

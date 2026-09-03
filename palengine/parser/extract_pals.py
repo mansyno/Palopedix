@@ -429,7 +429,12 @@ def _parse_pal_data(
     passive_list_prop = cast(dict[str, Any], save_param.get("PassiveSkillList", {}).get("value", {}))
     passives = cast(list[str], passive_list_prop.get("values", []))
 
-    rank = clean_value(save_param.get("Rank", {}).get("value", 0))
+    raw_rank = clean_value(save_param.get("Rank", {}).get("value", 0))
+    try:
+        raw_rank_val = int(raw_rank) if raw_rank is not None else 0
+        rank = max(0, raw_rank_val - 1) if raw_rank_val > 0 else 0
+    except (ValueError, TypeError):
+        rank = 0
     exp = clean_value(save_param.get("Exp", {}).get("value", 0))
 
     equip_waza = cast(list[str], save_param.get("EquipWaza", {}).get("value", {}).get("values", []))

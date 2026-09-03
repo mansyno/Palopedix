@@ -186,10 +186,26 @@ export function PalDetailModal({ pal, onClose }) {
             {pal.partner_skill && (
               <div style={{ background: 'linear-gradient(135deg, rgba(234, 179, 8, 0.15), rgba(168, 85, 247, 0.15))', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '1rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>🤝 Partner Skill: {pal.partner_skill.name}</h4>
-                  {pal.partner_skill.unlock_item && (
-                    <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <h4 style={{ fontWeight: 800, color: 'var(--accent-gold)', margin: 0, fontSize: '1rem' }}>
+                      🤝 Partner Skill: {pal.partner_skill.name}
+                    </h4>
+                    {pal.rank !== undefined && (
+                      <span className="badge" style={{ background: 'var(--accent-gold)', color: '#000', fontWeight: 800, fontSize: '0.75rem', padding: '0.15rem 0.45rem' }}>
+                        Lv. {(pal.partner_skill.level || pal.rank + 1)}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    {pal.partner_skill.scaling_range && (
+                      <span className="badge badge-subtle" style={{ fontSize: '0.72rem', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
+                        📈 {pal.partner_skill.scaling_range}
+                      </span>
+                    )}
+                    {pal.partner_skill.unlock_item && (
+                      <span className="badge" style={{ background: 'rgba(255,255,255,0.1)' }}>Req: {pal.partner_skill.unlock_item}</span>
+                    )}
+                  </div>
                 </div>
                 {pal.partner_skill.description && (
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-primary)', margin: 0, lineHeight: 1.4 }}>{pal.partner_skill.description}</p>

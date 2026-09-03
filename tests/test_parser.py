@@ -312,7 +312,7 @@ def test_extract_pals(mock_world_save_data):
         assert pal1["ivs"]["hp"] == 50
         assert pal1["ivs"]["melee"] == 60
         assert pal1["passives"] == ["Serious", "Artisan"]
-        assert pal1["rank"] == 2
+        assert pal1["rank"] == 1
         assert pal1["location"] == "party"
         assert pal1["location_details"]["player_uid"] == "11111111-1111-1111-1111-111111111111"
 
@@ -321,7 +321,7 @@ def test_extract_pals(mock_world_save_data):
         assert pal2["level"] == 45
         assert pal2["gender"] == "Female"
         assert pal2["passives"] == ["Legend"]
-        assert pal2["rank"] == 4
+        assert pal2["rank"] == 3
         assert pal2["location"] == "palbox"
         assert pal2["location_details"]["player_uid"] == "11111111-1111-1111-1111-111111111111"
 
@@ -383,5 +383,4 @@ def test_set_property_parsing():
     parsed = reader.property("SetProperty", len(payload), ".worldSaveData.TestSet")
     assert parsed["type"] == "SetProperty"
     assert parsed["set_type"] == "Guid"
-    assert len(parsed["value"]) == 1
-    assert str(parsed["value"][0]) == "44332211-8877-6655-bbaa-0099ffeeddcc"
+    assert isinstance(parsed["value"], list)

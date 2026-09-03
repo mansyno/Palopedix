@@ -66,6 +66,7 @@ export function getPassiveMeta(skill, isMatched = false) {
 
 export function PassiveBadge({
   skill,
+  passive,
   isMatched = false,
   size = 'sm',
   className = '',
@@ -74,9 +75,10 @@ export function PassiveBadge({
 }) {
   const [pos, setPos] = useState(null);
 
-  if (!skill) return null;
+  const activeSkill = skill || passive;
+  if (!activeSkill) return null;
 
-  const meta = getPassiveMeta(skill, isMatched);
+  const meta = getPassiveMeta(activeSkill, isMatched);
   if (!meta) return null;
 
   const handleMouseMove = (e) => {

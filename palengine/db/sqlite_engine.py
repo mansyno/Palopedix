@@ -46,16 +46,22 @@ def transform_icon_path(path: Optional[str]) -> Optional[str]:
     return normalized if (normalized.startswith("/") or normalized.startswith("http")) else None
 
 
-def clean_skill_text(text: Optional[str]) -> Optional[str]:
-    """Removes Unreal Engine and rich-text markup tags from skill descriptions."""
+def clean_skill_text(text: Optional[str], pal_name: str = "Pal") -> Optional[str]:
+    """Removes Unreal Engine markup tags and resolves canonical element and entity names."""
     if not text:
         return None
-    # Remove XML-style tags like <itemName id=|...|/> or </Color>
-    cleaned = re.sub(r"<[^>]+>", "", text)
-    # Remove Unreal placeholder variables like {ReferenceMsgId_RideSpeedUp}
-    cleaned = re.sub(r"\{[^}]+\}", "", cleaned)
-    # Normalize whitespace
+    from palengine.analytics.partner_skill_scaling import sanitize_markup_elements
+    cleaned = sanitize_markup_elements(text, pal_name)
+    # Remove Unreal placeholder variables like {ReferenceMsgId_DamageUp} or [ReferenceMsgId_DamageUp]
+    cleaned = re.sub(r"\[ReferenceMsgId_[^\]]+\]", "", cleaned)
+    cleaned = re.sub(r"\{ReferenceMsgId_[^}]+\}", "", cleaned)
+    cleaned = re.sub(r"\[ReferencePassive[^\]]+\]", "", cleaned)
+    cleaned = re.sub(r"\{ReferencePassive[^}]+\}", "", cleaned)
+    cleaned = re.sub(r"\[Passive[^\]]+\]", "", cleaned)
+    cleaned = re.sub(r"\{Passive[^}]+\}", "", cleaned)
+    # Normalize whitespace and punctuation spacing
     cleaned = " ".join(cleaned.split())
+    cleaned = re.sub(r"\s+([.,!?:;%])", r"\1", cleaned)
     return cleaned if cleaned else None
 
 
@@ -388,6 +394,9 @@ def classify_pal_partner_categories(
         for k in [
             "increases attack of",
             "increases defense of",
+            "increases its attack and defense",
+            "increases knocklem",
+            "steel resolve increases",
             "enhances",
             "party pal",
             "fighting alongside you",
@@ -860,107 +869,107 @@ class SQLiteEngine:
             """
             )
 
-            cursor.execute("DROP TABLE IF EXISTS main.pal_work_suitabilities")
-            cursor.execute(
-                """
-                CREATE TABLE pal_work_suitabilities AS
-                SELECT
-                    pal_id AS pal_internal_name,
-                    CASE LOWER(work_type)
-                        WHEN 'handcraft' THEN 'handiwork'
-                        WHEN 'electricity' THEN 'generating_electricity'
-                        WHEN 'generateelectricity' THEN 'generating_electricity'
-                        WHEN 'productmedicine' THEN 'medicine_production'
-                        WHEN 'medicine' THEN 'medicine_production'
-                        WHEN 'transport' THEN 'transporting'
-                        WHEN 'monsterfarm' THEN 'farming'
-                        WHEN 'emitflame' THEN 'kindling'
-                        WHEN 'seeding' THEN 'planting'
-                        WHEN 'collection' THEN 'gathering'
-                        WHEN 'deforest' THEN 'lumbering'
-                        WHEN 'cool' THEN 'cooling'
-                        ELSE LOWER(work_type)
-                    END AS suitability_name,
-                    level
-                FROM palworld_master.work_suitability
-            """
-            )
-
-            cursor.execute("DROP TABLE IF EXISTS main.active_skills")
-            cursor.execute(
-                """
-                CREATE TABLE active_skills AS
-                SELECT
-                    id,
-                    name,
-                    element,
-                    power,
-                    cooldown AS cooldown_sec,
-                    description,
-                    icon_path
-                FROM palworld_master.skills
-                WHERE type = 'Active' OR type = 'active' OR category = 'Active'
-            """
-            )
-
-            cursor.execute("DROP TABLE IF EXISTS main.passive_skills")
-            cursor.execute(
-                """
-                CREATE TABLE passive_skills AS
-                SELECT id, name, CAST(power AS INTEGER) as rank, description
-                FROM palworld_master.skills
-                WHERE type = 'Passive' OR category = 'Passive' OR category LIKE 'Passive%'
-                """
-            )
-
-            cursor.execute("DROP TABLE IF EXISTS main.partner_skills")
-            cursor.execute(
-                """
-                CREATE TABLE partner_skills AS
-                SELECT s.id, s.name, ps.pal_id as pal_internal_name, s.description
-                FROM palworld_master.skills s
-                JOIN palworld_master.pal_skills ps ON s.id = ps.skill_id
-                WHERE s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%'
-                """
-            )
-
-            cursor.execute("DROP TABLE IF EXISTS main.base_structures")
-            cursor.execute(
-                """
-                CREATE TABLE base_structures AS
-                SELECT id, name, category, tech_level as technology_level
-                FROM palworld_master.buildings
-                """
-            )
-
-            cursor.execute("DROP TABLE IF EXISTS main.breeding_combos")
-            cursor.execute(
-                """
-                CREATE TABLE breeding_combos AS
-                SELECT parent1_id as parent1, parent2_id as parent2, child_id as child
-                FROM palworld_master.breeding_combos
-                """
-            )
-
-            # Special Crossover Unique Combos (Eye of Cthulhu)
-            eye_combos = [
-                ("Eye of Cthulhu", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Blue Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Cave Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Demon Eye", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Enchanted Sword", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Green Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Illuminant Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Illuminant Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Purple Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Rainbow Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-                ("Red Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
-            ]
-            for p1, p2, ch in eye_combos:
+                cursor.execute("DROP TABLE IF EXISTS main.pal_work_suitabilities")
                 cursor.execute(
-                    "INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child) VALUES (?, ?, ?)",
-                    (p1, p2, ch),
+                    """
+                    CREATE TABLE pal_work_suitabilities AS
+                    SELECT
+                        pal_id AS pal_internal_name,
+                        CASE LOWER(work_type)
+                            WHEN 'handcraft' THEN 'handiwork'
+                            WHEN 'electricity' THEN 'generating_electricity'
+                            WHEN 'generateelectricity' THEN 'generating_electricity'
+                            WHEN 'productmedicine' THEN 'medicine_production'
+                            WHEN 'medicine' THEN 'medicine_production'
+                            WHEN 'transport' THEN 'transporting'
+                            WHEN 'monsterfarm' THEN 'farming'
+                            WHEN 'emitflame' THEN 'kindling'
+                            WHEN 'seeding' THEN 'planting'
+                            WHEN 'collection' THEN 'gathering'
+                            WHEN 'deforest' THEN 'lumbering'
+                            WHEN 'cool' THEN 'cooling'
+                            ELSE LOWER(work_type)
+                        END AS suitability_name,
+                        level
+                    FROM palworld_master.work_suitability
+                """
                 )
+
+                cursor.execute("DROP TABLE IF EXISTS main.active_skills")
+                cursor.execute(
+                    """
+                    CREATE TABLE active_skills AS
+                    SELECT
+                        id,
+                        name,
+                        element,
+                        power,
+                        cooldown AS cooldown_sec,
+                        description,
+                        icon_path
+                    FROM palworld_master.skills
+                    WHERE type = 'Active' OR type = 'active' OR category = 'Active'
+                """
+                )
+
+                cursor.execute("DROP TABLE IF EXISTS main.passive_skills")
+                cursor.execute(
+                    """
+                    CREATE TABLE passive_skills AS
+                    SELECT id, name, CAST(power AS INTEGER) as rank, description
+                    FROM palworld_master.skills
+                    WHERE type = 'Passive' OR category = 'Passive' OR category LIKE 'Passive%'
+                    """
+                )
+
+                cursor.execute("DROP TABLE IF EXISTS main.partner_skills")
+                cursor.execute(
+                    """
+                    CREATE TABLE partner_skills AS
+                    SELECT s.id, s.name, ps.pal_id as pal_internal_name, s.description
+                    FROM palworld_master.skills s
+                    JOIN palworld_master.pal_skills ps ON s.id = ps.skill_id
+                    WHERE s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%'
+                    """
+                )
+
+                cursor.execute("DROP TABLE IF EXISTS main.base_structures")
+                cursor.execute(
+                    """
+                    CREATE TABLE base_structures AS
+                    SELECT id, name, category, tech_level as technology_level
+                    FROM palworld_master.buildings
+                    """
+                )
+
+                cursor.execute("DROP TABLE IF EXISTS main.breeding_combos")
+                cursor.execute(
+                    """
+                    CREATE TABLE breeding_combos AS
+                    SELECT parent1_id as parent1, parent2_id as parent2, child_id as child
+                    FROM palworld_master.breeding_combos
+                    """
+                )
+
+                # Special Crossover Unique Combos (Eye of Cthulhu)
+                eye_combos = [
+                    ("Eye of Cthulhu", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Blue Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Cave Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Demon Eye", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Enchanted Sword", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Green Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Illuminant Bat", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Illuminant Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Purple Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Rainbow Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                    ("Red Slime", "Eye of Cthulhu", "Eye of Cthulhu"),
+                ]
+                for p1, p2, ch in eye_combos:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO breeding_combos (parent1, parent2, child) VALUES (?, ?, ?)",
+                        (p1, p2, ch),
+                    )
 
             cursor.execute(
                 """
@@ -1401,11 +1410,13 @@ class SQLiteEngine:
             )
             """
         )
-        for cat in PARTNER_SKILL_CATEGORY_DEFS:
-            cursor.execute(
-                "INSERT OR REPLACE INTO partner_skill_categories (category_id, name, description, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
-                (cat["category_id"], cat["name"], cat["description"], cat["icon"], cat["sort_order"]),
-            )
+        cat_count_row = cursor.execute("SELECT COUNT(*) FROM partner_skill_categories").fetchone()
+        if not cat_count_row or cat_count_row[0] == 0:
+            for cat in PARTNER_SKILL_CATEGORY_DEFS:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO partner_skill_categories (category_id, name, description, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
+                    (cat["category_id"], cat["name"], cat["description"], cat["icon"], cat["sort_order"]),
+                )
 
         cursor.execute(
             """
@@ -1417,56 +1428,58 @@ class SQLiteEngine:
             """
         )
 
-        # Populate categories for all pals
-        use_palworld_db = (
-            self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
-        )
-        try:
-            pal_rows = cursor.execute(
-                """
-                SELECT p.internal_name, p.display_name, p.id, p.code,
-                       ps.name as partner_name, ps.description as partner_desc
-                FROM pals p
-                LEFT JOIN partner_skills ps ON LOWER(p.internal_name) = LOWER(ps.pal_internal_name)
-                                            OR LOWER(p.id) = LOWER(ps.pal_internal_name)
-                                            OR LOWER(p.code) = LOWER(ps.pal_internal_name)
-                """
-            ).fetchall()
+        # Populate categories for all pals if not populated
+        pal_cat_count = cursor.execute("SELECT COUNT(*) FROM pal_partner_skill_categories").fetchone()
+        if not pal_cat_count or pal_cat_count[0] == 0:
+            use_palworld_db = (
+                self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
+            )
+            try:
+                pal_rows = cursor.execute(
+                    """
+                    SELECT p.internal_name, p.display_name, p.id, p.code,
+                           ps.name as partner_name, ps.description as partner_desc
+                    FROM pals p
+                    LEFT JOIN partner_skills ps ON LOWER(p.internal_name) = LOWER(ps.pal_internal_name)
+                                                OR LOWER(p.id) = LOWER(ps.pal_internal_name)
+                                                OR LOWER(p.code) = LOWER(ps.pal_internal_name)
+                    """
+                ).fetchall()
 
-            for pr in pal_rows:
-                pal_key = pr["internal_name"] or pr["id"] or pr["code"]
-                p_display = pr["display_name"]
-                ps_name = pr["partner_name"]
-                ps_desc = pr["partner_desc"]
+                for pr in pal_rows:
+                    pal_key = pr["internal_name"] or pr["id"] or pr["code"]
+                    p_display = pr["display_name"]
+                    ps_name = pr["partner_name"]
+                    ps_desc = pr["partner_desc"]
 
-                # If partner_skills row didn't match via pal_internal_name, try checking palworld_master
-                if use_palworld_db and (not ps_name or not ps_desc):
-                    try:
-                        s_row = cursor.execute(
-                            """
-                            SELECT s.name, s.description
-                            FROM palworld_master.pal_skills ps
-                            JOIN palworld_master.skills s ON ps.skill_id = s.id
-                            WHERE (LOWER(ps.pal_id) = LOWER(?) OR ps.pal_id = ?)
-                              AND (s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%')
-                            LIMIT 1
-                            """,
-                            (pal_key, pal_key),
-                        ).fetchone()
-                        if s_row:
-                            ps_name = s_row["name"]
-                            ps_desc = clean_skill_text(s_row["description"])
-                    except Exception:
-                        pass
+                    # If partner_skills row didn't match via pal_internal_name, try checking palworld_master
+                    if use_palworld_db and (not ps_name or not ps_desc):
+                        try:
+                            s_row = cursor.execute(
+                                """
+                                SELECT s.name, s.description
+                                FROM palworld_master.pal_skills ps
+                                JOIN palworld_master.skills s ON ps.skill_id = s.id
+                                WHERE (LOWER(ps.pal_id) = LOWER(?) OR ps.pal_id = ?)
+                                  AND (s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%')
+                                LIMIT 1
+                                """,
+                                (pal_key, pal_key),
+                            ).fetchone()
+                            if s_row:
+                                ps_name = s_row["name"]
+                                ps_desc = clean_skill_text(s_row["description"])
+                        except Exception:
+                            pass
 
-                cats = classify_pal_partner_categories(p_display, ps_name, ps_desc)
-                for c in cats:
-                    cursor.execute(
-                        "INSERT OR IGNORE INTO pal_partner_skill_categories (pal_internal_name, category_id) VALUES (?, ?)",
-                        (pal_key, c),
-                    )
-        except Exception as e:
-            print(f"Warning populating partner skill categories: {e}")
+                    cats = classify_pal_partner_categories(p_display, ps_name, ps_desc)
+                    for c in cats:
+                        cursor.execute(
+                            "INSERT OR IGNORE INTO pal_partner_skill_categories (pal_internal_name, category_id) VALUES (?, ?)",
+                            (pal_key, c),
+                        )
+            except Exception as e:
+                print(f"Warning populating partner skill categories: {e}")
 
         # ---------- Passive Skill Modifiers Table Setup & Population ----------
         cursor.execute(
@@ -1481,45 +1494,49 @@ class SQLiteEngine:
             )
             """
         )
-        for pmod in PASSIVE_SKILL_MODIFIER_DEFS:
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO passive_skill_modifiers 
-                (passive_id, name, work_speed_mod, move_speed_mod, san_decay_pts, hunger_rate_pts)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    pmod["passive_id"],
-                    pmod["name"],
-                    pmod.get("work_speed_mod", 0.0),
-                    pmod.get("move_speed_mod", 0.0),
-                    pmod.get("san_decay_pts", 0.0),
-                    pmod.get("hunger_rate_pts", 0.0),
-                ),
-            )
+        mod_count = cursor.execute("SELECT COUNT(*) FROM passive_skill_modifiers").fetchone()
+        if not mod_count or mod_count[0] == 0:
+            for pmod in PASSIVE_SKILL_MODIFIER_DEFS:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO passive_skill_modifiers 
+                    (passive_id, name, work_speed_mod, move_speed_mod, san_decay_pts, hunger_rate_pts)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        pmod["passive_id"],
+                        pmod["name"],
+                        pmod.get("work_speed_mod", 0.0),
+                        pmod.get("move_speed_mod", 0.0),
+                        pmod.get("san_decay_pts", 0.0),
+                        pmod.get("hunger_rate_pts", 0.0),
+                    ),
+                )
 
         # Seed structure aliases and friendly display names into SQLite structure_aliases table
-        aliases_path = os.path.join(self.data_dir, "structure_aliases.json")
-        if os.path.exists(aliases_path):
-            try:
-                with open(aliases_path, "r", encoding="utf-8") as f:
-                    aliases_data = json.load(f)
-                for sa in aliases_data:
-                    cursor.execute(
-                        """
-                        INSERT OR REPLACE INTO structure_aliases (alias, canonical_name, display_name, work_type, is_automated)
-                        VALUES (?, ?, ?, ?, ?)
-                    """,
-                        (
-                            sa.get("alias"),
-                            sa.get("canonical_name"),
-                            sa.get("display_name"),
-                            sa.get("work_type"),
-                            sa.get("is_automated", 0),
-                        ),
-                    )
-            except Exception as e:
-                print(f"Warning populating structure aliases: {e}")
+        sa_count = cursor.execute("SELECT COUNT(*) FROM structure_aliases").fetchone()
+        if not sa_count or sa_count[0] == 0:
+            aliases_path = os.path.join(self.data_dir, "structure_aliases.json")
+            if os.path.exists(aliases_path):
+                try:
+                    with open(aliases_path, "r", encoding="utf-8") as f:
+                        aliases_data = json.load(f)
+                    for sa in aliases_data:
+                        cursor.execute(
+                            """
+                            INSERT OR REPLACE INTO structure_aliases (alias, canonical_name, display_name, work_type, is_automated)
+                            VALUES (?, ?, ?, ?, ?)
+                        """,
+                            (
+                                sa.get("alias"),
+                                sa.get("canonical_name"),
+                                sa.get("display_name"),
+                                sa.get("work_type"),
+                                sa.get("is_automated", 0),
+                            ),
+                        )
+                except Exception as e:
+                    print(f"Warning populating structure aliases: {e}")
 
         self.conn.commit()
 
@@ -2817,6 +2834,31 @@ class SQLiteEngine:
             self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
         )
 
+        pal_skills_map = defaultdict(list)
+        pal_ws_map = defaultdict(list)
+        if use_palworld_db:
+            try:
+                s_all = self.conn.execute("""
+                    SELECT ps.pal_id, s.id, s.name, s.element, s.type, s.category, s.power, s.cooldown,
+                           s.min_range, s.max_range, s.stat_modifier, s.unlock_item,
+                           s.description, s.icon_path, ps.level_learned, ps.is_guaranteed
+                    FROM palworld_master.pal_skills ps
+                    JOIN palworld_master.skills s ON ps.skill_id = s.id
+                    ORDER BY ps.level_learned ASC, s.name ASC
+                """).fetchall()
+                for sr in s_all:
+                    s_dict = dict(sr)
+                    pal_skills_map[str(s_dict.get("pal_id") or "").lower()].append(s_dict)
+            except Exception:
+                pass
+
+            try:
+                ws_all = self.conn.execute("SELECT pal_id, work_type, level FROM palworld_master.work_suitability ORDER BY level DESC").fetchall()
+                for wsr in ws_all:
+                    pal_ws_map[str(wsr.get("pal_id") or "").lower()].append(dict(wsr))
+            except Exception:
+                pass
+
         for r in rows:
             pal_dict = dict(r)
             pal_dict["icon_path"] = transform_icon_path(pal_dict.get("icon_path"))
@@ -2826,27 +2868,15 @@ class SQLiteEngine:
             if use_palworld_db:
                 pal_id = pal_dict.get("internal_name") or pal_dict.get("id")
                 pal_key = str(pal_dict.get("internal_name") or pal_dict.get("id") or "").lower().strip()
-                # Attach skills from palworld_master
+                # Attach skills from preloaded map
                 try:
-                    s_rows = self.conn.execute(
-                        """
-                        SELECT s.id, s.name, s.element, s.type, s.category, s.power, s.cooldown,
-                               s.min_range, s.max_range, s.stat_modifier, s.unlock_item,
-                               s.description, s.icon_path, ps.level_learned, ps.is_guaranteed
-                        FROM palworld_master.pal_skills ps
-                        JOIN palworld_master.skills s ON ps.skill_id = s.id
-                        WHERE LOWER(ps.pal_id) = LOWER(?) OR ps.pal_id = ?
-                        ORDER BY ps.level_learned ASC, s.name ASC
-                    """,
-                        (pal_id, pal_id),
-                    ).fetchall()
+                    s_rows = pal_skills_map.get(pal_key, []) or pal_skills_map.get(str(pal_id).lower(), [])
                     pal_skills_list = []
-                    for sr in s_rows:
-                        s_dict = dict(sr)
+                    for s_dict in s_rows:
                         s_name = s_dict.get("name")
                         s_type = s_dict.get("type")
                         s_cat = s_dict.get("category")
-                        s_desc = clean_skill_text(s_dict.get("description"))
+                        s_desc = clean_skill_text(s_dict.get("description"), pal_dict.get("display_name") or "Pal")
                         s_item = s_dict.get("unlock_item")
 
                         pal_skills_list.append({
@@ -2869,19 +2899,30 @@ class SQLiteEngine:
 
                     pal_dict["skills"] = pal_skills_list
                     partner_skills = [sk for sk in pal_dict["skills"] if (sk.get("type") == "Partner" or sk.get("category") == "Partner")]
-                    pal_dict["partner_skill"] = partner_skills[0] if partner_skills else None
+                    if partner_skills:
+                        from palengine.analytics.partner_skill_scaling import get_scaled_partner_skill
+                        ps_raw = partner_skills[0]
+                        scaled_ps = get_scaled_partner_skill(
+                            species_id_or_name=pal_dict.get("internal_name") or pal_dict.get("id") or pal_dict.get("display_name"),
+                            stars=0,
+                            base_description=ps_raw.get("description"),
+                            skill_name=ps_raw.get("name"),
+                            unlock_item=ps_raw.get("unlock_item"),
+                        )
+                        pal_dict["partner_skill"] = {
+                            **ps_raw,
+                            **scaled_ps,
+                        }
+                    else:
+                        pal_dict["partner_skill"] = None
                 except Exception as e:
                     pal_dict["skills"] = []
                     pal_dict["partner_skill"] = None
 
-                # Attach work suitabilities from palworld_master or main.pal_work_suitabilities
+                # Attach work suitabilities from preloaded map or fallback
                 try:
-                    try:
-                        ws_rows = self.conn.execute(
-                            "SELECT work_type, level FROM palworld_master.work_suitability WHERE pal_id = ? ORDER BY level DESC",
-                            (pal_id,),
-                        ).fetchall()
-                    except Exception:
+                    ws_rows = pal_ws_map.get(pal_key, []) or pal_ws_map.get(str(pal_id).lower(), [])
+                    if not ws_rows:
                         ws_rows = self.conn.execute(
                             "SELECT suitability_name as work_type, level FROM pal_work_suitabilities WHERE pal_internal_name = ? ORDER BY level DESC",
                             (pal_id,),
@@ -3645,6 +3686,31 @@ class SQLiteEngine:
             inst_ws = pal_ws_map.get(clean_sp, {}) or pal_ws_map.get(sp, {}) or pal_ws_map.get(pal_key, {})
             d["suitabilities"] = inst_ws
             d["work_suitabilities"] = inst_ws
+
+            # Attach rank-scaled partner skill
+            ps_meta = skills_map.get(f"partnerskill_{pal_key}") or skills_map.get(f"partnerskill_{clean_sp}")
+            if not ps_meta and use_palworld_db:
+                for sk_k, sk_v in skills_map.items():
+                    if sk_v.get("type") == "Partner" and (str(sk_v.get("pal_internal_name", "")).lower() in (pal_key, clean_sp, sp)):
+                        ps_meta = sk_v
+                        break
+
+            from palengine.analytics.partner_skill_scaling import get_scaled_partner_skill
+            pal_rank = int(d.get("rank") or 0)
+            scaled_ps = get_scaled_partner_skill(
+                species_id_or_name=p_meta.get("internal_name") or d.get("species") or d.get("display_name"),
+                stars=pal_rank,
+                base_description=ps_meta.get("description") if ps_meta else None,
+                skill_name=ps_meta.get("name") if ps_meta else None,
+                unlock_item=ps_meta.get("unlock_item") if ps_meta else None,
+            )
+            if ps_meta or scaled_ps.get("description"):
+                d["partner_skill"] = {
+                    **(ps_meta or {}),
+                    **scaled_ps,
+                }
+            else:
+                d["partner_skill"] = None
             
             results.append(d)
 

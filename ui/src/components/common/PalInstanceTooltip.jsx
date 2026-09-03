@@ -150,11 +150,21 @@ export function PalInstanceTooltip({ instance, children }) {
           )}
 
           {instance.partner_skill && (
-            <div className="pal-tooltip-row">
+            <div className="pal-tooltip-row" style={{ alignItems: 'flex-start' }}>
               <span className="pal-tooltip-label">🤝 Partner:</span>
-              <span style={{ color: 'var(--accent-gold)', fontWeight: 600, fontSize: '0.78rem' }}>
-                {instance.partner_skill.name || instance.partner_skill}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                <span style={{ color: 'var(--accent-gold)', fontWeight: 700, fontSize: '0.78rem' }}>
+                  {instance.partner_skill.name || instance.partner_skill}
+                  <span style={{ marginLeft: '0.35rem', color: '#fef08a', fontSize: '0.72rem', background: 'rgba(234,179,8,0.2)', padding: '0.05rem 0.3rem', borderRadius: '4px' }}>
+                    Lv. {(instance.partner_skill.level || (instance.rank || 0) + 1)}
+                  </span>
+                </span>
+                {instance.partner_skill.description && (
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', lineHeight: 1.2 }}>
+                    {instance.partner_skill.description}
+                  </span>
+                )}
+              </div>
             </div>
           )}
 

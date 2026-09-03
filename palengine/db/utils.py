@@ -30,14 +30,12 @@ def transform_icon_path(path: Optional[str]) -> Optional[str]:
     return f"/assets/pals/{base_name}.png"
 
 def clean_skill_text(text: Optional[str]) -> Optional[str]:
-    """Clean rich text formatting tags (e.g. <Yellow>, <Color>, </>) from skill descriptions."""
+    """Clean rich text formatting tags and resolve elements properly from skill descriptions."""
     if not text:
         return None
-    # Remove XML/HTML style formatting tags
-    cleaned = re.sub(r'<[^>]+>', '', text)
-    # Remove Unreal Engine escape sequences
-    cleaned = cleaned.replace(r'\r\n', ' ').replace(r'\n', ' ').strip()
-    return cleaned
+    from palengine.analytics.partner_skill_scaling import sanitize_markup_elements
+    cleaned = sanitize_markup_elements(text)
+    return cleaned if cleaned else None
 
 def calculate_aptitude(name: str, p_id: str, category: Optional[str]) -> dict[str, Any]:
     """Calculate passive aptitude tier and visual badge colors."""

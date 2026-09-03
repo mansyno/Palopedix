@@ -93,10 +93,10 @@ export function CondenserView({ pals = [], setSelectedPal }) {
               isInstance: true,
               display_name: c.species || masterPal?.display_name,
               paldex_number: masterPal?.paldex_number || c.paldex_number,
-              partner_skill: masterPal?.partner_skill,
-              partner_skill_categories: masterPal?.partner_skill_categories || [],
+              partner_skill: candPal.partner_skill || masterPal?.partner_skill,
+              partner_skill_categories: (candPal.partner_skill_categories && candPal.partner_skill_categories.length > 0) ? candPal.partner_skill_categories : (masterPal?.partner_skill_categories || []),
               passives: c.passives || candPal.passives || [],
-              equip_waza: masterPal?.equip_waza || [],
+              equip_waza: candPal.equip_waza || masterPal?.equip_waza || [],
             });
           };
 

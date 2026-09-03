@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { CustomSelect } from './CustomSelect';
 
 export const OFFICIAL_ELEMENTS = [
   { name: 'Neutral', label: 'Neutral', emoji: '⚪', color: '#cbd5e1', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)' },
@@ -166,6 +167,22 @@ export function PalFilterModal({
     return [slot1, slot2, slot3, slot4].filter(s => s && s.trim() !== '');
   }, [slot1, slot2, slot3, slot4]);
 
+  // Format species options for CustomSelect
+  const formattedSpeciesOptions = useMemo(() => {
+    return [
+      { value: '', label: 'All Species' },
+      ...speciesOptions.map(s => ({ value: s.name, label: s.name })),
+    ];
+  }, [speciesOptions]);
+
+  // Format passive options for CustomSelect
+  const formattedPassiveOptions = useMemo(() => {
+    return [
+      { value: '', label: '-- None --' },
+      ...allPassives.map(p => ({ value: p.name || p.id, label: p.name || p.id })),
+    ];
+  }, [allPassives]);
+
   // Element Selection Handlers
   const handleToggleElement = (elementName) => {
     const exists = selectedElements.includes(elementName);
@@ -262,17 +279,13 @@ export function PalFilterModal({
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: partnerGroup ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
                   🤝 Partner Group
                 </label>
-                <select
+                <CustomSelect
                   value={partnerGroup}
-                  onChange={e => setPartnerGroup(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: partnerGroup ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  {PARTNER_GROUP_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setPartnerGroup}
+                  options={PARTNER_GROUP_OPTIONS}
+                  placeholder="All Partner Groups"
+                  accentColor="var(--accent-gold)"
+                />
               </div>
 
               {/* Location */}
@@ -280,36 +293,28 @@ export function PalFilterModal({
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: location ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
                   📍 Location
                 </label>
-                <select
+                <CustomSelect
                   value={location}
-                  onChange={e => setLocation(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: location ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  {LOCATION_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setLocation}
+                  options={LOCATION_OPTIONS}
+                  placeholder="All Locations"
+                  accentColor="var(--accent-gold)"
+                />
               </div>
 
-              {/* Species */}
+              {/* Species (Searchable) */}
               <div>
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: species ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
                   🐾 Species
                 </label>
-                <select
+                <CustomSelect
                   value={species}
-                  onChange={e => setSpecies(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: species ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  <option value="">All Species</option>
-                  {speciesOptions.map(s => (
-                    <option key={s.name} value={s.name}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSpecies}
+                  options={formattedSpeciesOptions}
+                  placeholder="All Species"
+                  searchable={true}
+                  accentColor="var(--accent-gold)"
+                />
               </div>
 
               {/* Gender */}
@@ -317,17 +322,13 @@ export function PalFilterModal({
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: gender ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
                   ⚧ Gender
                 </label>
-                <select
+                <CustomSelect
                   value={gender}
-                  onChange={e => setGender(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: gender ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  {GENDER_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setGender}
+                  options={GENDER_OPTIONS}
+                  placeholder="All Genders"
+                  accentColor="var(--accent-gold)"
+                />
               </div>
 
               {/* Min Level */}
@@ -342,7 +343,17 @@ export function PalFilterModal({
                   placeholder="Min Lv"
                   value={minLevel}
                   onChange={e => setMinLevel(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: minLevel ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                  style={{
+                    width: '100%',
+                    fontSize: '0.78rem',
+                    padding: '0.32rem 0.5rem',
+                    background: 'rgba(15, 23, 42, 0.95)',
+                    border: minLevel ? '1px solid #818cf8' : '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    color: 'var(--text-primary)',
+                    minHeight: '30px',
+                    boxSizing: 'border-box'
+                  }}
                 />
               </div>
 
@@ -351,23 +362,19 @@ export function PalFilterModal({
                 <label style={{ display: 'block', marginBottom: '0.2rem', color: rarity ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
                   👑 Rarity Tier
                 </label>
-                <select
+                <CustomSelect
                   value={rarity}
-                  onChange={e => setRarity(e.target.value)}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: rarity ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  {RARITY_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setRarity}
+                  options={RARITY_OPTIONS}
+                  placeholder="All Rarities"
+                  accentColor="var(--accent-gold)"
+                />
               </div>
             </div>
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 2: PASSIVE SKILLS (4 COMPACT DROPDOWNS IN ONE ROW) */}
+          {/* SECTION 2: PASSIVE SKILLS (4 COMPACT DROPDOWNS IN ONE ROW - SEARCHABLE) */}
           {/* ========================================================================= */}
           <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -387,7 +394,7 @@ export function PalFilterModal({
               )}
             </div>
 
-            {/* 4 Dropdown Selectors in a Single Horizontal Row */}
+            {/* 4 Searchable Custom Selectors in a Single Horizontal Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
               
               {/* Dropdown 1 */}
@@ -395,19 +402,15 @@ export function PalFilterModal({
                 <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot1 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
                   Skill 1
                 </label>
-                <select
+                <CustomSelect
                   value={slot1}
-                  onChange={e => setSlot1(e.target.value)}
+                  onChange={setSlot1}
+                  options={formattedPassiveOptions}
+                  placeholder="-- None --"
+                  searchable={true}
                   disabled={loadingPassives}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: slot1 ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  <option value="">-- None --</option>
-                  {allPassives.map(p => (
-                    <option key={p.name || p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  accentColor="#818cf8"
+                />
               </div>
 
               {/* Dropdown 2 */}
@@ -415,19 +418,15 @@ export function PalFilterModal({
                 <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot2 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
                   Skill 2
                 </label>
-                <select
+                <CustomSelect
                   value={slot2}
-                  onChange={e => setSlot2(e.target.value)}
+                  onChange={setSlot2}
+                  options={formattedPassiveOptions}
+                  placeholder="-- None --"
+                  searchable={true}
                   disabled={loadingPassives}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: slot2 ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  <option value="">-- None --</option>
-                  {allPassives.map(p => (
-                    <option key={p.name || p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  accentColor="#818cf8"
+                />
               </div>
 
               {/* Dropdown 3 */}
@@ -435,19 +434,15 @@ export function PalFilterModal({
                 <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot3 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
                   Skill 3
                 </label>
-                <select
+                <CustomSelect
                   value={slot3}
-                  onChange={e => setSlot3(e.target.value)}
+                  onChange={setSlot3}
+                  options={formattedPassiveOptions}
+                  placeholder="-- None --"
+                  searchable={true}
                   disabled={loadingPassives}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: slot3 ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  <option value="">-- None --</option>
-                  {allPassives.map(p => (
-                    <option key={p.name || p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  accentColor="#818cf8"
+                />
               </div>
 
               {/* Dropdown 4 */}
@@ -455,19 +450,15 @@ export function PalFilterModal({
                 <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot4 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
                   Skill 4
                 </label>
-                <select
+                <CustomSelect
                   value={slot4}
-                  onChange={e => setSlot4(e.target.value)}
+                  onChange={setSlot4}
+                  options={formattedPassiveOptions}
+                  placeholder="-- None --"
+                  searchable={true}
                   disabled={loadingPassives}
-                  style={{ width: '100%', fontSize: '0.78rem', padding: '0.3rem 0.4rem', background: 'rgba(15, 23, 42, 0.9)', border: slot4 ? '1px solid #818cf8' : '1px solid var(--border-color)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                >
-                  <option value="">-- None --</option>
-                  {allPassives.map(p => (
-                    <option key={p.name || p.id} value={p.name}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  accentColor="#818cf8"
+                />
               </div>
 
             </div>

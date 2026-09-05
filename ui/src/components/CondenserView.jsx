@@ -2,24 +2,48 @@ import React, { useState, useEffect } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
 
-export function CondenserView({ pals = [], setSelectedPal }) {
+export function CondenserView({ pals = [], setSelectedPal, worldId, saveLoaded }) {
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [filterSpecies, setFilterSpecies] = useState('');
 
-  useEffect(() => {
+  const fetchCandidates = () => {
     setLoading(true);
+    setError(null);
     fetch('/api/save/condense')
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) {
+          let msg = `Server returned status ${res.status}`;
+          try {
+            const errData = await res.json();
+            if (errData?.detail) msg = errData.detail;
+            else if (errData?.error) msg = errData.error;
+          } catch {
+            // ignore
+          }
+          throw new Error(msg);
+        }
+        return res.json();
+      })
       .then(data => {
-        if (Array.isArray(data)) setCandidates(data);
+        if (Array.isArray(data)) {
+          setCandidates(data);
+        } else {
+          setCandidates([]);
+        }
         setLoading(false);
       })
       .catch(err => {
         console.error('Error fetching condenser candidates:', err);
+        setError(err.message || 'Failed to fetch condenser recommendations.');
         setLoading(false);
       });
-  }, []);
+  };
+
+  useEffect(() => {
+    fetchCandidates();
+  }, [worldId, saveLoaded]);
 
   const filteredCandidates = candidates.filter(c => {
     if (filterSpecies && !(c.species || '').toLowerCase().includes(filterSpecies.toLowerCase())) return false;
@@ -34,10 +58,34 @@ export function CondenserView({ pals = [], setSelectedPal }) {
     );
   }
 
+  if (error) {
+    return (
+      <div style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ color: 'var(--accent-red, #ef4444)', fontSize: '1rem', fontWeight: 600 }}>
+          ⚠️ {error}
+        </div>
+        <button
+          onClick={fetchCandidates}
+          className="primary-btn"
+          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+        >
+          🔄 Try Again
+        </button>
+      </div>
+    );
+  }
+
   if (!candidates || candidates.length === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '3rem' }}>
+      <div style={{ textAlign: 'center', padding: '3rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
         <p style={{ color: 'var(--text-secondary)' }}>No save file loaded or no duplicate Pals found.</p>
+        <button
+          onClick={fetchCandidates}
+          className="secondary-btn"
+          style={{ padding: '0.4rem 1rem', fontSize: '0.85rem', cursor: 'pointer' }}
+        >
+          🔄 Check Again
+        </button>
       </div>
     );
   }
@@ -53,7 +101,27 @@ export function CondenserView({ pals = [], setSelectedPal }) {
               Based on duplicates, passives, and IVs. Max rank calculates exact fodder threshold (4, 16, 32, or 64 sacrifices).
             </p>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={fetchCandidates}
+              disabled={loading}
+              style={{
+                padding: '0.35rem 0.75rem',
+                borderRadius: '6px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: 'var(--text-primary)',
+                border: '1px solid var(--border-color)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Refresh condenser data from backend"
+            >
+              🔄 Refresh
+            </button>
             <input
               type="text"
               placeholder="Filter species..."

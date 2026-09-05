@@ -595,8 +595,8 @@ def execute_migration(req: MigrationExecuteRequest) -> dict[str, Any]:
                     raise HTTPException(
                         status_code=409,
                         detail=(
-                            "Palworld is currently running. Please save and exit the game to the title screen "
-                            "before transferring items to prevent file corruption or overwrite conflicts."
+                            "Palworld is currently running. Please save and exit the game completely "
+                            "before transferring items to prevent file locks, corruption, or overwrite conflicts."
                         ),
                     )
             except (psutil.NoSuchProcess, psutil.AccessDenied):

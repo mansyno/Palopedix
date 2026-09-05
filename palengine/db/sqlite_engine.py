@@ -562,7 +562,9 @@ class SQLiteEngine:
             db_file = os.path.join(self.data_dir, "userdata.db")
 
         os.makedirs(os.path.dirname(db_file), exist_ok=True)
-        self.conn = sqlite3.connect(db_file, check_same_thread=False, timeout=30.0)
+        self.conn = sqlite3.connect(
+            db_file, check_same_thread=False, timeout=30.0, cached_statements=0
+        )
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
         self.conn.execute("PRAGMA busy_timeout=30000")
@@ -1040,12 +1042,23 @@ class SQLiteEngine:
                 )
             """
             )
-            cursor.execute(
+            try:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO sub_missions
+                    SELECT * FROM palworld_master.sub_missions
                 """
-                INSERT OR IGNORE INTO sub_missions
-                SELECT * FROM palworld_master.sub_missions
-            """
-            )
+                )
+            except Exception:
+                try:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO sub_missions (id, category, title, npc_name, objective)
+                        SELECT id, category, title, npc_name, objective FROM palworld_master.sub_missions
+                    """
+                    )
+                except Exception:
+                    pass
 
             cursor.execute(
                 """
@@ -1056,12 +1069,15 @@ class SQLiteEngine:
                 )
             """
             )
-            cursor.execute(
+            try:
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO sub_mission_rewards
+                    SELECT * FROM palworld_master.sub_mission_rewards
                 """
-                INSERT OR IGNORE INTO sub_mission_rewards
-                SELECT * FROM palworld_master.sub_mission_rewards
-            """
-            )
+                )
+            except Exception:
+                pass
         else:
             # Legacy In-Memory SQLite Tables
             cursor.execute(
@@ -1569,7 +1585,9 @@ class SQLiteEngine:
         db_path = world["db_path"]
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = sqlite3.connect(
+            db_path, check_same_thread=False, timeout=30.0, cached_statements=0
+        )
         self.conn.row_factory = sqlite3.Row
         self._create_tables()
         self._load_static_metadata()

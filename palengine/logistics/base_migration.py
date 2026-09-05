@@ -28,14 +28,14 @@ from palworld_save_tools.paltypes import PALWORLD_TYPE_HINTS
 # ── Container Types & Metadata ────────────────────────────────────────────────
 CONTAINER_TYPE_INFO: dict[str, dict[str, Any]] = {
     "ItemChest_01": {"name": "Wooden Chest", "slots": 16, "category": "General"},
-    "ItemChest_02": {"name": "Metal Chest", "slots": 32, "category": "General"},
+    "ItemChest_02": {"name": "Metal Chest", "slots": 24, "category": "General"},
     "ItemChest_03": {"name": "Refined Metal Chest", "slots": 40, "category": "General"},
-    "ItemChest_04": {"name": "Large Container", "slots": 60, "category": "General"},
-    "ShippingContainer": {"name": "Shipping Container", "slots": 60, "category": "General"},
+    "ItemChest_04": {"name": "Large Container", "slots": 40, "category": "General"},
+    "ShippingContainer": {"name": "Shipping Container", "slots": 40, "category": "General"},
     "CoolerBox": {"name": "Cooler Box", "slots": 10, "category": "Food"},
-    "CoolerPalFoodBox": {"name": "Cooler Food Box", "slots": 6, "category": "Food"},
+    "CoolerPalFoodBox": {"name": "Cooler Food Box", "slots": 30, "category": "Food"},
     "PalFoodBox": {"name": "Feed Box", "slots": 6, "category": "Food"},
-    "PalMedicineBox": {"name": "Medicine Box", "slots": 10, "category": "Medicine"},
+    "PalMedicineBox": {"name": "Medicine Box", "slots": 6, "category": "Medicine"},
     "GuildChest": {"name": "Guild Chest", "slots": 32, "category": "General"},
     # Furniture Storage (Wardrobes, Cabinets, Cupboards, Shelves)
     "Shelf02_Stone": {"name": "Antique Wardrobe", "slots": 20, "category": "Furniture"},
@@ -65,6 +65,25 @@ CONTAINER_TYPE_INFO: dict[str, dict[str, Any]] = {
 DEFAULT_CONTAINER_SLOTS = 32
 
 
+def get_effective_migration_target_type(source_map_object_id: str) -> str:
+    """Maps furniture and wardrobe storage to standard Metal Chest (ItemChest_02).
+
+    All other functional containers preserve their exact type (e.g. CoolerBox, FeedBox).
+    """
+    info = CONTAINER_TYPE_INFO.get(source_map_object_id, {})
+    if (
+        info.get("category") == "Furniture"
+        or "Shelf" in source_map_object_id
+        or "Wardrobe" in info.get("name", "")
+        or "Cabinet" in info.get("name", "")
+        or "Locker" in info.get("name", "")
+        or "Closet" in info.get("name", "")
+    ):
+        return "ItemChest_02"
+    return source_map_object_id
+
+
+
 # ── The 10 Core Item Categories ───────────────────────────────────────────────
 MAIN_CATEGORIES: list[dict[str, str]] = [
     {
@@ -82,31 +101,37 @@ MAIN_CATEGORIES: list[dict[str, str]] = [
     {
         "id": "monster_drops",
         "name": "Monster Drops & Biologicals",
-        "label": "Monster Drops",
+        "label": "Drops",
         "default_container": "ItemChest_02",
     },
     {
         "id": "weapon_schematics",
         "name": "Weapon Schematics & Blueprints (Dedicated)",
-        "label": "Weapon Schematics",
+        "label": "Wpn Schem",
         "default_container": "ItemChest_02",
     },
     {
         "id": "armor_schematics",
         "name": "Armor Schematics & Blueprints (Dedicated)",
-        "label": "Armor Schematics",
+        "label": "Arm Schem",
         "default_container": "ItemChest_02",
     },
     {
         "id": "defence_attack_schematics",
         "name": "Defence & Attack Schematics & Blueprints (Dedicated)",
-        "label": "Defence Schematics",
+        "label": "Def Schem",
         "default_container": "ItemChest_02",
     },
     {
-        "id": "books_growth_tech",
-        "name": "Books, Manuals & Growth Tech (Dedicated)",
-        "label": "Books & Tech",
+        "id": "books_manuals",
+        "name": "Books & Manuals (Work & Training)",
+        "label": "Manuals",
+        "default_container": "ItemChest_02",
+    },
+    {
+        "id": "growth_elixirs",
+        "name": "Pal Souls, Lotuses & Growth",
+        "label": "Pal Growth",
         "default_container": "ItemChest_02",
     },
     {
@@ -164,7 +189,7 @@ def get_item_metadata_cache() -> dict[str, dict[str, Any]]:
 
 # ── Item Classifier (10 Main Categories) ──────────────────────────────────────
 def classify_item(item_id: str) -> str:
-    """Classifies any Palworld item static ID into exactly one of the 10 main categories."""
+    """Classifies any Palworld item static ID into exactly one of the 11 main categories."""
     if not item_id:
         return "structural_construction"
 
@@ -191,10 +216,11 @@ def classify_item(item_id: str) -> str:
             return "defence_attack_schematics"
         return "weapon_schematics"
 
-    # 2. Food, Ingredients & Crops (Perishables)
+    # 2. Food, Ingredients, Crops & Seeds
     if (
         cat == "Food"
         or subcat.startswith("Food")
+        or i_lower.endswith("seeds")
         or any(
             i_lower.startswith(prefix)
             for prefix in [
@@ -206,134 +232,125 @@ def classify_item(item_id: str) -> str:
     ):
         return "food_ingredients"
 
-    # 3. Books, Manuals & Growth Tech
+    # 3. Skill Fruits (Active Pal Skill Machines)
     if (
-        subcat
-        in {
+        subcat in {"ConsumeWazaMachine"}
+        or i_lower.startswith("skillcard_")
+        or "wazamachine" in i_lower
+    ):
+        return "skill_fruits_tactical"
+
+    # 4. Books & Manuals (Work Suitability Handbooks, Training Manuals, Technical Manuals)
+    if (
+        subcat in {
             "ConsumeTechnologyBook",
             "ConsumeAncientTechnologyBook",
+            "ConsumePalWorkSuitabilityUp",
             "ConsumePalGainExp",
-            "ConsumeGainStatusPoints",
-            "ConsumePalRankUp",
-            "ConsumePalLevelUp",
-            "ConsumePalAwakening",
         }
         or any(
             k in i_lower
             for k in [
+                "worksuitability_addticket",
+                "expboost",
                 "technologybook",
                 "ancienttechnologybook",
-                "palupgradestone",
+            ]
+        )
+    ):
+        return "books_manuals"
+
+    # 5. Pal Souls, Lotuses & Growth Enhancers (Physical stat boosters & remedies)
+    if (
+        subcat in {
+            "ConsumeGainStatusPoints",
+            "ConsumePalRankUp",
+            "ConsumePalLevelUp",
+            "ConsumePalAwakening",
+            "ConsumePalTalentUp",
+            "ConsumePalGainFriendshipPoint",
+            "ConsumePassiveSkillChange",
+            "ConsumePalRevive",
+            "ConsumeWorldTreeHolyWater",
+            "Drug",
+            "Medicine",
+        }
+        or i_lower.startswith("lotus_")
+        or i_lower.startswith("palupgradestone")
+        or i_lower.startswith("fruit_")
+        or i_lower.startswith("affectionfruit_")
+        or i_lower.startswith("rankup_")
+        or i_lower.startswith("elixir_")
+        or any(
+            k in i_lower
+            for k in [
                 "palsoul",
                 "statuspoint",
-                "elixir",
                 "memorywiping",
-            ]
-        )
-    ):
-        return "books_growth_tech"
-
-    # 4. Skill Fruits & Tactical Consumables
-    if (
-        subcat in {"ConsumeWazaMachine", "Drug", "Medicine"}
-        or i_lower.startswith("skillcard_")
-        or any(
-            k in i_lower
-            for k in [
-                "medicine",
-                "potion",
-                "wazamachine",
-                "drug",
                 "mindcleansing",
-                "herbs",
+                "disposable_implant",
+                "passive_implant",
             ]
         )
     ):
-        return "skill_fruits_tactical"
+        return "growth_elixirs"
 
-    # 5. Mining & Metallurgy
+    # 6. Mining & Metallurgy (Raw ores, ingots, processed minerals)
     if (
         subcat in {"MaterialOre", "MaterialIngot"}
-        or any(
-            k in i_lower
-            for k in [
-                "ore",
-                "ingot",
-                "coal",
-                "sulfur",
-                "quartz",
-                "plasteel",
-                "plastic",
-                "palbrite",
-            ]
-        )
+        or i_lower in {
+            "coal", "sulfur", "quartz", "plasteel", "plastic", "palbrite",
+            "chromium", "ore", "copperore", "ironore", "ancient_lava", "lava_ancient"
+        }
     ):
         return "mining_metallurgy"
 
-    # 6. Structural & Construction
+    # 7. Combat, Ammo, Spheres, Keys & Raid Slabs
     if (
-        subcat in {"MaterialWood", "MaterialStone", "MaterialProccessing"}
-        or any(
-            k in i_lower
-            for k in [
-                "wood",
-                "stone",
-                "fiber",
-                "charcoal",
-                "cement",
-                "clay",
-                "pal_crystal",
-                "polymer",
-                "circuit",
-                "gunpowder",
-                "carbonfiber",
-                "silicon",
-            ]
-        )
+        cat in {"Ammo", "Weapon", "SpecialWeapon", "Armor", "Accessory", "Glider", "CaptureItemModifier"}
+        or subcat in {"ConsumeBullet", "SPWeaponCaptureBall", "ConsumeTreasureMap"}
+        or i_lower.startswith("palsphere")
+        or i_lower.endswith("bullet")
+        or i_lower.endswith("arrow")
+        or i_lower.startswith("treasureboxkey")
+        or i_lower.startswith("palsummon_")
+        or i_lower in {"money", "goldcoin", "reinforcedarrow", "homeward", "battleticket"}
+        or i_lower.startswith("bountyproof")
     ):
-        return "structural_construction"
+        return "spheres_ammo_weapons"
 
-    # 7. Monster Drops & Biologicals
+    # 8. Monster Drops & Biologicals (Textiles, organs, parts, gems)
     if (
         subcat in {"MaterialMonster", "MaterialJewelry", "MaterialPalEgg"}
+        or i_lower.startswith("paloil")
+        or i_lower.startswith("palitem_")
         or any(
             k in i_lower
             for k in [
-                "organ",
-                "bone",
-                "horn",
-                "leather",
-                "wool",
-                "cloth",
-                "fang",
-                "claw",
-                "feather",
-                "pelt",
-                "gem",
-                "diamond",
-                "ruby",
-                "sapphire",
-                "ancientparts",
-                "ancientcore",
-                "venom",
+                "cloth", "leather", "wool", "organ", "bone", "horn", "fang",
+                "claw", "feather", "pelt", "gem", "diamond", "ruby", "sapphire",
+                "ancientparts", "ancientcore", "venom", "predatorcrystal"
             ]
         )
     ):
         return "monster_drops"
 
-    # 8. Spheres, Ammo & Weaponry (Combat equipment & ammo)
+    # 9. Structural & Construction (Basic Building materials only)
     if (
-        cat in {"Ammo", "Weapon", "SpecialWeapon", "Armor", "Accessory", "Glider"}
-        or subcat in {"ConsumeBullet", "SPWeaponCaptureBall"}
-        or i_lower.startswith("palsphere")
-        or i_lower.endswith("bullet")
-        or i_lower.endswith("arrow")
-        or i_lower in {"money", "goldcoin", "reinforcedarrow"}
+        subcat in {"MaterialWood", "MaterialStone", "MaterialProccessing"}
+        or any(
+            k in i_lower
+            for k in [
+                "wood", "stone", "fiber", "charcoal", "cement", "clay",
+                "pal_crystal", "polymer", "circuit", "gunpowder", "carbonfiber",
+                "silicon", "machineparts", "processed_wood"
+            ]
+        )
     ):
-        return "spheres_ammo_weapons"
+        return "structural_construction"
 
-    # Fallback to Structural
-    return "structural_construction"
+    # Fallback to general monster drops / materials if still uncaught
+    return "monster_drops"
 
 
 def get_item_max_stack(item_id: str) -> int:
@@ -522,7 +539,7 @@ def inspect_base_containers(
             continue
 
         c_info = container_items_map.get(
-            target_cid, {"slot_num": CONTAINER_TYPE_INFO.get(oid, {}).get("slots", 32), "items": []}
+            target_cid, {"slot_num": CONTAINER_TYPE_INFO.get(oid, {}).get("slots", 24), "items": []}
         )
 
         obj_record = {
@@ -576,14 +593,15 @@ def generate_construction_manifest(
 
     for sc in filtered_source:
         sc_type = sc["map_object_id"]
+        eff_type = get_effective_migration_target_type(sc_type)
         for item in sc["items"]:
             item_id = item["item_id"]
             cnt = item["count"]
             cat_id = classify_item(item_id)
-            if sc_type not in category_type_items[cat_id]:
-                category_type_items[cat_id][sc_type] = {}
-            category_type_items[cat_id][sc_type][item_id] = (
-                category_type_items[cat_id][sc_type].get(item_id, 0) + cnt
+            if eff_type not in category_type_items[cat_id]:
+                category_type_items[cat_id][eff_type] = {}
+            category_type_items[cat_id][eff_type][item_id] = (
+                category_type_items[cat_id][eff_type].get(item_id, 0) + cnt
             )
             total_source_items += cnt
 
@@ -614,7 +632,7 @@ def generate_construction_manifest(
         # Process each container type group separately to guarantee 1:1 type preservation
         for sc_type, items_dict in sorted(type_groups.items(), key=lambda x: x[0]):
             rec_name = CONTAINER_TYPE_INFO.get(sc_type, {}).get("name", sc_type)
-            container_cap = CONTAINER_TYPE_INFO.get(sc_type, {}).get("slots", 32)
+            container_cap = CONTAINER_TYPE_INFO.get(sc_type, {}).get("slots", 24)
 
             slots_needed = 0
             group_item_details = []
@@ -639,8 +657,12 @@ def generate_construction_manifest(
             # Determine type label tag if multiple container types exist in this category
             type_tag = ""
             if multiple_types_in_cat:
-                if "Cooler" in sc_type or "Food" in sc_type:
+                if sc_type == "CoolerPalFoodBox":
+                    type_tag = " CoolFeed"
+                elif sc_type == "CoolerBox":
                     type_tag = " Cooler"
+                elif "Food" in sc_type:
+                    type_tag = " Feed"
                 elif "Wardrobe" in rec_name or "Shelf" in sc_type:
                     type_tag = " Wardrobe"
                 elif "Locker" in rec_name:
@@ -648,26 +670,39 @@ def generate_construction_manifest(
                 elif "Cabinet" in rec_name:
                     type_tag = " Cabinet"
                 elif "Medicine" in sc_type:
-                    type_tag = " Medicine"
+                    type_tag = " Med"
                 else:
                     type_tag = f" {rec_name.split()[0]}"
 
             for i in range(1, containers_needed + 1):
-                box_label = f"[{c_label}{type_tag} {i}]"
+                box_label = f"{c_label}{type_tag} {i}"
                 search_name = box_label.lower()
-                plain_search = f"{c_label.lower()}{type_tag.lower()} {i}"
-                fallback_search = f"[{c_label} {i}]".lower() if not multiple_types_in_cat else None
-                single_search = (
-                    f"[{c_label}]".lower()
-                    if (not multiple_types_in_cat and containers_needed == 1)
+                bracket_search = f"[{box_label.lower()}]"
+                single_clean = (
+                    f"{c_label}{type_tag}".lower()
+                    if containers_needed == 1
                     else None
                 )
+                single_bracket = (
+                    f"[{c_label}{type_tag}]".lower()
+                    if containers_needed == 1
+                    else None
+                )
+                fallback_clean = f"{c_label} {i}".lower() if not multiple_types_in_cat else None
+                fallback_bracket = f"[{c_label} {i}]".lower() if not multiple_types_in_cat else None
+
+                alias_clean = search_name.replace("pal growth", "growth")
+                alias_bracket = f"[{alias_clean}]"
 
                 matched_tc = (
                     target_by_name.get(search_name)
-                    or target_by_name.get(plain_search)
-                    or (target_by_name.get(fallback_search) if fallback_search else None)
-                    or (target_by_name.get(single_search) if single_search else None)
+                    or target_by_name.get(bracket_search)
+                    or target_by_name.get(alias_clean)
+                    or target_by_name.get(alias_bracket)
+                    or (target_by_name.get(single_clean) if single_clean else None)
+                    or (target_by_name.get(single_bracket) if single_bracket else None)
+                    or (target_by_name.get(fallback_clean) if fallback_clean else None)
+                    or (target_by_name.get(fallback_bracket) if fallback_bracket else None)
                 )
 
                 # Validate container type match
@@ -772,6 +807,7 @@ def execute_base_migration(
     with open(sav_path, "rb") as f:
         raw = f.read()
 
+    save_type = raw[11] if len(raw) > 11 else 0x31
     magic = raw[8:11]
     if magic == b"PlM":
         import ooz
@@ -813,6 +849,7 @@ def execute_base_migration(
     for sc in source_containers:
         sc_id = sc["container_id"]
         sc_type = sc["map_object_id"]
+        eff_type = get_effective_migration_target_type(sc_type)
         c_struct = container_struct_map.get(sc_id)
         if not c_struct:
             continue
@@ -829,10 +866,24 @@ def execute_base_migration(
                 if 0 < s_len <= 200:
                     i_name = raw_b[12 : 12 + s_len - 1].decode("utf-8", errors="replace")
                     cat_id = classify_item(i_name)
-                    key = (cat_id, sc_type)
+                    key = (cat_id, eff_type)
                     if key not in slots_by_cat_and_type:
                         slots_by_cat_and_type[key] = []
                     slots_by_cat_and_type[key].append(s)
+
+    # Cohesive sorting: sort item slots by item name alphabetically, then count descending
+    for key, slot_list in slots_by_cat_and_type.items():
+        def _slot_sort_key(s_item):
+            raw_b = bytes(s_item.get("RawData", {}).get("value", {}).get("values", []))
+            if len(raw_b) >= 12:
+                s_len = struct.unpack_from("<i", raw_b, 8)[0]
+                count = struct.unpack_from("<i", raw_b, 4)[0]
+                if 0 < s_len <= 200:
+                    i_name = raw_b[12 : 12 + s_len - 1].decode("utf-8", errors="replace")
+                    return (i_name.lower(), -count)
+            return ("", 0)
+
+        slot_list.sort(key=_slot_sort_key)
 
     # Map manifest target containers to assign slots
     items_moved_count = 0
@@ -847,6 +898,10 @@ def execute_base_migration(
             continue
 
         cap = m_entry["container_capacity"]
+        actual_slot_num = target_struct.get("value", {}).get("SlotNum", {}).get("value")
+        if isinstance(actual_slot_num, int) and actual_slot_num > 0:
+            cap = min(cap, actual_slot_num)
+
         key = (cat_id, rec_type)
         cat_slots = slots_by_cat_and_type.get(key, [])
         assign_slots = cat_slots[:cap]
@@ -854,6 +909,8 @@ def execute_base_migration(
 
         new_slot_values = []
         for new_idx, slot_item in enumerate(assign_slots):
+            if new_idx >= cap:
+                break
             raw_b = bytearray(
                 slot_item.get("RawData", {}).get("value", {}).get("values", [])
             )
@@ -876,7 +933,7 @@ def execute_base_migration(
 
     # 3. Compress and write Level.sav
     new_gvas_bytes = gvas.write()
-    new_sav_bytes = compress_gvas_to_sav(new_gvas_bytes, -1)
+    new_sav_bytes = compress_gvas_to_sav(new_gvas_bytes, save_type)
 
     with open(sav_path, "wb") as f:
         f.write(new_sav_bytes)

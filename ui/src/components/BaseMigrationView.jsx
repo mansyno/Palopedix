@@ -12,6 +12,7 @@ export default function BaseMigrationView() {
   const [migrationResult, setMigrationResult] = useState(null);
   const [error, setError] = useState(null);
   const [expandedCategory, setExpandedCategory] = useState(null);
+  const [copiedLabel, setCopiedLabel] = useState(null);
 
   // Fetch available bases and their container breakdown
   const fetchBases = async () => {
@@ -505,11 +506,40 @@ export default function BaseMigrationView() {
                           fontSize: '0.9rem',
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 800, color: 'var(--accent-gold)', fontFamily: 'monospace', fontSize: '1rem' }}>
                             {box.box_label}
                           </span>
-                          <span style={{ color: 'var(--text-secondary)' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(box.box_label);
+                              setCopiedLabel(box.box_label);
+                              setTimeout(() => setCopiedLabel(null), 1500);
+                            }}
+                            style={{
+                              background: copiedLabel === box.box_label ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255,255,255,0.08)',
+                              border: copiedLabel === box.box_label ? '1px solid var(--accent-green)' : '1px solid var(--border-color)',
+                              color: copiedLabel === box.box_label ? 'var(--accent-green)' : 'var(--text-primary)',
+                              borderRadius: '6px',
+                              padding: '0.2rem 0.5rem',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              fontWeight: 600,
+                              transition: 'all 0.15s ease',
+                            }}
+                            title="Copy chest name to clipboard"
+                          >
+                            {copiedLabel === box.box_label ? '✓ Copied' : '📋 Copy'}
+                          </button>
+                          <span style={{ fontSize: '0.72rem', color: box.box_label.length <= 24 ? 'var(--text-secondary)' : '#f87171', background: 'rgba(0,0,0,0.3)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                            {box.box_label.length}/24 chars
+                          </span>
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
                             Type: <strong>{box.recommended_container_name}</strong> ({box.slots_required}/{box.container_capacity} slots)
                           </span>
                         </div>
@@ -575,7 +605,7 @@ export default function BaseMigrationView() {
                     ✅ All Target Containers Detected & Ready!
                   </p>
                   <p>
-                    All required containers are placed and named at Base 2. Please ensure Palworld is <strong>saved and closed to the title screen</strong> before clicking execute to avoid file conflicts.
+                    All required containers are placed and named at Base 2. Please ensure Palworld is <strong>saved and closed completely</strong> before clicking execute to avoid file conflicts.
                   </p>
                 </div>
 

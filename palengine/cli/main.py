@@ -461,8 +461,14 @@ def recommend(
 def condense(ctx: click.Context, save_path: Optional[str]) -> None:
     """Calculates top Pal condensing candidates from the save game."""
     engine: SQLiteEngine = ctx.obj["engine"]
-    resolved_path = get_resolved_save_path(save_path)
-    engine.load_save_data(resolved_path)
+    if save_path:
+        resolved_path = get_resolved_save_path(save_path)
+        engine.load_save_data(resolved_path)
+    elif not engine.query_instances({}):
+        resolved_path = get_resolved_save_path(None)
+        if resolved_path:
+            engine.load_save_data(resolved_path)
+
     candidates = engine.get_condense_candidates()
 
     if ctx.obj["format"] == "json":
@@ -475,16 +481,18 @@ def condense(ctx: click.Context, save_path: Optional[str]) -> None:
 
     display_rows = []
     for c in candidates:
-        keeper = c.get("keeper", {})
-        passives_str = ", ".join(keeper.get("passives", [])) if keeper.get("passives") else "None"
+        passives_list = c.get("passives", [])
+        passives_str = ", ".join(passives_list) if passives_list else "None"
+        stars = c.get("attainable_stars", 0)
         display_rows.append({
             "Species": c.get("species"),
-            "Duplicates": c.get("duplicate_count"),
-            "Target Rank": f"{c.get('target_rank')} Star",
-            "Keeper Lv": keeper.get("level"),
-            "Keeper IVs": f"{keeper.get('iv_hp')}/{keeper.get('iv_melee')}/{keeper.get('iv_defense')}",
-            "Keeper Passives": passives_str,
-            "Fodder Count": len(c.get("fodder_instances", [])),
+            "Total Owned": c.get("total_owned", 0),
+            "Sacrifices": c.get("sacrifices_available", 0),
+            "Target Rank": f"{stars} Star" if stars else "0 Star",
+            "Base Lv": c.get("base_level", 1),
+            "IVs (HP/Atk/Def)": f"{c.get('iv_hp')}/{c.get('iv_attack')}/{c.get('iv_defense')}",
+            "Passives": passives_str,
+            "Location": c.get("best_location", "Palbox"),
         })
     click.echo(tabulate(display_rows, headers="keys", tablefmt="github"))
 

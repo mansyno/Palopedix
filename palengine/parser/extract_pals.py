@@ -179,7 +179,7 @@ _register(".worldSaveData.MapObjectSaveData", _selective_decode_map_object)
 _register(".worldSaveData.BaseCampSaveData.Value.RawData", _tolerant_base_camp_decode)
 _register(".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData", _tolerant_worker_director_decode)
 
-# ── FArchiveReader: support SetProperty (Palworld v0.3+ / v0.4+ Locker & Dimensional Palbox) ──
+# ── FArchiveReader & FArchiveWriter: support SetProperty (Palworld v0.3+ / v0.4+ Locker & Dimensional Palbox) ──
 import palworld_save_tools.archive as _archive_mod
 
 if not getattr(_archive_mod.FArchiveReader.property, "_set_property_patched", False):
@@ -189,10 +189,11 @@ if not getattr(_archive_mod.FArchiveReader.property, "_set_property_patched", Fa
         if type_name == "SetProperty":
             set_type = self.fstring()
             _id = self.optional_guid()
-            self.data.seek(self.data.tell() + size)
+            raw_bytes = self.data.read(size)
             return {
                 "set_type": set_type,
                 "id": _id,
+                "raw_bytes": raw_bytes,
                 "value": [],
                 "type": type_name,
             }
@@ -200,6 +201,21 @@ if not getattr(_archive_mod.FArchiveReader.property, "_set_property_patched", Fa
 
     _tolerant_archive_property._set_property_patched = True  # type: ignore[attr-defined]
     _archive_mod.FArchiveReader.property = _tolerant_archive_property
+
+if not getattr(_archive_mod.FArchiveWriter.property_inner, "_set_property_patched", False):
+    _orig_writer_property_inner = _archive_mod.FArchiveWriter.property_inner
+
+    def _tolerant_writer_property_inner(self, property_type: str, property: dict[str, Any]) -> int:
+        if property_type == "SetProperty":
+            self.fstring(property["set_type"])
+            self.optional_guid(property.get("id", None))
+            raw_b = property.get("raw_bytes", b"")
+            self.write(raw_b)
+            return len(raw_b)
+        return _orig_writer_property_inner(self, property_type, property)
+
+    _tolerant_writer_property_inner._set_property_patched = True  # type: ignore[attr-defined]
+    _archive_mod.FArchiveWriter.property_inner = _tolerant_writer_property_inner
 
 
 # ──────────────────────────────────────────────────────────────────────────────

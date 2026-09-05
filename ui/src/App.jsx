@@ -553,6 +553,8 @@ function App() {
               <CondenserView
                 pals={pals}
                 setSelectedPal={setSelectedPal}
+                worldId={selectedWorldId}
+                saveLoaded={saveLoaded}
               />
             )}
 

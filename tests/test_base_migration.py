@@ -167,4 +167,47 @@ def test_manifest_source_container_type_preservation(monkeypatch):
     assert entry["recommended_container_type"] == "ItemChest_02"
     assert entry["recommended_container_name"] == "Metal Chest"
     assert entry["container_capacity"] == 32
-    assert entry["box_label"] == "[Food 1]"
+    assert entry["box_label"] == "Food 1"
+    assert len(entry["box_label"]) <= 24
+
+
+def test_wardrobe_items_route_to_metal_chest(monkeypatch):
+    """Verify Antique Wardrobe items route to standard Metal Chests (ItemChest_02), not new wardrobes."""
+    from palengine.logistics.base_migration import generate_construction_manifest
+
+    fake_containers = {
+        "base_src": [
+            {
+                "instance_id": "inst-wardrobe",
+                "container_id": "cid-w",
+                "map_object_id": "Shelf02_Stone",  # Antique Wardrobe
+                "custom_name": "old_wardrobe",
+                "slot_count": 20,
+                "items": [
+                    {"item_id": "Blueprint_Handgun_3", "count": 1, "slot_index": 0},
+                    {"item_id": "Blueprint_AssaultRifle_4", "count": 1, "slot_index": 1},
+                ],
+            }
+        ],
+        "base_dst": [],
+    }
+
+    monkeypatch.setattr(
+        "palengine.logistics.base_migration.inspect_base_containers",
+        lambda _: fake_containers,
+    )
+
+    manifest_res = generate_construction_manifest(
+        sav_path="dummy_path.sav",
+        source_base_id="base_src",
+        target_base_id="base_dst",
+    )
+
+    manifest = manifest_res["manifest"]
+    assert len(manifest) == 1
+    entry = manifest[0]
+    assert entry["category_id"] == "weapon_schematics"
+    assert entry["recommended_container_type"] == "ItemChest_02"
+    assert entry["recommended_container_name"] == "Metal Chest"
+    assert entry["box_label"] == "Wpn Schem 1"
+

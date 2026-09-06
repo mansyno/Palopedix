@@ -1,6 +1,18 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CustomSelect } from './CustomSelect';
+import { PassiveBadge, getPassiveMeta } from './PassiveBadge';
 import { getElementIconUrl } from '../../constants/gameData';
+
+export function getSkillTierRank(skill) {
+  if (!skill) return 0;
+  if (typeof skill.tier_rank === 'number') {
+    return skill.tier_rank;
+  }
+  const meta = getPassiveMeta(skill);
+  if (!meta || !meta.category) return 0;
+  const m = meta.category.match(/PassiveTier(-?\d+)/i);
+  return m ? parseInt(m[1], 10) : 0;
+}
 
 export const OFFICIAL_ELEMENTS = [
   { name: 'Neutral', label: 'Neutral', emoji: '⚪', color: '#cbd5e1', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)' },
@@ -94,6 +106,8 @@ export function PalFilterModal({
   speciesOptions = [],
   onApply,
   totalMatchingCount = null,
+  palSourceMode = 'caught',
+  instances = [],
 }) {
   // General Attribute Filters
   const [partnerGroup, setPartnerGroup] = useState(initialFilters.partnerGroup || '');
@@ -114,6 +128,7 @@ export function PalFilterModal({
   const [selectedElements, setSelectedElements] = useState(initialFilters.elements || []);
   const [allPassives, setAllPassives] = useState([]);
   const [loadingPassives, setLoadingPassives] = useState(false);
+  const [passiveSortMode, setPassiveSortMode] = useState('rarity');
 
   // Sync state whenever modal opens
   useEffect(() => {
@@ -179,6 +194,26 @@ export function PalFilterModal({
     return [slot1, slot2, slot3, slot4].filter(s => s && s.trim() !== '');
   }, [slot1, slot2, slot3, slot4]);
 
+  // Unique passive names present across all caught instances (used when in caught mode)
+  const caughtPassiveIdentifiers = useMemo(() => {
+    if (!instances || instances.length === 0) return new Set();
+    const ids = new Set();
+    for (const inst of instances) {
+      if (!inst.passives || !Array.isArray(inst.passives)) continue;
+      for (const p of inst.passives) {
+        if (typeof p === 'string') {
+          const clean = p.trim().toLowerCase();
+          if (clean) ids.add(clean);
+        } else if (p && typeof p === 'object') {
+          if (p.name) ids.add(p.name.trim().toLowerCase());
+          if (p.id) ids.add(p.id.trim().toLowerCase());
+          if (p.id) ids.add(p.id.replace(/^Passive_/i, '').replace(/_/g, ' ').trim().toLowerCase());
+        }
+      }
+    }
+    return ids;
+  }, [instances]);
+
   // Format species options for CustomSelect
   const formattedSpeciesOptions = useMemo(() => {
     return [
@@ -187,13 +222,59 @@ export function PalFilterModal({
     ];
   }, [speciesOptions]);
 
-  // Format passive options for CustomSelect
+  // Format passive options for CustomSelect with dynamic sorting and source-mode filtering
   const formattedPassiveOptions = useMemo(() => {
+    let sourcePassives = allPassives;
+    if (palSourceMode === 'caught' && caughtPassiveIdentifiers.size > 0) {
+      sourcePassives = allPassives.filter(p => {
+        const name = (p.name || '').trim().toLowerCase();
+        const id = (p.id || '').trim().toLowerCase();
+        const cleanId = (p.id || '').replace(/^Passive_/i, '').replace(/_/g, ' ').trim().toLowerCase();
+        return (
+          caughtPassiveIdentifiers.has(name) ||
+          caughtPassiveIdentifiers.has(id) ||
+          caughtPassiveIdentifiers.has(cleanId)
+        );
+      });
+    }
+
+    const sorted = [...sourcePassives];
+    if (passiveSortMode === 'rarity') {
+      sorted.sort((a, b) => {
+        const rankA = getSkillTierRank(a);
+        const rankB = getSkillTierRank(b);
+        if (rankB !== rankA) {
+          return rankB - rankA;
+        }
+        return (a.name || a.id || '').localeCompare(b.name || b.id || '');
+      });
+    } else {
+      sorted.sort((a, b) => (a.name || a.id || '').localeCompare(b.name || b.id || ''));
+    }
+
     return [
-      { value: '', label: '-- None --' },
-      ...allPassives.map(p => ({ value: p.name || p.id, label: p.name || p.id })),
+      { value: '', label: '-- None --', skill: null },
+      ...sorted.map(p => ({
+        value: p.name || p.id,
+        label: p.name || p.id,
+        skill: p,
+      })),
     ];
-  }, [allPassives]);
+  }, [allPassives, passiveSortMode, palSourceMode, caughtPassiveIdentifiers]);
+
+  const renderPassiveOption = (opt) => {
+    if (!opt || (!opt.skill && !opt.value)) {
+      return <span style={{ color: 'var(--text-muted)' }}>-- None --</span>;
+    }
+    return <PassiveBadge skill={opt.skill || opt.value || opt.label} size="sm" />;
+  };
+
+  const renderPassiveSelected = (opt) => {
+    if (!opt || (!opt.skill && !opt.value)) {
+      return <span style={{ color: 'var(--text-muted)' }}>-- None --</span>;
+    }
+    return <PassiveBadge skill={opt.skill || opt.value || opt.label} size="sm" />;
+  };
 
   // Element Selection Handlers
   const handleToggleElement = (elementName) => {
@@ -241,7 +322,15 @@ export function PalFilterModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
+    <div
+      className="modal-overlay"
+      onClick={onClose}
+      style={{
+        zIndex: 1100,
+        alignItems: 'flex-start',
+        padding: '3.5vh 1rem 1rem 1rem',
+      }}
+    >
       <div 
         className="modal-content" 
         onClick={e => e.stopPropagation()} 
@@ -250,28 +339,49 @@ export function PalFilterModal({
           width: '96%',
           display: 'flex', 
           flexDirection: 'column', 
-          padding: '1.4rem 1.6rem',
-          borderRadius: '20px',
+          padding: '0.85rem 1.4rem',
+          borderRadius: '16px',
           background: 'rgba(15, 23, 42, 0.97)',
           boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7)',
           border: '1px solid rgba(99, 102, 241, 0.3)',
-          maxHeight: '90vh',
+          maxHeight: '92vh',
           overflowY: 'auto'
         }}
       >
         <button className="modal-close-btn" onClick={onClose} title="Close (Esc)">✕</button>
 
-        {/* Modal Header */}
-        <div style={{ marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.3rem' }}>⚡</span>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, background: 'linear-gradient(135deg, #fff, #a5b4fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
-              Filter Pals
-            </h2>
+        {/* Modal Header (Condensed to half the previous space) */}
+        <div style={{ marginBottom: '0.45rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <span style={{ fontSize: '1.05rem' }}>⚡</span>
+              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, background: 'linear-gradient(135deg, #fff, #a5b4fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+                Filter Pals
+              </h2>
+            </div>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+              All active filters are cumulative.
+            </span>
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem', marginTop: '0.2rem', marginBottom: 0 }}>
-            Configure any combination of general attributes, pal gear status, passive skills, and elemental types. All active filters are cumulative.
-          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <span
+              style={{
+                fontSize: '0.68rem',
+                fontWeight: 700,
+                padding: '0.15rem 0.5rem',
+                borderRadius: '6px',
+                background: palSourceMode === 'caught' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
+                border: palSourceMode === 'caught' ? '1px solid rgba(52, 211, 153, 0.35)' : '1px solid rgba(99, 102, 241, 0.35)',
+                color: palSourceMode === 'caught' ? '#34d399' : '#818cf8',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+              }}
+            >
+              {palSourceMode === 'caught' ? '💼 Filter Scope: Caught Pals' : '🌐 Filter Scope: All Real In-Game Pals'}
+            </span>
+          </div>
         </div>
 
         {/* Filter Body */}
@@ -405,21 +515,66 @@ export function PalFilterModal({
           {/* SECTION 2: PASSIVE SKILLS (4 COMPACT DROPDOWNS IN ONE ROW - SEARCHABLE) */}
           {/* ========================================================================= */}
           <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
                 <span>🛡️</span> Passive Skills Combination
                 <span style={{ fontSize: '0.72rem', fontWeight: 600, color: activeSelectedPassives.length > 0 ? '#34d399' : 'var(--text-secondary)', marginLeft: '0.2rem' }}>
                   ({activeSelectedPassives.length}/4 Selected)
                 </span>
               </h3>
-              {activeSelectedPassives.length > 0 && (
-                <button 
-                  onClick={() => { setSlot1(''); setSlot2(''); setSlot3(''); setSlot4(''); }} 
-                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
-                >
-                  Clear Skills
-                </button>
-              )}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                {/* Sort Mode Toggle Control */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', background: 'rgba(0,0,0,0.4)', borderRadius: '6px', padding: '2px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPassiveSortMode('rarity')}
+                    title="Sort passives by rarity tier (Tier 5 down to negative tiers)"
+                    style={{
+                      border: 'none',
+                      background: passiveSortMode === 'rarity' ? 'var(--primary-gradient)' : 'transparent',
+                      color: passiveSortMode === 'rarity' ? '#fff' : 'var(--text-secondary)',
+                      padding: '0.2rem 0.5rem',
+                      fontSize: '0.7rem',
+                      fontWeight: passiveSortMode === 'rarity' ? 700 : 500,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: passiveSortMode === 'rarity' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                    }}
+                  >
+                    ⭐ Rarity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPassiveSortMode('name')}
+                    title="Sort passives alphabetically (A to Z)"
+                    style={{
+                      border: 'none',
+                      background: passiveSortMode === 'name' ? 'var(--primary-gradient)' : 'transparent',
+                      color: passiveSortMode === 'name' ? '#fff' : 'var(--text-secondary)',
+                      padding: '0.2rem 0.5rem',
+                      fontSize: '0.7rem',
+                      fontWeight: passiveSortMode === 'name' ? 700 : 500,
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      boxShadow: passiveSortMode === 'name' ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+                    }}
+                  >
+                    🔤 Name (A-Z)
+                  </button>
+                </div>
+
+                {activeSelectedPassives.length > 0 && (
+                  <button 
+                    onClick={() => { setSlot1(''); setSlot2(''); setSlot3(''); setSlot4(''); }} 
+                    style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                  >
+                    Clear Skills
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* 4 Searchable Custom Selectors in a Single Horizontal Row */}
@@ -438,6 +593,8 @@ export function PalFilterModal({
                   searchable={true}
                   disabled={loadingPassives}
                   accentColor="#818cf8"
+                  renderOption={renderPassiveOption}
+                  renderSelected={renderPassiveSelected}
                 />
               </div>
 
@@ -454,6 +611,8 @@ export function PalFilterModal({
                   searchable={true}
                   disabled={loadingPassives}
                   accentColor="#818cf8"
+                  renderOption={renderPassiveOption}
+                  renderSelected={renderPassiveSelected}
                 />
               </div>
 
@@ -470,6 +629,8 @@ export function PalFilterModal({
                   searchable={true}
                   disabled={loadingPassives}
                   accentColor="#818cf8"
+                  renderOption={renderPassiveOption}
+                  renderSelected={renderPassiveSelected}
                 />
               </div>
 
@@ -486,6 +647,8 @@ export function PalFilterModal({
                   searchable={true}
                   disabled={loadingPassives}
                   accentColor="#818cf8"
+                  renderOption={renderPassiveOption}
+                  renderSelected={renderPassiveSelected}
                 />
               </div>
 

@@ -52,7 +52,20 @@ export function SaveGameExplorerView({
   pals = [],
   saveLoaded,
   setSelectedPal,
+  palSourceMode: incomingPalSourceMode = 'caught',
+  handlePalSourceModeChange: incomingHandlePalSourceModeChange,
+  ownedSpecies = [],
 }) {
+  const [localSourceMode, setLocalSourceMode] = useState(incomingPalSourceMode || 'caught');
+  const palSourceMode = incomingPalSourceMode || localSourceMode;
+  const handlePalSourceModeChange = (mode) => {
+    if (incomingHandlePalSourceModeChange) {
+      incomingHandlePalSourceModeChange(mode);
+    } else {
+      setLocalSourceMode(mode);
+    }
+  };
+
   // Advanced Filter Modal State
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
@@ -136,18 +149,53 @@ export function SaveGameExplorerView({
     );
   }, [activeFilters]);
 
-  const speciesOptions = useMemo(() => {
-    const counts = new Map();
-    instances.forEach(inst => {
-      const name = inst.display_name || inst.species;
-      if (name) {
-        counts.set(name, (counts.get(name) || 0) + 1);
+  // Real In-Game Pals (Exclude non-playable 6 slimes, 7 crossover terraria monsters, 9 tower boss pairs, 3 cut NPCs)
+  const realInGamePals = useMemo(() => {
+    if (!Array.isArray(pals) || pals.length === 0) return [];
+    const EXCLUDED_NAMES = new Set([
+      'green slime', 'blue slime', 'red slime', 'purple slime', 'illuminant slime', 'rainbow slime',
+      'cave bat', 'illuminant bat', 'eye of cthulhu', 'demon eye', 'true eye of cthulhu', 'moon lord', 'enchanted sword',
+      'zoe & grizzbolt', 'lily & lyleen', 'marcus & faleris', 'axel & orserk',
+      'victor & shadowbeak', 'saya & selyne', 'auri & shaolong', 'bjorn & bastigor', 'zenara & astralym',
+      'boltmane', 'dragostrophe', 'pidf rider', 'eleclion',
+    ]);
+
+    return pals.filter(p => {
+      const name = (p.display_name || '').trim().toLowerCase();
+      if (!name || EXCLUDED_NAMES.has(name) || name.includes('&') || name.includes('slime')) {
+        return false;
       }
+      return true;
     });
-    return Array.from(counts.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([name, count]) => ({ name, count }));
-  }, [instances]);
+  }, [pals]);
+
+  const speciesOptions = useMemo(() => {
+    if (palSourceMode === 'caught') {
+      const counts = new Map();
+      instances.forEach(inst => {
+        const name = inst.display_name || inst.species;
+        if (name) {
+          counts.set(name, (counts.get(name) || 0) + 1);
+        }
+      });
+      return Array.from(counts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([name, count]) => ({ name, count }));
+    } else {
+      const seen = new Set();
+      const list = [];
+      realInGamePals
+        .slice()
+        .sort((a, b) => (a.paldex_number || 0) - (b.paldex_number || 0) || (a.display_name || '').localeCompare(b.display_name || ''))
+        .forEach(p => {
+          if (p.display_name && !seen.has(p.display_name)) {
+            seen.add(p.display_name);
+            list.push({ name: p.display_name, count: null });
+          }
+        });
+      return list;
+    }
+  }, [instances, realInGamePals, palSourceMode]);
 
   const filteredInstances = useMemo(() => {
     return instances.filter(pi => {
@@ -254,6 +302,91 @@ export function SaveGameExplorerView({
     handleSort,
   } = useTableSort(filteredInstances, 'level', true);
 
+  // Global In-Game Pals Filtered by active modal filters
+  const filteredGlobalPals = useMemo(() => {
+    if (palSourceMode !== 'global') return [];
+    return realInGamePals.filter(pal => {
+      // Species
+      if (activeFilters.species && (pal.display_name || '').toLowerCase() !== activeFilters.species.toLowerCase()) {
+        return false;
+      }
+
+      // Partner Group
+      if (activeFilters.partnerGroup) {
+        const cats = pal.partner_skill_categories || [];
+        if (!cats.some(c => c.id === activeFilters.partnerGroup || c.name?.toLowerCase() === activeFilters.partnerGroup.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Rarity Tier
+      if (activeFilters.rarity) {
+        const palRarity = pal.rarity;
+        if (activeFilters.rarity === 'legendary' && palRarity !== 20) return false;
+        if (activeFilters.rarity === 'boss' && palRarity !== 10) return false;
+        if (activeFilters.rarity === 'rare' && (palRarity < 7 || palRarity > 9)) return false;
+        if (activeFilters.rarity === 'mid' && (palRarity < 4 || palRarity > 6)) return false;
+        if (activeFilters.rarity === 'common' && (palRarity < 1 || palRarity > 3)) return false;
+        if (!isNaN(parseInt(activeFilters.rarity, 10)) && palRarity !== parseInt(activeFilters.rarity, 10)) return false;
+      }
+
+      // Pal Gear Status Filter
+      if (activeFilters.gearStatus) {
+        const g = pal.gear;
+        if (activeFilters.gearStatus === 'crafted') {
+          if (!g || !g.requires_gear || !g.is_crafted) return false;
+        } else if (activeFilters.gearStatus === 'not_crafted') {
+          if (!g || !g.requires_gear || g.is_crafted) return false;
+        } else if (activeFilters.gearStatus === 'no_gear') {
+          if (g && g.requires_gear) return false;
+        } else if (activeFilters.gearStatus === 'requires_gear') {
+          if (!g || !g.requires_gear) return false;
+        }
+      }
+
+      // Elemental Type Filter
+      if (activeFilters.elements && activeFilters.elements.length > 0) {
+        const pElem1 = (pal.element_1 || '').toLowerCase().trim();
+        const pElem2 = (pal.element_2 || '').toLowerCase().trim();
+        const palElemSet = new Set([pElem1, pElem2].filter(Boolean));
+
+        if (activeFilters.elements.length === 1) {
+          const target = activeFilters.elements[0].toLowerCase().trim();
+          if (!palElemSet.has(target)) return false;
+        } else if (activeFilters.elements.length === 2) {
+          const target1 = activeFilters.elements[0].toLowerCase().trim();
+          const target2 = activeFilters.elements[1].toLowerCase().trim();
+          if (!palElemSet.has(target1) || !palElemSet.has(target2)) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [realInGamePals, activeFilters, palSourceMode]);
+
+  // Global In-Game Pals sorted using active sortCol / sortDesc
+  const sortedGlobalPals = useMemo(() => {
+    const list = [...filteredGlobalPals];
+    return list.sort((a, b) => {
+      if (sortCol === 'display_name') {
+        return sortDesc ? (b.display_name || '').localeCompare(a.display_name || '') : (a.display_name || '').localeCompare(b.display_name || '');
+      }
+      if (sortCol === 'level' || sortCol === 'rank') {
+        const rA = a.rarity || 0;
+        const rB = b.rarity || 0;
+        return sortDesc ? rB - rA : rA - rB;
+      }
+      if (sortCol === 'current_speed') {
+        const sA = a.run_speed || 0;
+        const sB = b.run_speed || 0;
+        return sortDesc ? sB - sA : sA - sB;
+      }
+      const numA = a.paldex_number || 9999;
+      const numB = b.paldex_number || 9999;
+      return sortDesc ? numB - numA : numA - numB;
+    });
+  }, [filteredGlobalPals, sortCol, sortDesc]);
+
   // Group instances by species
   const groupedSpeciesData = useMemo(() => {
     const groups = new Map();
@@ -330,9 +463,29 @@ export function SaveGameExplorerView({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
       {/* Top Filter Bar & Active Filter Chips */}
-      {saveLoaded && (
+      {(saveLoaded || palSourceMode === 'global') && (
         <div style={{ flexShrink: 0, marginBottom: '0.35rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: activeModalFiltersCount > 0 ? '0.3rem' : 0 }}>
+            {/* Pal Source Mode Toggle: [ 🌐 All Game Pals | 💼 My Caught Pals ] */}
+            <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
+              <button 
+                type="button"
+                className={`btn ${palSourceMode === 'global' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
+                onClick={() => handlePalSourceModeChange('global')}
+              >
+                🌐 All Game Pals ({realInGamePals.length})
+              </button>
+              <button 
+                type="button"
+                className={`btn ${palSourceMode === 'caught' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
+                onClick={() => handlePalSourceModeChange('caught')}
+              >
+                💼 My Caught Pals ({instances.length})
+              </button>
+            </div>
+
             <button
               className="btn"
               onClick={() => setIsFilterModalOpen(true)}
@@ -436,78 +589,86 @@ export function SaveGameExplorerView({
 
             {/* View Mode & Grouping Controls */}
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              {isGroupedBySpecies && (
-                <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                  <button
-                    className="btn"
-                    onClick={expandAll}
-                    style={{
-                      fontSize: '0.72rem',
-                      padding: '0.25rem 0.5rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-color)',
-                      color: 'var(--text-secondary)',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                    title="Expand all species groups"
-                  >
-                    ➕ Expand All
-                  </button>
-                  <button
-                    className="btn"
-                    onClick={collapseAll}
-                    style={{
-                      fontSize: '0.72rem',
-                      padding: '0.25rem 0.5rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-color)',
-                      color: 'var(--text-secondary)',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                    title="Collapse all species groups"
-                  >
-                    ➖ Collapse All
-                  </button>
-                </div>
-              )}
+              {palSourceMode === 'caught' ? (
+                <>
+                  {isGroupedBySpecies && (
+                    <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                      <button
+                        className="btn"
+                        onClick={expandAll}
+                        style={{
+                          fontSize: '0.72rem',
+                          padding: '0.25rem 0.5rem',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                        title="Expand all species groups"
+                      >
+                        ➕ Expand All
+                      </button>
+                      <button
+                        className="btn"
+                        onClick={collapseAll}
+                        style={{
+                          fontSize: '0.72rem',
+                          padding: '0.25rem 0.5rem',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                        title="Collapse all species groups"
+                      >
+                        ➖ Collapse All
+                      </button>
+                    </div>
+                  )}
 
-              {/* Group / Flat Toggle */}
-              <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
-                <button
-                  onClick={() => setIsGroupedBySpecies(true)}
-                  style={{
-                    fontSize: '0.74rem',
-                    padding: '0.25rem 0.6rem',
-                    background: isGroupedBySpecies ? 'rgba(99, 102, 241, 0.4)' : 'transparent',
-                    border: 'none',
-                    color: isGroupedBySpecies ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: isGroupedBySpecies ? 700 : 500,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  📁 Grouped ({groupedSpeciesData.length})
-                </button>
-                <button
-                  onClick={() => setIsGroupedBySpecies(false)}
-                  style={{
-                    fontSize: '0.74rem',
-                    padding: '0.25rem 0.6rem',
-                    background: !isGroupedBySpecies ? 'rgba(99, 102, 241, 0.4)' : 'transparent',
-                    border: 'none',
-                    color: !isGroupedBySpecies ? '#fff' : 'var(--text-secondary)',
-                    fontWeight: !isGroupedBySpecies ? 700 : 500,
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  📄 Flat ({filteredInstances.length})
-                </button>
-              </div>
+                  {/* Group / Flat Toggle */}
+                  <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
+                    <button
+                      onClick={() => setIsGroupedBySpecies(true)}
+                      style={{
+                        fontSize: '0.74rem',
+                        padding: '0.25rem 0.6rem',
+                        background: isGroupedBySpecies ? 'rgba(99, 102, 241, 0.4)' : 'transparent',
+                        border: 'none',
+                        color: isGroupedBySpecies ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: isGroupedBySpecies ? 700 : 500,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      📁 Grouped ({groupedSpeciesData.length})
+                    </button>
+                    <button
+                      onClick={() => setIsGroupedBySpecies(false)}
+                      style={{
+                        fontSize: '0.74rem',
+                        padding: '0.25rem 0.6rem',
+                        background: !isGroupedBySpecies ? 'rgba(99, 102, 241, 0.4)' : 'transparent',
+                        border: 'none',
+                        color: !isGroupedBySpecies ? '#fff' : 'var(--text-secondary)',
+                        fontWeight: !isGroupedBySpecies ? 700 : 500,
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      📄 Flat ({filteredInstances.length})
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <span style={{ fontSize: '0.74rem', color: 'var(--accent-gold)', fontWeight: 600 }}>
+                  Showing {filteredGlobalPals.length} Real In-Game Pals
+                </span>
+              )}
             </div>
           </div>
 
@@ -657,29 +818,166 @@ export function SaveGameExplorerView({
         initialFilters={activeFilters}
         speciesOptions={speciesOptions}
         onApply={(newFilters) => pushFilterState(newFilters)}
-        totalMatchingCount={filteredInstances.length}
+        totalMatchingCount={palSourceMode === 'caught' ? filteredInstances.length : filteredGlobalPals.length}
+        palSourceMode={palSourceMode}
+        instances={instances}
       />
 
       {/* Scrollable Table Area */}
-      {saveLoaded ? (
+      {(saveLoaded || palSourceMode === 'global') ? (
         <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden', padding: 0, marginBottom: '1.5rem' }}>
           <table style={{ width: '100%', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th onClick={() => handleSort('display_name')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.4rem', width: '14%' }}>Species{sortCol === 'display_name' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th onClick={() => handleSort('level')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '5%' }}>Level{sortCol === 'level' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th onClick={() => handleSort('display_name')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.4rem', width: '15%' }}>Species{sortCol === 'display_name' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
+                <th onClick={() => handleSort('level')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '6%' }}>{palSourceMode === 'caught' ? 'Level' : 'Rarity'}{sortCol === 'level' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
                 <th onClick={() => handleSort('gender')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '4%' }}>Sex{sortCol === 'gender' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
                 <th onClick={() => handleSort('rank')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '4%' }}>Rank{sortCol === 'rank' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th style={{ whiteSpace: 'nowrap', padding: '0.35rem 0.35rem', width: '15%' }}>Partner Groups</th>
+                <th style={{ whiteSpace: 'nowrap', padding: '0.35rem 0.35rem', width: '14%' }}>Partner Groups</th>
                 <th onClick={() => handleSort('current_speed')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '6%' }}>Speed{sortCol === 'current_speed' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th style={{ whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '8%' }}>IVs (H/A/D)</th>
+                <th style={{ whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '10%' }}>{palSourceMode === 'caught' ? 'IVs (H/A/D)' : 'Base (H/A/D)'}</th>
                 <th onClick={() => handleSort('location')} style={{ cursor: 'pointer', whiteSpace: 'nowrap', padding: '0.35rem 0.35rem', width: '8%' }}>Location{sortCol === 'location' ? (sortDesc ? ' ▼' : ' ▲') : ''}</th>
-                <th style={{ padding: '0.35rem 0.4rem', width: '30%' }}>Passives</th>
+                <th style={{ padding: '0.35rem 0.4rem', width: '27%' }}>{palSourceMode === 'caught' ? 'Passives' : 'Partner Ability / Bio'}</th>
                 <th style={{ whiteSpace: 'nowrap', padding: '0.35rem 0.25rem', width: '6%', textAlign: 'center' }}>Element</th>
               </tr>
             </thead>
             <tbody>
-              {isGroupedBySpecies ? (
+              {palSourceMode === 'global' ? (
+                /* ========================================================================= */
+                /* GLOBAL ALL IN-GAME PALS VIEW */
+                /* ========================================================================= */
+                sortedGlobalPals.length > 0 ? (
+                  sortedGlobalPals.map(pal => {
+                    const palIcon = pal.icon_url || (pal.display_name ? `/assets/pals/icons/${pal.display_name.toLowerCase().replace(/ /g, '_')}.png` : null);
+                    const cats = pal.partner_skill_categories || [];
+
+                    return (
+                      <tr
+                        key={pal.internal_name || pal.id || pal.display_name}
+                        onClick={() => setSelectedPal && setSelectedPal(pal)}
+                        style={{ cursor: 'pointer', transition: 'background 0.12s ease' }}
+                        className="pal-table-row"
+                      >
+                        {/* Species & Bio */}
+                        <td style={{ padding: '0.35rem 0.4rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                            {palIcon ? (
+                              <img
+                                src={palIcon}
+                                alt={pal.display_name}
+                                style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <span style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>🐾</span>
+                            )}
+                            <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                #{String(pal.paldex_number || 0).padStart(3, '0')} {pal.display_name}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Rarity */}
+                        <td style={{ padding: '0.35rem 0.25rem', fontSize: '0.78rem', color: 'var(--accent-gold)', fontWeight: 600 }}>
+                          Tier {pal.rarity ?? '-'}
+                        </td>
+
+                        {/* Sex */}
+                        <td style={{ padding: '0.35rem 0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          -
+                        </td>
+
+                        {/* Rank */}
+                        <td style={{ padding: '0.35rem 0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          -
+                        </td>
+
+                        {/* Partner Groups */}
+                        <td style={{ padding: '0.35rem 0.35rem' }}>
+                          <div style={{ display: 'flex', gap: '0.2rem', flexWrap: 'wrap' }}>
+                            {cats.length > 0 ? cats.map((cat, cIdx) => (
+                              <span
+                                key={cIdx}
+                                title={cat.name || cat.description}
+                                style={{
+                                  fontSize: '0.66rem',
+                                  padding: '0.08rem 0.3rem',
+                                  background: 'rgba(99, 102, 241, 0.2)',
+                                  border: '1px solid rgba(99, 102, 241, 0.4)',
+                                  borderRadius: '4px',
+                                  color: '#c7d2fe',
+                                  fontWeight: 600,
+                                  whiteSpace: 'nowrap'
+                                }}
+                              >
+                                {cat.icon} {SHORT_CATEGORY_NAMES[cat.category_id || cat.id] || cat.name || cat.id}
+                              </span>
+                            )) : (
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>-</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Speed */}
+                        <td style={{ padding: '0.35rem 0.25rem', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {pal.run_speed ?? '-'}
+                        </td>
+
+                        {/* Base Stats (HP / ATK / DEF) */}
+                        <td style={{ padding: '0.35rem 0.25rem', fontSize: '0.72rem', color: '#94a3b8', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#86efac' }}>{pal.hp}</span> / <span style={{ color: '#fca5a5' }}>{pal.attack_melee}</span> / <span style={{ color: '#93c5fd' }}>{pal.defense}</span>
+                        </td>
+
+                        {/* Location */}
+                        <td style={{ padding: '0.35rem 0.35rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          🌐 Game Paldex
+                        </td>
+
+                        {/* Inherent Trait / Description */}
+                        <td style={{ padding: '0.35rem 0.4rem', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                            {pal.partner_skill?.name ? `⚔️ ${pal.partner_skill.name}` : (pal.description || '-')}
+                          </span>
+                        </td>
+
+                        {/* Elements */}
+                        <td style={{ padding: '0.35rem 0.25rem', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.2rem', justifyContent: 'center', alignItems: 'center' }}>
+                            {pal.element_1 && (
+                              <img
+                                src={getElementIconUrl(pal.element_1)}
+                                alt={pal.element_1}
+                                title={pal.element_1}
+                                style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            )}
+                            {pal.element_2 && (
+                              <img
+                                src={getElementIconUrl(pal.element_2)}
+                                alt={pal.element_2}
+                                title={pal.element_2}
+                                style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={10} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>
+                      No in-game Pals match the active filter criteria.
+                    </td>
+                  </tr>
+                )
+              ) : (
+                <>
+                  {isGroupedBySpecies ? (
                 /* ========================================================================= */
                 /* 2-TIER GROUPED BY SPECIES VIEW */
                 /* ========================================================================= */
@@ -1189,7 +1487,9 @@ export function SaveGameExplorerView({
                   </td>
                 </tr>
               )}
-            </tbody>
+            </>
+          )}
+        </tbody>
           </table>
         </div>
       ) : (
@@ -1197,7 +1497,7 @@ export function SaveGameExplorerView({
           <div className="glass-card" style={{ padding: '3rem', textAlign: 'center', maxWidth: '500px' }}>
             <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📁</span>
             <h3 style={{ marginBottom: '0.5rem' }}>No Save Game Loaded</h3>
-            <p style={{ fontSize: '0.85rem' }}>Please select or upload a Palworld save file in Settings to explore your caught Pals.</p>
+            <p style={{ fontSize: '0.85rem' }}>Please select or upload a Palworld save file in Settings to explore your caught Pals, or switch to <strong>🌐 All Game Pals</strong> above.</p>
           </div>
         </div>
       )}

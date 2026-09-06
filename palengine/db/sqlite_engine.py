@@ -184,6 +184,15 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     p_id = str(skill_dict.get("id") or "").strip()
     raw_cat = skill_dict.get("category")
 
+    # Tier rank & tier category
+    tier_rank = 0
+    if raw_cat:
+        m = re.search(r"PassiveTier(-?\d+)", str(raw_cat))
+        if m:
+            tier_rank = int(m.group(1))
+    skill_dict["tier_rank"] = tier_rank
+    skill_dict["tier"] = raw_cat
+
     # Aptitude degree & color indicator
     skill_dict["aptitude"] = calculate_aptitude(name, p_id, raw_cat)
     # Source categorization

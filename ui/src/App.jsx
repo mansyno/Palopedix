@@ -512,7 +512,7 @@ function App() {
             {/* 🎒 Save Inventory Tab */}
             {activeTab === 'inventory' && <InventoryView />}
 
-            {/* 💾 Save Game Explorer Tab */}
+            {/* 🐾 World Pals Tab */}
             {activeTab === 'save_game' && (
               <SaveGameExplorerView
                 instances={instances}
@@ -522,6 +522,9 @@ function App() {
                 handleLoadSave={handleLoadSave}
                 loading={loading}
                 setSelectedPal={setSelectedPal}
+                palSourceMode={palSourceMode}
+                handlePalSourceModeChange={handlePalSourceModeChange}
+                ownedSpecies={ownedSpecies}
               />
             )}
 

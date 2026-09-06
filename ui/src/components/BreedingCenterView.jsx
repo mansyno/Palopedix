@@ -370,42 +370,44 @@ export function BreedingCenterView({
           </div>
 
           {breedResult && (
-            <div 
-              className="glass-card" 
-              style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)', borderRadius: '12px', cursor: 'pointer' }}
-              onClick={() => openPalDetails(breedResult)}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                {breedResult.icon_path ? (
-                  <img src={breedResult.icon_path} alt={breedResult.display_name} style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                ) : (
-                  <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem' }}>
-                    {breedResult.display_name ? breedResult.display_name[0] : 'P'}
-                  </div>
-                )}
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Offspring Result (Click for Bio & Stats):</div>
-                  <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#34d399' }}>{breedResult.display_name}</h3>
-                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    <span>Breeding Power: <strong style={{ color: 'var(--accent-gold)' }}>{breedResult.breeding_power}</strong></span>
-                    <span>Food: <strong>🍖 {breedResult.food_requirement || 1}</strong></span>
+            <PalInstanceTooltip instance={resolvePalForTooltip(breedResult)}>
+              <div 
+                className="glass-card" 
+                style={{ padding: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(99, 102, 241, 0.15)', borderColor: 'var(--border-color-hover)', borderRadius: '12px', cursor: 'pointer' }}
+                onClick={() => openPalDetails(breedResult)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                  {breedResult.icon_path ? (
+                    <img src={breedResult.icon_path} alt={breedResult.display_name} style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  ) : (
+                    <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem' }}>
+                      {breedResult.display_name ? breedResult.display_name[0] : 'P'}
+                    </div>
+                  )}
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Offspring Result (Click for Bio & Stats):</div>
+                    <h3 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0, color: '#34d399' }}>{breedResult.display_name}</h3>
+                    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                      <span>Breeding Power: <strong style={{ color: 'var(--accent-gold)' }}>{breedResult.breeding_power}</strong></span>
+                      <span>Food: <strong>🍖 {breedResult.food_requirement || 1}</strong></span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                <div className="badge-container">
-                  {breedResult.element_1 && <span className="badge badge-element">{breedResult.element_1}</span>}
-                  {breedResult.element_2 && <span className="badge badge-element">{breedResult.element_2}</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                  <div className="badge-container">
+                    {breedResult.element_1 && <span className="badge badge-element">{breedResult.element_1}</span>}
+                    {breedResult.element_2 && <span className="badge badge-element">{breedResult.element_2}</span>}
+                  </div>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }} 
+                    onClick={(e) => { e.stopPropagation(); openPalDetails(breedResult); }}
+                  >
+                    Inspect Pal in Paldex →
+                  </button>
                 </div>
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }} 
-                  onClick={(e) => { e.stopPropagation(); openPalDetails(breedResult); }}
-                >
-                  Inspect Pal in Paldex →
-                </button>
               </div>
-            </div>
+            </PalInstanceTooltip>
           )}
         </div>
       )}
@@ -460,13 +462,19 @@ export function BreedingCenterView({
                       <tr key={idx}>
                         <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[0])}>
-                          {combo[0]}
+                          <PalInstanceTooltip instance={resolvePalForTooltip(combo[0])}>
+                            <span>{combo[0]}</span>
+                          </PalInstanceTooltip>
                         </td>
                         <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[1])}>
-                          {combo[1]}
+                          <PalInstanceTooltip instance={resolvePalForTooltip(combo[1])}>
+                            <span>{combo[1]}</span>
+                          </PalInstanceTooltip>
                         </td>
                         <td style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, cursor: 'pointer' }} onClick={() => openPalDetails(reverseSearchTerm)}>
-                          {reverseSearchTerm}
+                          <PalInstanceTooltip instance={resolvePalForTooltip(reverseSearchTerm)}>
+                            <span>{reverseSearchTerm}</span>
+                          </PalInstanceTooltip>
                         </td>
                       </tr>
                     ))}
@@ -534,38 +542,41 @@ export function BreedingCenterView({
                       <tr key={idx} onClick={() => openPalDetails(pal)} style={{ cursor: 'pointer' }}>
                         <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{idx + 1}</td>
                         <td style={{ fontWeight: 600 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                            {pal.icon_path ? (
-                              <img src={pal.icon_path} alt={pal.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                            ) : (
-                              <span style={{ fontSize: '1rem' }}>🐾</span>
-                            )}
-                            <span style={{ color: 'var(--accent-gold)' }}>{pal.display_name}</span>
-                          </div>
+                          <PalInstanceTooltip instance={resolvePalForTooltip(pal)}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              {pal.icon_path ? (
+                                <img src={pal.icon_path} alt={pal.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                              ) : (
+                                <span style={{ fontSize: '1rem' }}>🐾</span>
+                              )}
+                              <span style={{ color: 'var(--accent-gold)' }}>{pal.display_name}</span>
+                            </div>
+                          </PalInstanceTooltip>
                         </td>
                         <td>
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                             {pal.other_parents && pal.other_parents.length > 0 ? (
                               pal.other_parents.map((parentName, pIdx) => (
-                                <span 
-                                  key={pIdx} 
-                                  className="badge" 
-                                  style={{ 
-                                    fontSize: '0.72rem', 
-                                    padding: '0.12rem 0.4rem', 
-                                    background: 'rgba(99, 102, 241, 0.15)', 
-                                    color: '#a5b4fc', 
-                                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openPalDetails(parentName);
-                                  }}
-                                >
-                                  {parentName}
-                                </span>
+                                <PalInstanceTooltip key={pIdx} instance={resolvePalForTooltip(parentName)}>
+                                  <span 
+                                    className="badge" 
+                                    style={{ 
+                                      fontSize: '0.72rem', 
+                                      padding: '0.12rem 0.4rem', 
+                                      background: 'rgba(99, 102, 241, 0.15)', 
+                                      color: '#a5b4fc', 
+                                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openPalDetails(parentName);
+                                    }}
+                                  >
+                                    {parentName}
+                                  </span>
+                                </PalInstanceTooltip>
                               ))
                             ) : (
                               <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontStyle: 'italic' }}>None available</span>
@@ -783,7 +794,7 @@ export function BreedingCenterView({
                                 <span>⭐ Recommended Save Parent Candidates (Click to Inspect Full Bio & Passives):</span>
                               </div>
                               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.82rem' }}>
-                                <PalInstanceTooltip instance={{
+                                <PalInstanceTooltip instance={resolvePalForTooltip({
                                   display_name: step.parent1,
                                   gender: step.parent1_gender,
                                   level: step.parent1_level,
@@ -794,7 +805,7 @@ export function BreedingCenterView({
                                   location: step.parent1_location,
                                   location_details: step.parent1_location_details,
                                   ivs: step.parent1_ivs,
-                                }}>
+                                })}>
                                   <div 
                                     style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', width: '100%' }}
                                     onClick={() => openPalDetails({
@@ -837,7 +848,7 @@ export function BreedingCenterView({
                                   </div>
                                 </PalInstanceTooltip>
 
-                                <PalInstanceTooltip instance={{
+                                <PalInstanceTooltip instance={resolvePalForTooltip({
                                   display_name: step.parent2,
                                   gender: step.parent2_gender,
                                   level: step.parent2_level,
@@ -848,7 +859,7 @@ export function BreedingCenterView({
                                   location: step.parent2_location,
                                   location_details: step.parent2_location_details,
                                   ivs: step.parent2_ivs,
-                                }}>
+                                })}>
                                   <div 
                                     style={{ background: 'rgba(255,255,255,0.02)', padding: '0.4rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer', width: '100%' }}
                                     onClick={() => openPalDetails({
@@ -1010,39 +1021,41 @@ export function BreedingCenterView({
                               gap: '0.75rem',
                             }}
                           >
-                            <div 
-                              style={{ 
-                                display: 'flex', 
-                                alignItems: 'center', 
-                                gap: '0.75rem', 
-                                minWidth: '220px',
-                                cursor: 'pointer',
-                                padding: '0.2rem 0.4rem',
-                                borderRadius: '8px',
-                              }}
-                              title="Click to view full Master Paldex stats, skills, and drops"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openPalDetails(item.species);
-                              }}
-                            >
-                              {item.icon_path ? (
-                                <img src={item.icon_path} alt={item.species} style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
-                              ) : (
-                                <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
-                                  {item.species[0]}
-                                </div>
-                              )}
-                              <div>
-                                <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  <span>{item.species}</span>
-                                  <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 400 }}>🔍</span>
-                                </div>
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                                  #{item.paldex_number ? String(item.paldex_number).padStart(3, '0') : '???'} • {item.element_1}{item.element_2 ? ` / ${item.element_2}` : ''}
+                            <PalInstanceTooltip instance={resolvePalForTooltip(item.species)}>
+                              <div 
+                                style={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: '0.75rem', 
+                                  minWidth: '220px',
+                                  cursor: 'pointer',
+                                  padding: '0.2rem 0.4rem',
+                                  borderRadius: '8px',
+                                }}
+                                title="Click to view full Master Paldex stats, skills, and drops"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openPalDetails(item.species);
+                                }}
+                              >
+                                {item.icon_path ? (
+                                  <img src={item.icon_path} alt={item.species} style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                ) : (
+                                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
+                                    {item.species[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#38bdf8', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                    <span>{item.species}</span>
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 400 }}>🔍</span>
+                                  </div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                                    #{item.paldex_number ? String(item.paldex_number).padStart(3, '0') : '???'} • {item.element_1}{item.element_2 ? ` / ${item.element_2}` : ''}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            </PalInstanceTooltip>
 
                             {samplePair && (
                               <div 
@@ -1066,9 +1079,13 @@ export function BreedingCenterView({
                                 }}
                               >
                                 <span style={{ color: 'var(--text-secondary)', fontSize: '0.7rem' }}>Sample Pair:</span>
-                                <span style={{ color: '#a5b4fc', fontWeight: 600 }}>{samplePair.parent1}</span>
+                                <PalInstanceTooltip instance={resolvePalForTooltip(samplePair.parent1)}>
+                                  <span style={{ color: '#a5b4fc', fontWeight: 600 }}>{samplePair.parent1}</span>
+                                </PalInstanceTooltip>
                                 <span style={{ color: 'var(--text-secondary)' }}>+</span>
-                                <span style={{ color: '#a5b4fc', fontWeight: 600 }}>{samplePair.parent2}</span>
+                                <PalInstanceTooltip instance={resolvePalForTooltip(samplePair.parent2)}>
+                                  <span style={{ color: '#a5b4fc', fontWeight: 600 }}>{samplePair.parent2}</span>
+                                </PalInstanceTooltip>
                               </div>
                             )}
 
@@ -1149,26 +1166,30 @@ export function BreedingCenterView({
                                         title="Click to load pair into Direct Pair Calculator"
                                       >
                                         <td style={{ padding: '0.55rem 1rem', fontWeight: 600, color: '#e2e8f0' }}>
-                                          <span 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openPalDetails(p.parent1);
-                                            }}
-                                            style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
-                                          >
-                                            {p.parent1}
-                                          </span>
+                                          <PalInstanceTooltip instance={resolvePalForTooltip(p.parent1)}>
+                                            <span 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openPalDetails(p.parent1);
+                                              }}
+                                              style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
+                                            >
+                                              {p.parent1}
+                                            </span>
+                                          </PalInstanceTooltip>
                                         </td>
                                         <td style={{ padding: '0.55rem 1rem', fontWeight: 600, color: '#e2e8f0' }}>
-                                          <span 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              openPalDetails(p.parent2);
-                                            }}
-                                            style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
-                                          >
-                                            {p.parent2}
-                                          </span>
+                                          <PalInstanceTooltip instance={resolvePalForTooltip(p.parent2)}>
+                                            <span 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                openPalDetails(p.parent2);
+                                              }}
+                                              style={{ color: 'var(--accent-gold)', textDecoration: 'underline' }}
+                                            >
+                                              {p.parent2}
+                                            </span>
+                                          </PalInstanceTooltip>
                                         </td>
                                         <td style={{ padding: '0.4rem 1rem', textAlign: 'center' }}>
                                           <button 

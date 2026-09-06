@@ -705,17 +705,16 @@ export function SaveGameExplorerView({
                       {/* Tier 1: Species Group Header Row */}
                       <tr
                         onClick={() => toggleSpecies(palName)}
+                        className={`species-group-row ${isExpanded ? 'expanded' : ''}`}
                         style={{
                           background: isExpanded ? 'rgba(99, 102, 241, 0.16)' : 'rgba(15, 23, 42, 0.65)',
-                          borderBottom: isExpanded ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid rgba(255,255,255,0.06)',
-                          borderLeft: isExpanded ? '4px solid #818cf8' : '4px solid transparent',
                           cursor: 'pointer',
                           userSelect: 'none',
                           transition: 'background 0.15s ease'
                         }}
                       >
                         {/* Species & Expand Indicator */}
-                        <td style={{ padding: '0.45rem 0.5rem' }}>
+                        <td style={{ padding: '0.45rem 0.5rem', borderLeft: isExpanded ? '4px solid #818cf8' : '4px solid transparent' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                             <span style={{
                               display: 'inline-flex',
@@ -858,6 +857,7 @@ export function SaveGameExplorerView({
 
                       {/* Tier 2: Child Pal Instance Rows */}
                       {isExpanded && sortedChildren.map((pi, childIdx) => {
+                        const isLastChild = childIdx === sortedChildren.length - 1;
                         const locClass = pi.location === 'party' ? 'badge-party' : (pi.location === 'base' ? 'badge-base' : (pi.location === 'dps' ? 'badge-dps' : 'badge-palbox'));
                         const locLabel = pi.location === 'party' ? 'PARTY' : (pi.location === 'base' ? 'BASE' : (pi.location === 'dps' ? 'STORAGE' : 'PALBOX'));
                         const locIcon = pi.location === 'party' ? '⚔️' : (pi.location === 'base' ? '🏠' : (pi.location === 'dps' ? '🔮' : '📦'));
@@ -875,9 +875,12 @@ export function SaveGameExplorerView({
                         const childElements = [pi.element_1 || masterPal?.element_1, pi.element_2 || masterPal?.element_2].filter(Boolean);
 
                         return (
-                          <tr key={pi.instance_id || `child-${childIdx}`} style={{ background: 'rgba(0, 0, 0, 0.25)', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <tr
+                            key={pi.instance_id || `child-${childIdx}`}
+                            className={`instance-sub-row ${isLastChild ? 'last-child' : ''}`}
+                          >
                             {/* Nested Pal Instance Name / Tooltip */}
-                            <td style={{ padding: '0.3rem 0.4rem 0.3rem 1.6rem' }}>
+                            <td style={{ padding: '0.35rem 0.4rem 0.35rem 1.6rem', borderLeft: '4px solid rgba(129, 140, 248, 0.5)' }}>
                               <PalInstanceTooltip instance={pi} masterPal={masterPal}>
                                 <span
                                   style={{ fontWeight: 600, color: '#f8fafc', cursor: 'pointer', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}

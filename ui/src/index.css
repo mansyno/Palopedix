@@ -409,8 +409,8 @@ table {
 }
 
 th, td {
-  padding: 0.35rem 0.65rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
   vertical-align: middle;
 }
 
@@ -424,16 +424,38 @@ th {
   top: 0;
   z-index: 10;
   background: #0f172a;
-  box-shadow: inset 0 -2px 0 var(--border-color);
+  box-shadow: inset 0 -2px 0 rgba(99, 102, 241, 0.45);
   user-select: none;
 }
 
 tbody tr:hover {
-  background: rgba(99, 102, 241, 0.05);
+  background: rgba(99, 102, 241, 0.12);
 }
 
 td {
   font-size: 0.88rem;
+}
+
+/* Specific styling for grouped species table rows */
+tr.species-group-row > td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+tr.species-group-row.expanded > td {
+  border-bottom: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+tr.instance-sub-row > td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(10, 15, 28, 0.75);
+}
+
+tr.instance-sub-row:hover > td {
+  background: rgba(99, 102, 241, 0.2) !important;
+}
+
+tr.instance-sub-row.last-child > td {
+  border-bottom: 2px solid rgba(99, 102, 241, 0.55);
 }
 
 /* Breeding path steps */

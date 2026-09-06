@@ -3680,6 +3680,9 @@ class SQLiteEngine:
             d["display_name"] = p_meta.get("display_name") or d.get("species")
             d["element_1"] = p_meta.get("element_1")
             d["element_2"] = p_meta.get("element_2")
+            d["paldex_number"] = p_meta.get("paldex_number")
+            d["nocturnal"] = bool(p_meta.get("nocturnal"))
+            d["food_requirement"] = p_meta.get("food_requirement", 1)
             d["hp"] = p_meta.get("hp")
             d["attack_melee"] = p_meta.get("attack_melee")
             d["defense"] = p_meta.get("defense")
@@ -3930,92 +3933,15 @@ class SQLiteEngine:
     def get_condense_candidates(self) -> list[dict]:
         from collections import defaultdict
         
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT COUNT(*) as c FROM pal_instances")
-        count = cursor.fetchone()["c"]
-        if count < 1:
+        all_instances = self.query_instances({})
+        if not all_instances:
             return []
 
-        pal_metadata = {}
-        for row in self.conn.execute("SELECT id, code, name, hp, attack, defense, icon_path FROM palworld_master.pals"):
-            data = {
-                "name": row["name"],
-                "hp": row["hp"],
-                "attack": row["attack"],
-                "defense": row["defense"],
-                "icon_path": row["icon_path"],
-            }
-            if row["id"]:
-                pal_metadata[row["id"].lower()] = data
-            if row["code"]:
-                pal_metadata[row["code"].lower()] = data
-
-        for row in self.conn.execute("SELECT id, code, internal_name, display_name, hp, attack_melee, defense, icon_path FROM pals"):
-            data = {
-                "name": row["display_name"] or row["internal_name"] or row["id"],
-                "hp": row["hp"],
-                "attack": row["attack_melee"],
-                "defense": row["defense"],
-                "icon_path": row["icon_path"],
-            }
-            if row["id"]:
-                pal_metadata[row["id"].lower()] = data
-            if row["code"]:
-                pal_metadata[row["code"].lower()] = data
-            if row["internal_name"]:
-                pal_metadata[row["internal_name"].lower()] = data
-
-        skill_metadata = {}
-        for row in self.conn.execute("SELECT id, name, CAST(rank AS TEXT) as category FROM passive_skills"):
-            skill_metadata[row["id"].lower()] = {
-                "name": row["name"],
-                "category": row["category"] or "PassiveTier1"
-            }
-
-        cursor.execute("""
-            SELECT i.instance_id, i.species, i.level, i.rank, i.iv_hp, i.iv_melee, i.iv_defense, i.location, i.location_details_base_camp_name,
-                   GROUP_CONCAT(p.passive_id, ',') as passives
-            FROM pal_instances i
-            LEFT JOIN pal_instance_passives p ON i.instance_id = p.instance_id
-            GROUP BY i.instance_id
-        """)
-        instances = [dict(r) for r in cursor.fetchall()]
-
         species_groups = defaultdict(list)
-        for inst in instances:
-            raw_species = inst.get('species')
-            if not raw_species:
-                continue
-
-            clean_species = raw_species.lower()
-            if clean_species.startswith("boss_"):
-                clean_species = clean_species[5:]
-
-            meta = pal_metadata.get(clean_species) or pal_metadata.get(raw_species.lower())
-            if not meta:
-                # Skip unmapped non-Pals (human NPCs / enemies)
-                continue
-
-            display_species = meta['name']
-            inst['display_species'] = display_species
-            inst['base_stats'] = meta
-            
-            raw_passives = (inst.get('passives') or '').split(',')
-            display_passives = []
-            passive_score = 0
-            for p in raw_passives:
-                p = p.strip()
-                if p and p != 'None':
-                    s_meta = skill_metadata.get(p.lower())
-                    if s_meta:
-                        display_passives.append(s_meta["name"])
-                        passive_score += 50
-                    else:
-                        display_passives.append(p)
-                        
-            inst['display_passives'] = display_passives
-            inst['passive_score'] = passive_score
-            species_groups[display_species].append(inst)
+        for inst in all_instances:
+            sp = inst.get("display_name") or inst.get("species")
+            if sp:
+                species_groups[sp].append(inst)
 
         candidates = []
         for display_species, pals in species_groups.items():
@@ -4023,11 +3949,10 @@ class SQLiteEngine:
                 continue
                 
             def get_score(p):
-                iv_hp = p.get('iv_hp') or 0
-                iv_atk = p.get('iv_melee') or 0
-                iv_def = p.get('iv_defense') or 0
-                iv_sum = iv_hp + iv_atk + iv_def
-                p_score = p.get('passive_score', 0)
+                ivs = p.get('ivs', {})
+                iv_sum = (ivs.get('hp', 0) or 0) + (ivs.get('melee', 0) or 0) + (ivs.get('defense', 0) or 0)
+                passives = p.get('passives', [])
+                p_score = len(passives) * 50
                 curr_rank = p.get('rank', 0) or 0
                 return (curr_rank * 5000) + (p_score * 1000) + (p.get('level', 0) or 0) * 100 + iv_sum
 
@@ -4062,10 +3987,10 @@ class SQLiteEngine:
             
             lvl = best.get('level') or 1
             curr_rank = best.get('rank', 0) or 0
-            iv_hp = best.get('iv_hp') or 0
-            iv_atk = best.get('iv_melee') or 0
-            iv_def = best.get('iv_defense') or 0
-            passives_list = best.get('display_passives', [])
+            ivs = best.get('ivs', {})
+            iv_hp = ivs.get('hp', 0) or best.get('iv_hp', 0) or 0
+            iv_atk = ivs.get('melee', 0) or best.get('iv_melee', 0) or 0
+            iv_def = ivs.get('defense', 0) or best.get('iv_defense', 0) or 0
             
             needed_per_rank = {0: 4, 1: 16, 2: 32, 3: 64}
             rem_sacrifices = sacrifices
@@ -4074,63 +3999,26 @@ class SQLiteEngine:
                 rem_sacrifices -= needed_per_rank[attainable_stars]
                 attainable_stars += 1
 
-            sp_base = best['base_stats']
-            
-            def calc_hp(base, l, iv):
-                return int(500 + 5 * l + (base * 0.5 * l) * (1 + (iv * 0.3) / 100))
-                
-            def calc_atk(base, l, iv, passives):
-                val = 100 + (base * 0.075 * l) * (1 + (iv * 0.3) / 100)
-                mult = 1.0
-                passives_lower = [p.strip().lower() for p in passives]
-                if 'musclehead' in passives_lower: mult += 0.30
-                if 'ferocious' in passives_lower: mult += 0.20
-                if 'coward' in passives_lower: mult -= 0.10
-                if 'pacifist' in passives_lower: mult -= 0.20
-                if 'hooligan' in passives_lower: mult += 0.15
-                if 'sadist' in passives_lower: mult += 0.15
-                return int(val * mult)
-                
-            def calc_def(base, l, iv, passives):
-                val = 50 + (base * 0.075 * l) * (1 + (iv * 0.3) / 100)
-                mult = 1.0
-                passives_lower = [p.strip().lower() for p in passives]
-                if 'burly body' in passives_lower: mult += 0.20
-                if 'masochist' in passives_lower: mult += 0.15
-                if 'downtrodden' in passives_lower: mult -= 0.10
-                if 'hooligan' in passives_lower: mult -= 0.10
-                return int(val * mult)
-
-            est_hp = calc_hp(sp_base.get("hp", 100), lvl, iv_hp)
-            est_atk = calc_atk(sp_base.get("attack", 100), lvl, iv_atk, passives_list)
-            est_def = calc_def(sp_base.get("defense", 100), lvl, iv_def, passives_list)
-            
-            icon_path = None
-            raw_icon = sp_base.get('icon_path')
-            if raw_icon:
-                parts = raw_icon.replace('\\', '/').split('/')
-                icon_path = "/assets/" + parts[-2] + "/" + parts[-1]
-
             best_loc_str = (best.get('location') or 'storage').lower()
             if best_loc_str == 'dps': best_loc_display = 'Dimensional Storage'
             elif best_loc_str == 'palbox': best_loc_display = 'Palbox'
             elif best_loc_str == 'party': best_loc_display = 'Party'
-            # Attach partner skill categories
-            c_cats = []
-            try:
-                cat_rows = self.conn.execute(
-                    """
-                    SELECT DISTINCT c.category_id as id, c.name, c.icon, c.description
-                    FROM pal_partner_skill_categories pc
-                    JOIN partner_skill_categories c ON pc.category_id = c.category_id
-                    WHERE LOWER(pc.pal_internal_name) = LOWER(?) OR LOWER(pc.pal_internal_name) = LOWER(?)
-                    ORDER BY c.sort_order ASC
-                    """,
-                    (species, best.get("species", "")),
-                ).fetchall()
-                c_cats = [dict(cr) for cr in cat_rows]
-            except Exception:
-                c_cats = []
+            elif best_loc_str == 'base': best_loc_display = 'Base Camp'
+            else: best_loc_display = 'Palbox'
+
+            # Rescale partner skill to attainable_stars
+            from palengine.analytics.partner_skill_scaling import get_scaled_partner_skill
+            ps = best.get('partner_skill')
+            gear_info = best.get('gear') or (ps.get('gear') if isinstance(ps, dict) else None)
+            if ps and isinstance(ps, dict):
+                scaled = get_scaled_partner_skill(
+                    species_id_or_name=species,
+                    stars=attainable_stars,
+                    base_description=ps.get('description'),
+                    skill_name=ps.get('name'),
+                    unlock_item=ps.get('unlock_item'),
+                )
+                ps = {**ps, **scaled, 'gear': gear_info}
 
             results.append({
                 'species': species,
@@ -4140,15 +4028,21 @@ class SQLiteEngine:
                 'base_level': lvl,
                 'best_location': best_loc_display,
                 'locations_breakdown': dict(loc_counts),
-                'hp': est_hp,
-                'attack': est_atk,
-                'defense': est_def,
+                'hp': best.get('hp'),
+                'attack': best.get('attack_melee'),
+                'defense': best.get('defense'),
                 'iv_hp': iv_hp,
                 'iv_attack': iv_atk,
                 'iv_defense': iv_def,
-                'passives': passives_list,
-                'partner_skill_categories': c_cats,
-                'icon_path': icon_path
+                'passives': [p.get('name') if isinstance(p, dict) else str(p) for p in best.get('passives', [])],
+                'partner_skill_categories': best.get('partner_skill_categories', []),
+                'icon_path': best.get('icon_path'),
+                'element_1': best.get('element_1'),
+                'element_2': best.get('element_2'),
+                'partner_skill': ps,
+                'gear': gear_info,
+                'gender': best.get('gender'),
+                'rank': attainable_stars,
             })
             
         return results
@@ -4332,64 +4226,12 @@ class SQLiteEngine:
         return result_list
 
     def get_owned_pals_with_suitabilities(self) -> list[dict[str, Any]]:
-        """Returns all owned Pal instances in the Palbox with work suitabilities and passives (batch-optimized)."""
-        cursor = self.conn.cursor()
-        instances = cursor.execute(
-            """
-            SELECT pi.*, p.display_name, p.paldex_number, p.food_requirement, p.nocturnal, p.icon_path
-            FROM pal_instances pi
-            LEFT JOIN pals p ON LOWER(REPLACE(pi.species, 'BOSS_', '')) = LOWER(p.internal_name)
-                             OR LOWER(pi.species) = LOWER(p.internal_name)
-                             OR LOWER(pi.species) = LOWER(p.display_name)
-            WHERE pi.location IN ('palbox', 'base', 'party', 'dps')
-            """
-        ).fetchall()
-
-        if not instances:
-            return []
-
-        # Batch load suitabilities into lookup dict
-        ws_lookup: dict[str, dict[str, int]] = {}
-        for r in cursor.execute("SELECT LOWER(pal_internal_name) as k, suitability_name, level FROM pal_work_suitabilities").fetchall():
-            k = r["k"]
-            if k not in ws_lookup:
-                ws_lookup[k] = {}
-            ws_lookup[k][r["suitability_name"]] = r["level"]
-
-        # Batch load passives into lookup dict
-        pass_lookup: dict[str, list[dict[str, str]]] = {}
-        for r in cursor.execute(
-            """
-            SELECT pip.instance_id, COALESCE(ps.name, pip.passive_id) as name, pip.passive_id as id
-            FROM pal_instance_passives pip
-            LEFT JOIN passive_skills ps ON LOWER(pip.passive_id) = LOWER(ps.id)
-            """
-        ).fetchall():
-            iid = r["instance_id"]
-            if iid not in pass_lookup:
-                pass_lookup[iid] = []
-            pass_lookup[iid].append({"name": r["name"], "id": r["id"]})
-
-        custom_names_map = self.get_base_camp_custom_names()
-
-        results = []
-        for inst in instances:
-            d = dict(inst)
-            inst_id = d["instance_id"]
-            base_id = d.get("location_details_base_camp_id")
-            if base_id and base_id in custom_names_map:
-                d["location_details_base_camp_name"] = custom_names_map[base_id]
-
-            species_clean = (d.get("species") or "").lower().replace("boss_", "")
-            species_raw = (d.get("species") or "").lower()
-
-            d["suitabilities"] = ws_lookup.get(species_clean) or ws_lookup.get(species_raw, {})
-            pass_list = pass_lookup.get(inst_id, [])
-            d["passives"] = [p["name"] for p in pass_list]
-            d["raw_passives"] = [p["id"] for p in pass_list]
-            d["icon_path"] = transform_icon_path(d.get("icon_path"))
-            results.append(d)
-        return results
+        """Returns all owned Pal instances in active storage locations with complete metadata via query_instances."""
+        instances = self.query_instances({})
+        return [
+            p for p in instances
+            if p.get("location") in ("palbox", "base", "party", "dps")
+        ]
 
     def get_passive_skill_modifiers(self) -> dict[str, dict[str, float]]:
         """Returns mapping of passive skill modifiers from SQLite keyed by lowercase id and name."""

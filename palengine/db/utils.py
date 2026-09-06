@@ -70,18 +70,68 @@ def calculate_aptitude(name: str, p_id: str, category: Optional[str]) -> dict[st
     
     return {'tier': 1, 'color': 'white', 'label': 'Standard'}
 
-def categorize_passive_source(name: str, p_id: str, category: Optional[str]) -> str:
+def is_pal_passive(p_id: str, name: str) -> bool:
+    """Returns True if the passive skill is an authentic Pal passive (not equipment, boss defeat perk, or effigy)."""
+    if not p_id or not name or name == "-" or name == "":
+        return False
+    # Boss defeat rewards (permanent player perks)
+    if "BossDefeat" in p_id:
+        return False
+    # Accessories, rings, and armor equipment
+    if "ACC" in p_id or "Equip" in p_id or "Armor" in p_id:
+        return False
+    # Rings of elemental resistance (item rings: ElementResist_Aqua_1, vs Pal passives: ElementResist_Aqua_1_PAL)
+    if p_id.startswith("ElementResist_") and not p_id.endswith("_PAL"):
+        return False
+    # Lifmunk effigy player capture power
+    if p_id.startswith("CaptureLevel_"):
+        return False
+    # Glider / boots / jump count player perks
+    if p_id.startswith("AirDash_") or p_id.startswith("JumpCount_") or p_id.startswith("RideJumpCount_"):
+        return False
+    # Thermal undershirt / armor temperature resist
+    if p_id.startswith("TemperatureResist_"):
+        return False
+    # Carrying capacity / drop rate accessories
+    if p_id.startswith("MaxInventoryWeight_") or p_id.startswith("StonDrop_") or p_id.startswith("WoodDrop_") or p_id.startswith("StonWoodDrop_"):
+        return False
+    # Sphere launcher modules
+    if p_id.startswith("SphereModule_"):
+        return False
+    # Gym leader / boss specific internal skills
+    if p_id.startswith("GYM_"):
+        return False
+    # Collect items dummy entries
+    if p_id.startswith("CollectItem_"):
+        return False
+    return True
+
+
+def categorize_passive_source(name: str, p_id: str, category: Optional[str] = None) -> str:
     """Categorize the origin source of a passive skill."""
+    if not is_pal_passive(p_id, name):
+        p_lower = p_id.lower()
+        if "bossdefeat" in p_lower:
+            return "Boss Defeat"
+        if any(p_lower.startswith(k) for k in ["capturelevel_", "airdash_", "jumpcount_", "ridejumpcount_", "spheremodule_"]):
+            return "Player"
+        return "Equipment"
+
     name_l = name.lower()
-    if 'legend' in name_l or 'emperor' in name_l or 'divine dragon' in name_l:
-        return 'Legendary'
-    if 'mutation' in name_l or (p_id and 'mutation' in p_id.lower()):
-        return 'Mutation'
-    if 'world tree' in name_l or (p_id and 'worldtree' in p_id.lower()):
-        return 'World Tree'
-    if 'equipment' in name_l or (p_id and 'equip' in p_id.lower()):
-        return 'Equipment'
-    return 'Pals'
+    id_l = p_id.lower()
+    if "worldtree" in id_l or "world tree" in name_l:
+        return "World Tree"
+    if "mutation" in id_l or "mutation" in name_l:
+        return "Mutation"
+    if (
+        "legend" in name_l
+        or "emperor" in name_l
+        or "divine dragon" in name_l
+        or "lord of " in name_l
+        or p_id in ["Legend", "Witch", "EternalFlame", "Invader"]
+    ):
+        return "Legendary"
+    return "Pals"
 
 def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     """Enrich a skill record with aptitude and source metadata."""

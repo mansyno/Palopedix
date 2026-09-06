@@ -139,7 +139,7 @@ export function PalFilterModal({
   useEffect(() => {
     if (isOpen && allPassives.length === 0) {
       setLoadingPassives(true);
-      fetch('/api/skills?type=Passive')
+      fetch('/api/skills?type=Passive&source=Pals')
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {

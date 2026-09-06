@@ -432,6 +432,7 @@ def get_skills(
     element: Optional[str] = None,
     category: Optional[str] = None,
     source: Optional[str] = None,
+    pal_only: Optional[bool] = None,
     search: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries skills catalog (Active, Passive, Partner)."""
@@ -444,6 +445,8 @@ def get_skills(
         filters["category"] = category
     if source:
         filters["source"] = source
+    if pal_only is not None:
+        filters["pal_only"] = pal_only
     if search:
         filters["search"] = search
     return db_engine.query_skills(filters)

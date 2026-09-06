@@ -114,15 +114,68 @@ def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Option
     return True
 
 
-def categorize_passive_source(name: str, p_id: str, category: Optional[str]) -> str:
-    """Categorizes passive skills into Pal, Player, or Base effects."""
-    n_l = name.lower()
+def is_pal_passive(p_id: str, name: str) -> bool:
+    """Returns True if the passive skill is an authentic Pal passive (not equipment, boss defeat perk, or effigy)."""
+    if not p_id or not name or name == "-" or name == "":
+        return False
+    # Boss defeat rewards (permanent player perks)
+    if "BossDefeat" in p_id:
+        return False
+    # Accessories, rings, and armor equipment
+    if "ACC" in p_id or "Equip" in p_id or "Armor" in p_id:
+        return False
+    # Rings of elemental resistance (item rings: ElementResist_Aqua_1, vs Pal passives: ElementResist_Aqua_1_PAL)
+    if p_id.startswith("ElementResist_") and not p_id.endswith("_PAL"):
+        return False
+    # Lifmunk effigy player capture power
+    if p_id.startswith("CaptureLevel_"):
+        return False
+    # Glider / boots / jump count player perks
+    if p_id.startswith("AirDash_") or p_id.startswith("JumpCount_") or p_id.startswith("RideJumpCount_"):
+        return False
+    # Thermal undershirt / armor temperature resist
+    if p_id.startswith("TemperatureResist_"):
+        return False
+    # Carrying capacity / drop rate accessories
+    if p_id.startswith("MaxInventoryWeight_") or p_id.startswith("StonDrop_") or p_id.startswith("WoodDrop_") or p_id.startswith("StonWoodDrop_"):
+        return False
+    # Sphere launcher modules
+    if p_id.startswith("SphereModule_"):
+        return False
+    # Gym leader / boss specific internal skills
+    if p_id.startswith("GYM_"):
+        return False
+    # Collect items dummy entries
+    if p_id.startswith("CollectItem_"):
+        return False
+    return True
+
+
+def categorize_passive_source(name: str, p_id: str, category: Optional[str] = None) -> str:
+    """Categorizes passive skills into Pals, Equipment, World Tree, Mutation, Legendary, etc."""
+    if not is_pal_passive(p_id, name):
+        p_lower = p_id.lower()
+        if "bossdefeat" in p_lower:
+            return "Boss Defeat"
+        if any(p_lower.startswith(k) for k in ["capturelevel_", "airdash_", "jumpcount_", "ridejumpcount_", "spheremodule_"]):
+            return "Player"
+        return "Equipment"
+
+    name_l = name.lower()
     id_l = p_id.lower()
-    if any(k in n_l for k in ["vanguard", "stronghold strategist", "motivational leader", "mine foreman", "logging foreman", "healing coach", "wellness watcher", "reload master"]):
-        return "Player Boost"
-    if any(k in n_l for k in ["artisan", "serious", "work slave", "clumsy", "slacker", "conceited", "diet lover", "efficient worker", "workaholic"]):
-        return "Work / Base"
-    return "Pal Combat"
+    if "worldtree" in id_l or "world tree" in name_l:
+        return "World Tree"
+    if "mutation" in id_l or "mutation" in name_l:
+        return "Mutation"
+    if (
+        "legend" in name_l
+        or "emperor" in name_l
+        or "divine dragon" in name_l
+        or "lord of " in name_l
+        or p_id in ["Legend", "Witch", "EternalFlame", "Invader"]
+    ):
+        return "Legendary"
+    return "Pals"
 
 
 def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
@@ -3405,9 +3458,15 @@ class SQLiteEngine:
                         continue
                     results.append(d)
 
+        if "pal_only" in filters and filters["pal_only"]:
+            results = [s for s in results if s.get("type") != "Passive" or is_pal_passive(s.get("id", ""), s.get("name", ""))]
+
         if "source" in filters and filters["source"]:
             src_val = str(filters["source"]).strip().lower()
-            results = [s for s in results if str(s.get("source", "")).strip().lower() == src_val]
+            if src_val in ["pals", "pal"]:
+                results = [s for s in results if s.get("type") != "Passive" or is_pal_passive(s.get("id", ""), s.get("name", ""))]
+            else:
+                results = [s for s in results if str(s.get("source", "")).strip().lower() == src_val]
 
         return results
 

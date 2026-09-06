@@ -55,10 +55,6 @@ def clean_skill_text(text: Optional[str], pal_name: str = "Pal") -> Optional[str
     # Remove Unreal placeholder variables like {ReferenceMsgId_DamageUp} or [ReferenceMsgId_DamageUp]
     cleaned = re.sub(r"\[ReferenceMsgId_[^\]]+\]", "", cleaned)
     cleaned = re.sub(r"\{ReferenceMsgId_[^}]+\}", "", cleaned)
-    cleaned = re.sub(r"\[ReferencePassive[^\]]+\]", "", cleaned)
-    cleaned = re.sub(r"\{ReferencePassive[^}]+\}", "", cleaned)
-    cleaned = re.sub(r"\[Passive[^\]]+\]", "", cleaned)
-    cleaned = re.sub(r"\{Passive[^}]+\}", "", cleaned)
     # Normalize whitespace and punctuation spacing
     cleaned = " ".join(cleaned.split())
     cleaned = re.sub(r"\s+([.,!?:;%])", r"\1", cleaned)
@@ -2948,10 +2944,11 @@ class SQLiteEngine:
                     if partner_skills:
                         from palengine.analytics.partner_skill_scaling import get_scaled_partner_skill
                         ps_raw = partner_skills[0]
+                        raw_desc = next((s.get("description") for s in s_rows if s.get("id") == ps_raw.get("id")), ps_raw.get("description"))
                         scaled_ps = get_scaled_partner_skill(
                             species_id_or_name=pal_dict.get("internal_name") or pal_dict.get("id") or pal_dict.get("display_name"),
                             stars=0,
-                            base_description=ps_raw.get("description"),
+                            base_description=raw_desc,
                             skill_name=ps_raw.get("name"),
                             unlock_item=ps_raw.get("unlock_item") or (gear_info["name"] if gear_info["requires_gear"] else None),
                         )

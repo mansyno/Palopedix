@@ -10,6 +10,7 @@ import {
   RARITY_OPTIONS,
   GEAR_STATUS_OPTIONS,
 } from './common/PalFilterModal';
+import { getElementIconUrl } from '../constants/gameData';
 
 const SHORT_CATEGORY_NAMES = {
   flying_mount: 'Fly',
@@ -32,21 +33,7 @@ const SHORT_CATEGORY_NAMES = {
   no_active_skill: '',
 };
 
-const ELEMENT_ICON_MAP = {
-  Neutral: '/assets/elements/Normal.png',
-  Normal: '/assets/elements/Normal.png',
-  Fire: '/assets/elements/Fire.png',
-  Water: '/assets/elements/Water.png',
-  Grass: '/assets/elements/Grass.png',
-  Leaf: '/assets/elements/Grass.png',
-  Electric: '/assets/elements/Electric.png',
-  Electricity: '/assets/elements/Electric.png',
-  Ice: '/assets/elements/Ice.png',
-  Ground: '/assets/elements/Ground.png',
-  Earth: '/assets/elements/Ground.png',
-  Dark: '/assets/elements/Dark.png',
-  Dragon: '/assets/elements/Dragon.png',
-};
+
 
 const DEFAULT_FILTERS = {
   partnerGroup: '',
@@ -859,7 +846,7 @@ export function SaveGameExplorerView({
                             {group.elements.map(el => (
                               <img
                                 key={el}
-                                src={ELEMENT_ICON_MAP[el] || `/assets/elements/${el}.png`}
+                                src={getElementIconUrl(el)}
                                 alt=""
                                 style={{ width: '18px', height: '18px', objectFit: 'contain' }}
                                 onError={(e) => { e.target.style.display = 'none'; }}
@@ -1007,7 +994,7 @@ export function SaveGameExplorerView({
                                 {childElements.map(el => (
                                   <img
                                     key={el}
-                                    src={ELEMENT_ICON_MAP[el] || `/assets/elements/${el}.png`}
+                                    src={getElementIconUrl(el)}
                                     alt=""
                                     style={{ width: '16px', height: '16px', objectFit: 'contain' }}
                                     onError={(e) => { e.target.style.display = 'none'; }}
@@ -1179,7 +1166,7 @@ export function SaveGameExplorerView({
                           {flatElements.map(el => (
                             <img
                               key={el}
-                              src={ELEMENT_ICON_MAP[el] || `/assets/elements/${el}.png`}
+                              src={getElementIconUrl(el)}
                               alt=""
                               style={{ width: '16px', height: '16px', objectFit: 'contain' }}
                               onError={(e) => { e.target.style.display = 'none'; }}

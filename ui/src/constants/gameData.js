@@ -94,3 +94,27 @@ export const BASE_CATEGORY_MAP = {
   'Ranching': { emoji: '🐑', color: 'rgba(20, 184, 166, 0.15)', border: 'rgba(20, 184, 166, 0.4)', text: '#2dd4bf' },
   'Balanced': { emoji: '⚖️', color: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)', text: '#cbd5e1' },
 };
+
+export const ELEMENT_ASSET_MAP = {
+  Neutral: '/assets/elements/Neutral.png?v=2',
+  Normal: '/assets/elements/Normal.png?v=2',
+  Fire: '/assets/elements/Fire.png?v=2',
+  Water: '/assets/elements/Water.png?v=2',
+  Grass: '/assets/elements/Grass.png?v=2',
+  Leaf: '/assets/elements/Leaf.png?v=2',
+  Electric: '/assets/elements/Electric.png?v=2',
+  Electricity: '/assets/elements/Electricity.png?v=2',
+  Ice: '/assets/elements/Ice.png?v=2',
+  Ground: '/assets/elements/Ground.png?v=2',
+  Earth: '/assets/elements/Earth.png?v=2',
+  Dark: '/assets/elements/Dark.png?v=2',
+  Dragon: '/assets/elements/Dragon.png?v=2',
+};
+
+export function getElementIconUrl(elementName) {
+  if (!elementName) return '';
+  const key = String(elementName).trim();
+  const normalizedKey = key.charAt(0).toUpperCase() + key.slice(1).toLowerCase();
+  return ELEMENT_ASSET_MAP[key] || ELEMENT_ASSET_MAP[normalizedKey] || `/assets/elements/${key}.png?v=2`;
+}
+

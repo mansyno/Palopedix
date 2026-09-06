@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { getElementIconUrl } from '../constants/gameData';
 
 export function PaldexMasterView({
   pals = [],
@@ -238,13 +239,13 @@ export function PaldexMasterView({
                   <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
                     {p.element_1 && (
                       <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.1rem 0.35rem', fontSize: '0.7rem' }}>
-                        <img src={`/assets/elements/${p.element_1}.png`} alt={p.element_1} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                        <img src={getElementIconUrl(p.element_1)} alt={p.element_1} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
                         {p.element_1}
                       </span>
                     )}
                     {p.element_2 && (
                       <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', padding: '0.1rem 0.35rem', fontSize: '0.7rem' }}>
-                        <img src={`/assets/elements/${p.element_2}.png`} alt={p.element_2} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                        <img src={getElementIconUrl(p.element_2)} alt={p.element_2} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
                         {p.element_2}
                       </span>
                     )}

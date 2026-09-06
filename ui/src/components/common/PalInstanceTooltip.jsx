@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PassiveBadge } from './PassiveBadge';
+import { getElementIconUrl } from '../../constants/gameData';
 
 export function PalInstanceTooltip({ instance, children }) {
   const [pos, setPos] = useState(null);
@@ -128,13 +129,13 @@ export function PalInstanceTooltip({ instance, children }) {
               <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
                 {elem1 && (
                   <span className="badge badge-element" style={{ fontSize: '0.7rem', padding: '0.1rem 0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <img src={`/assets/elements/${elem1}.png`} alt={elem1} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                    <img src={getElementIconUrl(elem1)} alt={elem1} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
                     {elem1}
                   </span>
                 )}
                 {elem2 && (
                   <span className="badge badge-element" style={{ fontSize: '0.7rem', padding: '0.1rem 0.35rem', display: 'inline-flex', alignItems: 'center', gap: '0.2rem' }}>
-                    <img src={`/assets/elements/${elem2}.png`} alt={elem2} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                    <img src={getElementIconUrl(elem2)} alt={elem2} style={{ width: '12px', height: '12px' }} onError={(e) => { e.target.style.display = 'none'; }} />
                     {elem2}
                   </span>
                 )}

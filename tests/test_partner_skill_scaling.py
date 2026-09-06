@@ -170,3 +170,78 @@ def test_pal_gear_enrichment():
         assert lamball.get("gear") is not None
         assert lamball["gear"]["requires_gear"] is False
 
+
+def test_menasting_terra_multi_param_scaling():
+    base_desc = (
+        "While in party, player's Defense increases by {Passive2_EffectValue1}%, "
+        "and Electric Pals drop {Passive1_EffectValue1}% more items when defeated. (Does not stack)"
+    )
+    # Lv 1 (0 Stars)
+    res_0 = get_scaled_partner_skill("Menasting Terra", 0, base_desc, "Golden Scorpion")
+    assert res_0["level"] == 1
+    assert "player's Defense increases by 10%" in res_0["description"]
+    assert "Electric Pals drop 40% more items" in res_0["description"]
+    assert "by%" not in res_0["description"]
+    assert "drop%" not in res_0["description"]
+    assert "{" not in res_0["description"]
+    assert "}" not in res_0["description"]
+
+    # Lv 5 (4 Stars)
+    res_4 = get_scaled_partner_skill("DarkScorpion_Ground", 4, base_desc, "Golden Scorpion")
+    assert res_4["level"] == 5
+    assert "player's Defense increases by 20%" in res_4["description"]
+    assert "Electric Pals drop 80% more items" in res_4["description"]
+    assert "by%" not in res_4["description"]
+    assert "drop%" not in res_4["description"]
+
+
+def test_beakon_multi_param_scaling():
+    base_desc = (
+        "Can be ridden as a flying mount. While mounted, changes the player's attack type to Electric "
+        "and increases Attack by {Passive3_EffectValue1}%. This Pal's Movement Speed increases by "
+        "{Passive1_EffectValue1}% for each other Electric Pal in your party. (Excluding Beakon)"
+    )
+    # Lv 1 (0 Stars)
+    res_0 = get_scaled_partner_skill("Beakon", 0, base_desc, "Thunderous")
+    assert res_0["level"] == 1
+    assert "increases Attack by 50%" in res_0["description"]
+    assert "Movement Speed increases by 5%" in res_0["description"]
+
+    # Lv 5 (4 Stars)
+    res_4 = get_scaled_partner_skill("ThunderBird", 4, base_desc, "Thunderous")
+    assert res_4["level"] == 5
+    assert "increases Attack by 100%" in res_4["description"]
+    assert "Movement Speed increases by 10%" in res_4["description"]
+
+
+def test_helzephyr_lux_and_azurobe_cryst_infusion():
+    # Helzephyr Lux (HadesBird_Electric)
+    helz_desc = "Can be ridden as a flying mount. While mounted, changes the player's attack type to and increases Attack by%."
+    res_helz = get_scaled_partner_skill("Helzephyr Lux", 0, helz_desc, "Wings of Thunder")
+    assert "changes the player's attack type to Electric and increases Attack by 50%" in res_helz["description"]
+
+    # Azurobe Cryst (BlueDragon_Ice)
+    azur_desc = "Can be ridden to travel on water. While mounted, changes the player's attack type to and increases Attack by%."
+    res_azur = get_scaled_partner_skill("Azurobe Cryst", 4, azur_desc, "Icewing Dance")
+    assert "changes the player's attack type to Ice and increases Attack by 100%" in res_azur["description"]
+
+
+def test_no_broken_descriptions_across_all_pals():
+    import re
+    engine = SQLiteEngine(world_id="test_static_pals")
+    pals = engine.query_pals({})
+    assert len(pals) > 0
+
+    for p in pals:
+        ps = p.get("partner_skill")
+        if ps and ps.get("description"):
+            desc = ps["description"]
+            # Assert no broken tags or naked percentages remain
+            assert not re.search(r"[a-zA-Z]%", desc), f"Pal {p.get('display_name')} has broken bare % in: {desc}"
+            assert "{" not in desc, f"Pal {p.get('display_name')} has unparsed {{ in: {desc}"
+            assert "}" not in desc, f"Pal {p.get('display_name')} has unparsed }} in: {desc}"
+            assert "by%" not in desc
+            assert "drop%" not in desc
+            assert "take%" not in desc
+
+

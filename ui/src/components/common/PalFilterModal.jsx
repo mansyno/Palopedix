@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { CustomSelect } from './CustomSelect';
+import { getElementIconUrl } from '../../constants/gameData';
 
 export const OFFICIAL_ELEMENTS = [
   { name: 'Neutral', label: 'Neutral', emoji: '⚪', color: '#cbd5e1', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)' },
@@ -541,7 +542,7 @@ export function PalFilterModal({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <img
-                        src={`/assets/elements/${elem.name}.png`}
+                        src={getElementIconUrl(elem.name)}
                         alt={elem.name}
                         style={{ width: '18px', height: '18px', objectFit: 'contain' }}
                         onError={(e) => { e.target.style.display = 'none'; }}

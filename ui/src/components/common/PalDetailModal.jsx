@@ -1,5 +1,5 @@
 import React from 'react';
-import { WORK_SUITABILITY_MAP } from '../../constants/gameData';
+import { WORK_SUITABILITY_MAP, getElementIconUrl } from '../../constants/gameData';
 import { PassiveBadge, getPassiveMeta } from './PassiveBadge';
 
 export function PalDetailModal({ pal, onClose }) {
@@ -27,13 +27,13 @@ export function PalDetailModal({ pal, onClose }) {
               <div className="badge-container" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
                 {pal.element_1 && (
                   <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <img src={`/assets/elements/${pal.element_1}.png`} alt={pal.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <img src={getElementIconUrl(pal.element_1)} alt={pal.element_1} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
                     {pal.element_1}
                   </span>
                 )}
                 {pal.element_2 && (
                   <span className="badge badge-element" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <img src={`/assets/elements/${pal.element_2}.png`} alt={pal.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
+                    <img src={getElementIconUrl(pal.element_2)} alt={pal.element_2} className="element-icon-badge" onError={(e) => { e.target.style.display = 'none'; }} />
                     {pal.element_2}
                   </span>
                 )}

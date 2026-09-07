@@ -14,7 +14,17 @@
 2. **Never Write Redundant One-Off Scripts**: If you need data from a save file, Paldex, skill database, or base camp, run the CLI with `--format json` or use `SQLiteEngine`. Do NOT write temporary `.py` files in the root or scratch folders.
 3. **No In-Code Workarounds**: If data is missing or incomplete in a database table, do not create hardcoded Python fallback ladders. Surface the missing schema/data to the user.
 4. **No Proactive / Unrequested Logic Shifts**: Do not alter parsing formulas, database schemas, or generator scoring algorithms unless explicitly asked by the user.
-5. **Surgical Precision**: Touch only the exact files required for the task. Keep diffs minimal and clean.
+5. **Master Database & Save Isolation**:
+   - Master static game data is bundled at `data/palworld.db` (attached as `palworld_master`).
+   - Dynamic player and save game data is generated in per-world databases (`data/world_<WORLD_ID>.db`) and `data/userdata.db`.
+   - Never commit or track dynamic save databases or user save files to Git.
+6. **Playable In-Game Pals Standard**:
+   - The master database contains 316 raw entries. Exactly **291 species** are genuine, playable in-game Pals.
+   - Always exclude non-playable entities: 6 crossover slimes, 7 Terraria event monsters, 9 tower boss trainer pairs (`X & Y`), and 3 cut/unreleased NPCs (`Boltmane`, `Dragostrophe`, `PIDF Rider`).
+7. **Frontend Component Architecture**:
+   - Central filter dropdowns (`CustomSelect`) must render via `createPortal(..., document.body)` with `fixed` coordinates to prevent modal container clipping.
+   - World Pals and Filter Modal must respect `palSourceMode` (`'all'` vs `'caught'`), dynamically scoping available passive skills and species when caught mode is active.
+8. **Surgical Precision**: Touch only the exact files required for the task. Keep diffs minimal and clean.
 
 ---
 
@@ -117,10 +127,9 @@ FastAPI runs at `http://localhost:8000`:
 * `GET /api/bases` & `GET /api/bases/{id}`: Base camps & structures.
 * `GET /api/base_camps/{id}/recommendations`: Base camp optimal work crew.
 * `GET /api/breeding/path?target={target}&owned={auto|comma_separated}&target_skills={skills}`: Multi-gen breeding paths with gender odds and instance scores.
-* `GET /api/skills`: Active, Passive, and Partner skills catalog.
+* `GET /api/skills`: Active, Passive, and Partner skills catalog (includes `tier_rank` and `tier` metadata).
 * `GET /api/items` & `GET /api/items/{id}/recipe`: Items and crafting recipes.
 * `GET /api/tech_tree`: Unlockable technology nodes.
-
 
 ---
 
@@ -129,6 +138,7 @@ FastAPI runs at `http://localhost:8000`:
 * **`palengine/`**: Production Python backend package (API, CLI, DB, Analytics, Parser).
 * **`ui/`**: React Vite web frontend.
 * **`tests/`**: Pytest test suite (`python -m pytest tests -v`).
-* **`data/`**: Master SQLite databases and static game datasets.
+* **`data/`**: Bundled master SQLite database (`data/palworld.db`) and structure aliases.
+* **`assets/`**: Visual assets directory (downloaded via GitHub Releases).
 * **Root Directory**: Keep clean. Do NOT place loose `.py` scripts or JSON dumps in the project root.
 * **Temporary Files**: If any scratch analysis is strictly required, remove the scratch files immediately after validation.

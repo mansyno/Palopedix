@@ -29,14 +29,20 @@ Thumbs.db
 .DS_Store
 desktop.ini
 
-# Project
+# Project Save Files & Logs
 *.sav
 *.sav.json
-*.db
 *.sqlite
 *.log
 caught_pals*.json
-
-data/
 scratch/
 backups/
+
+# Assets Archive & Extracted Assets (Option B: Hosted via GitHub Releases)
+assets/*.zip
+assets/palworld_assets/
+
+# Data Directory: Ignore dynamic world/user databases, track master palworld.db & structure aliases
+data/*
+!data/palworld.db
+!data/structure_aliases.json

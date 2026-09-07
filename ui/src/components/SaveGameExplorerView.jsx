@@ -848,7 +848,7 @@ export function SaveGameExplorerView({
                 /* ========================================================================= */
                 sortedGlobalPals.length > 0 ? (
                   sortedGlobalPals.map(pal => {
-                    const palIcon = pal.icon_url || (pal.display_name ? `/assets/pals/icons/${pal.display_name.toLowerCase().replace(/ /g, '_')}.png` : null);
+                    const palIcon = pal.icon_path || pal.icon_url || (pal.display_name ? `/assets/pals/${pal.display_name.toLowerCase().replace(/ /g, '_')}.png` : null);
                     const cats = pal.partner_skill_categories || [];
 
                     return (
@@ -865,15 +865,15 @@ export function SaveGameExplorerView({
                               <img
                                 src={palIcon}
                                 alt={pal.display_name}
-                                style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}
+                                style={{ width: '24px', height: '24px', borderRadius: '4px', objectFit: 'contain', background: 'rgba(0,0,0,0.3)', flexShrink: 0 }}
                                 onError={(e) => { e.target.style.display = 'none'; }}
                               />
                             ) : (
-                              <span style={{ width: '28px', height: '28px', borderRadius: '6px', background: 'rgba(255,255,255,0.05)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>🐾</span>
+                              <span style={{ width: '24px', height: '24px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem', flexShrink: 0 }}>🐾</span>
                             )}
-                            <div style={{ minWidth: 0, overflow: 'hidden' }}>
-                              <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-primary)', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                #{String(pal.paldex_number || 0).padStart(3, '0')} {pal.display_name}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                              <span style={{ fontWeight: 800, color: 'var(--accent-gold)', fontSize: '0.84rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {pal.display_name}
                               </span>
                             </div>
                           </div>

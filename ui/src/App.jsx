@@ -51,7 +51,7 @@ function App() {
   const [instances, setInstances] = useState([]);
   const [bases, setBases] = useState([]);
   const [ownedSpecies, setOwnedSpecies] = useState([]);
-  const [palSourceMode, setPalSourceMode] = useState('global');
+  const [palSourceMode, setPalSourceMode] = useState('caught');
   const [ownedPals, setOwnedPals] = useState('');
 
   // --- Fetch Helper Functions ---

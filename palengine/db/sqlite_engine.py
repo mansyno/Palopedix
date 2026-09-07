@@ -3479,8 +3479,9 @@ class SQLiteEngine:
 
         return results
 
-    def query_instances(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
+    def query_instances(self, filters: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
         """Queries dynamic Pal instances table with multiple filter conditions."""
+        filters = filters or {}
         # 1. Preload master pals dictionary in memory for O(1) attribute lookup
         pal_rows = self.conn.execute("SELECT * FROM pals").fetchall()
         pals_map = {}
@@ -3728,8 +3729,8 @@ class SQLiteEngine:
             except Exception:
                 pass
 
-        # 5. Batch load custom base names
-        custom_names_map = self.get_base_camp_custom_names()
+        # 5. Batch load resolved base names (custom name or Base 1, Base 2, etc.)
+        base_names_map = self.get_resolved_base_names()
 
         # 6. Batch load Pal Gear mappings and player's crafted Key Items
         pal_gear_map = self.get_pal_gear_map()
@@ -3739,8 +3740,18 @@ class SQLiteEngine:
         for r in rows:
             d = dict(r)
             base_id = d.get("location_details_base_camp_id")
-            if base_id and base_id in custom_names_map:
-                d["location_details_base_camp_name"] = custom_names_map[base_id]
+            if base_id and base_id in base_names_map:
+                d["location_details_base_camp_name"] = base_names_map[base_id]
+            elif d.get("location") == "base":
+                raw_bname = d.get("location_details_base_camp_name")
+                if not raw_bname or raw_bname in ("Unnamed Base", "新規生成拠点"):
+                    d["location_details_base_camp_name"] = "Base 1"
+
+            d["location_details"] = {
+                "player_uid": d.get("location_details_player_uid"),
+                "base_camp_id": d.get("location_details_base_camp_id"),
+                "base_camp_name": d.get("location_details_base_camp_name"),
+            }
 
             sp = (d.get("species") or "").lower()
             clean_sp = sp[5:] if sp.startswith("boss_") else sp
@@ -3911,10 +3922,8 @@ class SQLiteEngine:
             return None
 
         summary = dict(base_row)
-        if summary.get("custom_name"):
-            summary["display_name"] = summary["custom_name"]
-        else:
-            summary["display_name"] = summary.get("name") or f"Base {base_camp_id[:8]}"
+        resolved_names = self.get_resolved_base_names()
+        summary["display_name"] = resolved_names.get(base_camp_id, summary.get("custom_name") or summary.get("name") or f"Base {base_camp_id[:8]}")
 
         struct_rows = self.conn.execute(
             """
@@ -4178,6 +4187,49 @@ class SQLiteEngine:
         self.conn.commit()
         self._cached_base_recommendations = None
 
+    def get_resolved_base_names(self) -> dict[str, str]:
+        """Returns mapping of base_camp_id to display name (custom_name if renamed; else 'Base 1', 'Base 2', etc.)."""
+        cursor = self.conn.cursor()
+        try:
+            camps = cursor.execute(
+                """
+                SELECT bc.base_camp_id, bc.name, cn.custom_name
+                FROM base_camps bc
+                LEFT JOIN base_camp_custom_names cn ON bc.base_camp_id = cn.base_camp_id
+                ORDER BY bc.rowid ASC
+                """
+            ).fetchall()
+        except Exception:
+            return {}
+
+        mapping: dict[str, str] = {}
+        for idx, c in enumerate(camps, start=1):
+            camp_id = c["base_camp_id"]
+            custom = c["custom_name"]
+            raw_name = c["name"]
+            if custom and custom.strip():
+                mapping[camp_id] = custom.strip()
+            elif raw_name and raw_name.strip() and raw_name.strip() not in ("Unnamed Base", "新規生成拠点") and raw_name.strip() != camp_id:
+                mapping[camp_id] = raw_name.strip()
+            else:
+                mapping[camp_id] = f"Base {idx}"
+
+        # If any base IDs in pal_instances were not in base_camps, assign sequential numbers
+        try:
+            extra_ids = cursor.execute(
+                "SELECT DISTINCT location_details_base_camp_id FROM pal_instances WHERE location_details_base_camp_id IS NOT NULL"
+            ).fetchall()
+            next_idx = len(mapping) + 1
+            for r in extra_ids:
+                bid = r[0]
+                if bid and bid not in mapping:
+                    mapping[bid] = f"Base {next_idx}"
+                    next_idx += 1
+        except Exception:
+            pass
+
+        return mapping
+
     def get_base_camp_custom_names(self) -> dict[str, str]:
         """Returns mapping of base_camp_id to custom_name."""
         cursor = self.conn.cursor()
@@ -4195,19 +4247,18 @@ class SQLiteEngine:
             SELECT bc.base_camp_id, bc.name, cn.custom_name
             FROM base_camps bc
             LEFT JOIN base_camp_custom_names cn ON bc.base_camp_id = cn.base_camp_id
+            ORDER BY bc.rowid ASC
             """
         ).fetchall()
         settings = self.get_world_settings()
         default_max = int(settings.get("BaseCampWorkerMaxNum", 15))
 
+        resolved_names = self.get_resolved_base_names()
         results = []
-        for c in camps:
+        for idx, c in enumerate(camps, start=1):
             c_dict = dict(c)
             camp_id = c_dict["base_camp_id"]
-            if c_dict.get("custom_name"):
-                c_dict["display_name"] = c_dict["custom_name"]
-            else:
-                c_dict["display_name"] = c_dict.get("name") or f"Base {camp_id[:8]}"
+            c_dict["display_name"] = resolved_names.get(camp_id, f"Base {idx}")
             
             # Count structure instances
             struct_count = cursor.execute(

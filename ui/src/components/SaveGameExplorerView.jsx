@@ -994,7 +994,11 @@ export function SaveGameExplorerView({
                     if (sortCol === 'gender') return sortDesc ? (b.gender || '').localeCompare(a.gender || '') : (a.gender || '').localeCompare(b.gender || '');
                     if (sortCol === 'rank') return sortDesc ? (b.rank || 0) - (a.rank || 0) : (a.rank || 0) - (b.rank || 0);
                     if (sortCol === 'current_speed') return sortDesc ? (b.current_speed || 0) - (a.current_speed || 0) : (a.current_speed || 0) - (b.current_speed || 0);
-                    if (sortCol === 'location') return sortDesc ? (b.location || '').localeCompare(a.location || '') : (a.location || '').localeCompare(b.location || '');
+                    if (sortCol === 'location') {
+                      const locA = a.location === 'base' ? (a.location_details_base_camp_name || a.location_details?.base_camp_name || 'Base 1') : (a.location || '');
+                      const locB = b.location === 'base' ? (b.location_details_base_camp_name || b.location_details?.base_camp_name || 'Base 1') : (b.location || '');
+                      return sortDesc ? locB.localeCompare(locA) : locA.localeCompare(locB);
+                    }
                     return 0;
                   });
 
@@ -1111,9 +1115,14 @@ export function SaveGameExplorerView({
                             {group.instances.some(i => i.location === 'party') && (
                               <span className="badge badge-party" style={{ fontSize: '0.58rem', padding: '0.04rem 0.25rem' }}>Party</span>
                             )}
-                            {group.instances.some(i => i.location === 'base') && (
-                              <span className="badge badge-base" style={{ fontSize: '0.58rem', padding: '0.04rem 0.25rem' }}>Base</span>
-                            )}
+                            {(() => {
+                              const basePals = group.instances.filter(i => i.location === 'base');
+                              if (basePals.length === 0) return null;
+                              const uniqueBaseNames = Array.from(new Set(basePals.map(p => p.location_details_base_camp_name || p.location_details?.base_camp_name || 'Base 1')));
+                              return uniqueBaseNames.map(bName => (
+                                <span key={bName} className="badge badge-base" style={{ fontSize: '0.58rem', padding: '0.04rem 0.25rem' }}>{bName}</span>
+                              ));
+                            })()}
                             {group.instances.some(i => i.location === 'palbox' || !i.location) && (
                               <span className="badge badge-palbox" style={{ fontSize: '0.58rem', padding: '0.04rem 0.25rem' }}>Box</span>
                             )}
@@ -1157,7 +1166,7 @@ export function SaveGameExplorerView({
                       {isExpanded && sortedChildren.map((pi, childIdx) => {
                         const isLastChild = childIdx === sortedChildren.length - 1;
                         const locClass = pi.location === 'party' ? 'badge-party' : (pi.location === 'base' ? 'badge-base' : (pi.location === 'dps' ? 'badge-dps' : 'badge-palbox'));
-                        const locLabel = pi.location === 'party' ? 'PARTY' : (pi.location === 'base' ? 'BASE' : (pi.location === 'dps' ? 'STORAGE' : 'PALBOX'));
+                        const locLabel = pi.location === 'party' ? 'PARTY' : (pi.location === 'base' ? (pi.location_details_base_camp_name || pi.location_details?.base_camp_name || 'Base 1') : (pi.location === 'dps' ? 'STORAGE' : 'PALBOX'));
                         const locIcon = pi.location === 'party' ? '⚔️' : (pi.location === 'base' ? '🏠' : (pi.location === 'dps' ? '🔮' : '📦'));
                         
                         const rankStars = (pi.rank && pi.rank > 0) ? '★'.repeat(pi.rank) : '-';
@@ -1323,7 +1332,7 @@ export function SaveGameExplorerView({
                   const palIcon = pi.icon_url || masterPal?.icon_url || (palName ? `/assets/pals/icons/${palName.toLowerCase().replace(/ /g, '_')}.png` : null);
                   
                   const locClass = pi.location === 'party' ? 'badge-party' : (pi.location === 'base' ? 'badge-base' : (pi.location === 'dps' ? 'badge-dps' : 'badge-palbox'));
-                  const locLabel = pi.location === 'party' ? 'PARTY' : (pi.location === 'base' ? 'BASE' : (pi.location === 'dps' ? 'STORAGE' : 'PALBOX'));
+                  const locLabel = pi.location === 'party' ? 'PARTY' : (pi.location === 'base' ? (pi.location_details_base_camp_name || pi.location_details?.base_camp_name || 'Base 1') : (pi.location === 'dps' ? 'STORAGE' : 'PALBOX'));
                   const locIcon = pi.location === 'party' ? '⚔️' : (pi.location === 'base' ? '🏠' : (pi.location === 'dps' ? '🔮' : '📦'));
                   
                   const rankStars = (pi.rank && pi.rank > 0) ? '★'.repeat(pi.rank) : '-';

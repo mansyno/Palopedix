@@ -204,3 +204,46 @@ def test_no_generators_no_electric_demand(engine):
     assert "GeneratingElectricity" not in audit["demand_by_suitability"]
     assert audit["electric_deficit"] == 0
 
+
+def test_unrenamed_base_camps_sequential_numbering(engine):
+    """Tests that unrenamed base camps receive sequential Base 1, Base 2 names and instances reflect them."""
+    engine.conn.execute("DELETE FROM base_camps")
+    engine.conn.execute("DELETE FROM base_camp_custom_names")
+    engine.conn.execute("INSERT INTO base_camps (base_camp_id, name) VALUES ('test_base_1', 'Unnamed Base')")
+    engine.conn.execute("INSERT INTO base_camps (base_camp_id, name) VALUES ('test_base_2', 'Unnamed Base')")
+    engine.conn.commit()
+
+    camps = engine.get_base_camps()
+    assert len(camps) >= 2
+    # test_base_1 and test_base_2 are in order of insertion
+    b1 = next(c for c in camps if c["base_camp_id"] == "test_base_1")
+    b2 = next(c for c in camps if c["base_camp_id"] == "test_base_2")
+    assert b1["display_name"] == "Base 1"
+    assert b2["display_name"] == "Base 2"
+
+    # Insert test pal instances assigned to base 1 and base 2
+    engine.conn.execute(
+        "INSERT OR REPLACE INTO pal_instances (instance_id, species, location, location_details_base_camp_id) VALUES ('pal_inst_1', 'Lamball', 'base', 'test_base_1')"
+    )
+    engine.conn.execute(
+        "INSERT OR REPLACE INTO pal_instances (instance_id, species, location, location_details_base_camp_id) VALUES ('pal_inst_2', 'Cattiva', 'base', 'test_base_2')"
+    )
+    engine.conn.commit()
+
+    instances = engine.query_instances()
+    p1 = next(i for i in instances if i["instance_id"] == "pal_inst_1")
+    p2 = next(i for i in instances if i["instance_id"] == "pal_inst_2")
+    assert p1["location_details_base_camp_name"] == "Base 1"
+    assert p1["location_details"]["base_camp_name"] == "Base 1"
+    assert p2["location_details_base_camp_name"] == "Base 2"
+    assert p2["location_details"]["base_camp_name"] == "Base 2"
+
+    # Now rename base 1 to custom name
+    engine.set_base_camp_custom_name("test_base_1", "Ore Fortress")
+    instances_after = engine.query_instances()
+    p1_after = next(i for i in instances_after if i["instance_id"] == "pal_inst_1")
+    p2_after = next(i for i in instances_after if i["instance_id"] == "pal_inst_2")
+    assert p1_after["location_details_base_camp_name"] == "Ore Fortress"
+    assert p2_after["location_details_base_camp_name"] == "Base 2"
+
+

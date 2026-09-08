@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
 import { getSkillTierRank } from './common/PalFilterModal';
+import { exportToJson } from '../utils/exportJson';
 
 export function BreedingCenterView({
   pals = [],
@@ -895,6 +896,30 @@ export function BreedingCenterView({
                         <span style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-secondary)' }}>
                           {currentPathObj.difficulty}
                         </span>
+                        <button
+                          onClick={() => {
+                            exportToJson(
+                              { target_species: targetPal, target_skills: targetSkills || null, paths: allBreedingPaths },
+                              `breeding_paths_${(targetPal || 'pal').replace(/[^a-z0-9_-]/gi, '_')}.json`
+                            );
+                          }}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            background: 'rgba(59, 130, 246, 0.15)',
+                            border: '1px solid rgba(59, 130, 246, 0.35)',
+                            color: '#93c5fd',
+                            padding: '0.2rem 0.55rem',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                          }}
+                          title="Export breeding path results to JSON file"
+                        >
+                          📥 Export JSON
+                        </button>
                       </div>
                     </div>
 

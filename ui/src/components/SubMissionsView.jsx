@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { exportToJson } from '../utils/exportJson';
 
 export function SubMissionsView() {
   const [locations, setLocations] = useState([]);
@@ -111,6 +112,29 @@ export function SubMissionsView() {
               width: '230px'
             }}
           />
+          <button
+            onClick={() => {
+              exportToJson(locations, 'active_sub_missions.json');
+            }}
+            disabled={!locations || locations.length === 0}
+            style={{
+              padding: '0.35rem 0.75rem',
+              borderRadius: '6px',
+              background: 'rgba(59, 130, 246, 0.15)',
+              color: '#93c5fd',
+              border: '1px solid rgba(59, 130, 246, 0.35)',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              whiteSpace: 'nowrap'
+            }}
+            title="Export sub-missions status to JSON file"
+          >
+            📥 Export JSON
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
+import { exportToJson } from '../utils/exportJson';
 
 export function CondenserView({ pals = [], setSelectedPal, worldId, saveLoaded }) {
   const [candidates, setCandidates] = useState([]);
@@ -121,6 +122,28 @@ export function CondenserView({ pals = [], setSelectedPal, worldId, saveLoaded }
               title="Refresh condenser data from backend"
             >
               🔄 Refresh
+            </button>
+            <button
+              onClick={() => {
+                exportToJson(candidates, 'condenser_candidates.json');
+              }}
+              disabled={loading || !candidates || candidates.length === 0}
+              style={{
+                padding: '0.35rem 0.75rem',
+                borderRadius: '6px',
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#93c5fd',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="Export condenser candidates to JSON file"
+            >
+              📥 Export JSON
             </button>
             <input
               type="text"

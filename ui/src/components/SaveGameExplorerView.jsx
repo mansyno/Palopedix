@@ -12,6 +12,7 @@ import {
   OFFICIAL_WORK_SUITABILITIES,
 } from './common/PalFilterModal';
 import { getElementIconUrl } from '../constants/gameData';
+import { exportToJson } from '../utils/exportJson';
 
 const SHORT_CATEGORY_NAMES = {
   flying_mount: 'Fly',
@@ -718,6 +719,33 @@ export function SaveGameExplorerView({
                   Showing {filteredGlobalPals.length} Real In-Game Pals
                 </span>
               )}
+
+              {/* Export JSON Button */}
+              <button
+                onClick={() => {
+                  const dataToExport = palSourceMode === 'caught' ? filteredInstances : filteredGlobalPals;
+                  const filename = palSourceMode === 'caught' ? 'caught_pals_instances.json' : 'paldex_pals.json';
+                  exportToJson(dataToExport, filename);
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  color: '#93c5fd',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.74rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Export current Pal list to JSON"
+              >
+                <span>📥</span>
+                <span>Export JSON</span>
+              </button>
             </div>
           </div>
 

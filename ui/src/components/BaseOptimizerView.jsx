@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
 import { WORK_TYPE_ASSET_MAP, CATEGORY_STYLES } from '../constants/gameData';
+import { exportToJson } from '../utils/exportJson';
 
 export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
   const [baseCamps, setBaseCamps] = useState([]);
@@ -237,6 +238,33 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
                 <span style={{ color: 'var(--text-secondary)' }}>SAN:</span>
                 <strong style={{ color: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? '#ef4444' : '#a78bfa' }}>{recommendation.food_and_san_summary?.san_stability_status}</strong>
               </div>
+
+              {/* Export JSON Button */}
+              <button
+                onClick={() => {
+                  const baseName = activeBase?.custom_name || activeBase?.display_name || activeBase?.name || selectedBaseId || 'base';
+                  const sanitized = baseName.replace(/[^a-z0-9_-]/gi, '_');
+                  exportToJson(recommendation, `base_optimizer_${sanitized}.json`);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'rgba(59, 130, 246, 0.15)',
+                  border: '1px solid rgba(59, 130, 246, 0.35)',
+                  color: '#93c5fd',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'background 0.15s ease'
+                }}
+                title="Export recommendation results to JSON file"
+              >
+                <span>📥</span>
+                <span>Export JSON</span>
+              </button>
             </div>
           )}
         </div>

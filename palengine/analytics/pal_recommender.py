@@ -30,6 +30,7 @@ SUITABILITY_ALIAS_MAP = {
     "productmedicine": "medicine_production",
     "medicine": "medicine_production",
     "medicine_production": "medicine_production",
+    "medicineproduction": "medicine_production",
     "cool": "cooling",
     "cooling": "cooling",
     "transport": "transporting",
@@ -211,7 +212,14 @@ class PalRecommender:
                 if elec_lvl > 0:
                     total_suitability_score += (elec_lvl ** 2) * 25.0 * elec_deficit
 
-        # Database-Driven Partner Skill Synergies
+        # Condensation Rank Multiplier (0★ to 4★)
+        # 1-3 stars grant +8% to +24% effective capability; 4 stars grants +40% (since 4★ gives +1 to all suitabilities & upgraded skills)
+        rank_val = int(pal.get("rank") or 0)
+        if rank_val > 0:
+            condensation_mult = 1.0 + (0.08 * rank_val if rank_val < 4 else 0.40)
+            total_suitability_score *= condensation_mult
+
+        # Database-Driven & Trait-Driven Base Partner Skill Synergies
         disp_clean = (pal.get("display_name") or "").lower().strip()
         species_clean = (pal.get("species") or "").lower().strip()
         if species_clean.startswith("boss_"):
@@ -257,6 +265,34 @@ class PalRecommender:
             if is_resource_gatherer:
                 partner_synergy_bonus += 35.0
 
+        # 4. Comprehensive Base-Affecting Partner Skills (Workshop, Agriculture, Incubation, Auras)
+        has_workshop = ((base_audit or {}).get("crafting_count") or 0) > 0 or ((base_audit or {}).get("smelting_count") or 0) > 0
+        if has_workshop:
+            if "sekhmet" in species_clean or "sekhmet" in disp_clean:
+                # Desert Empress: +30% to +50% workshop efficiency + 20% Anubis work speed
+                partner_synergy_bonus += 220.0
+            elif any(k in species_clean or k in disp_clean for k in ["gorirat_terra", "ribbuny_botan"]):
+                partner_synergy_bonus += 80.0
+
+        has_agriculture = ((base_audit or {}).get("agriculture_count") or 0) > 0
+        if has_agriculture:
+            if "lullu" in species_clean or "lullu" in disp_clean:
+                partner_synergy_bonus += 160.0
+            elif "prunelia" in species_clean or "prunelia" in disp_clean:
+                partner_synergy_bonus += 160.0
+
+        if breeding_pens > 0:
+            if "dynamoff" in species_clean or "dynamoff" in disp_clean:
+                partner_synergy_bonus += 140.0
+
+        # Global base suitability auras (Wumpo, Wumpo Botan, Ribbuny, Flopie, Dogen)
+        if any(k in species_clean or k in disp_clean for k in ["wumpo", "ribbuny", "flopie", "dogen"]):
+            partner_synergy_bonus += 100.0
+
+        # SAN & Hunger preservation auras (Dark Mushroom Dragon, Sweets Sheep)
+        if any(k in species_clean or k in disp_clean for k in ["mushroom", "sheep"]):
+            partner_synergy_bonus += 60.0
+
         # Food & SAN Stability Score (combining database passives with base food rating)
         food_req = pal.get("food_requirement") or 3
         food_penalty = food_req * 3.0
@@ -296,6 +332,8 @@ class PalRecommender:
             "move_speed_mult": round(move_speed_mult, 2),
             "san_bonus": round(san_bonus, 1),
             "food_bonus": round(food_bonus, 1),
+            "partner_synergy_bonus": round(partner_synergy_bonus, 1),
+            "stability_score": round(stability_score, 1),
             "matching_roles": matching_roles,
             "total_score": round(final_score, 1),
             "icon_path": pal.get("icon_path"),
@@ -308,37 +346,42 @@ class PalRecommender:
         electric_deficit: int = 0,
         reserved_breeding: int = 0,
     ) -> Dict[str, int]:
-        """Calculates target worker quota per suitability based on facility counts and category focus."""
+        """Calculates target worker quota per suitability bounded by physical facility slots and category focus."""
         target_quotas: Dict[str, int] = {}
         focus_config = CATEGORY_FOCUS_MAP.get(base_category, CATEGORY_FOCUS_MAP["Balanced"])
         primary_roles = [r.lower().replace(" ", "").replace("_", "") for r in focus_config.get("primary", [])]
 
         for req_ws, info in demand_map.items():
             f_count = info.get("facility_count", 1)
+            phys_slots = info.get("physical_worker_slots", f_count)
             clean_ws = req_ws.lower().replace(" ", "").replace("_", "")
 
-            if req_ws in ["GeneratingElectricity", "Electricity"]:
-                base_q = max(1, electric_deficit + 1 if electric_deficit > 0 else 1)
-            elif req_ws in ["Planting", "Watering", "Gathering"]:
-                base_q = max(2, min(4, f_count))
-            elif req_ws in ["Mining", "Lumbering"]:
-                base_q = max(1, min(4, f_count))
-            elif req_ws in ["Transporting", "Transport"]:
-                base_q = max(2, min(4, f_count + 1))
-            elif req_ws in ["MonsterFarm", "Farming"]:
-                base_q = max(1, min(4, f_count * 2))
-            elif req_ws in ["Kindling", "EmitFlame"]:
-                base_q = max(1, min(3, f_count))
-            elif req_ws in ["Medicine", "MedicineProduction"]:
-                base_q = max(1, min(2, f_count))
-            elif req_ws in ["Handcraft"]:
-                base_q = max(1, min(3, f_count))
+            if clean_ws in ["generatingelectricity", "electricity"]:
+                base_q = max(1, min(phys_slots, electric_deficit + 1 if electric_deficit > 0 else 1))
+            elif clean_ws in ["planting", "seeding", "gathering", "collection"]:
+                base_q = max(1, min(phys_slots, f_count))
+            elif clean_ws in ["watering"]:
+                base_q = max(1, min(phys_slots, max(2, f_count)))
+            elif clean_ws in ["mining", "lumbering"]:
+                base_q = max(1, min(phys_slots, max(2, f_count)))
+            elif clean_ws in ["transporting", "transport"]:
+                base_q = max(2, min(phys_slots, 4))
+            elif clean_ws in ["monsterfarm", "farming"]:
+                base_q = max(1, min(phys_slots, f_count * 4))
+            elif clean_ws in ["kindling", "emitflame"]:
+                base_q = max(1, phys_slots)
+            elif clean_ws in ["medicine", "medicineproduction", "productmedicine"]:
+                base_q = max(1, min(phys_slots, f_count))
+            elif clean_ws in ["cooling", "cool"]:
+                base_q = max(1, min(phys_slots, f_count))
+            elif clean_ws in ["handcraft", "handiwork"]:
+                base_q = max(1, min(phys_slots, 4))
             else:
-                base_q = max(1, min(3, f_count))
+                base_q = max(1, min(phys_slots, f_count))
 
-            # Boost primary focus quota
+            # Boost primary focus quota up to physical_slots ceiling
             if clean_ws in primary_roles:
-                base_q = max(base_q, int(base_q * 1.3))
+                base_q = min(phys_slots, max(base_q, int(base_q * 1.3)))
 
             target_quotas[req_ws] = base_q
         return target_quotas
@@ -360,18 +403,32 @@ class PalRecommender:
             if not pal.get("matching_roles") or pal.get("total_score", 0.0) <= 0:
                 total_utility -= 500.0
                 continue
-            total_utility += pal.get("total_score", 0.0)
+
+            has_useful_role = False
             for r in pal.get("matching_roles", []):
                 wt = r["work_type"]
                 curr_count = role_counts.get(wt, 0)
                 target = quotas.get(wt, 2)
+                phys_cap = demand_map.get(wt, {}).get("physical_worker_slots", target)
+
                 if curr_count < target:
                     # High utility for filling understaffed required suitability
                     total_utility += r["role_score"] * 1.5
+                    has_useful_role = True
+                elif curr_count < phys_cap:
+                    # Diminishing utility for extra workers within physical facility capacity
+                    total_utility += r["role_score"] * 0.25
+                    has_useful_role = True
                 else:
-                    # Diminishing utility for excess workers on already satiated role
-                    total_utility -= r["role_score"] * 0.35
+                    # Heavy congestion penalty for exceeding physical facility capacity
+                    total_utility -= r["role_score"] * 2.0
+
                 role_counts[wt] = curr_count + 1
+
+            if has_useful_role:
+                total_utility += (pal.get("partner_synergy_bonus", 0.0) * 0.4) + pal.get("stability_score", 0.0)
+            else:
+                total_utility -= 300.0
 
         return total_utility
 
@@ -526,7 +583,46 @@ class PalRecommender:
                         assigned_instance_ids.add(cand_iid)
                         assigned_ranch_species.add(cand_sp)
 
-        # 3b. Critical Scarcity & Specialist Allocation
+        # 3b. Base Partner Skill Anchor Allocation (Non-Stacking Buffers)
+        for bid, audit in base_audits.items():
+            if len(assigned_teams[bid]) >= base_effective_caps[bid]:
+                continue
+            # Workshop / Production Anchor: 1 Sekhmet (+30%-50% workshop speed + 20% Anubis speed)
+            if (audit.get("crafting_count") or 0) > 0 or (audit.get("smelting_count") or 0) > 0:
+                sekhmet_cands = [
+                    p for p in owned_pals
+                    if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
+                    and ("sekhmet" in (p.get("species") or "").lower() or "sekhmet" in (p.get("display_name") or "").lower())
+                ]
+                if sekhmet_cands:
+                    best_s = max(sekhmet_cands, key=lambda p: scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"])
+                    s_iid = str(best_s.get("instance_id") or id(best_s))
+                    s_rep = scored_matrix[s_iid][bid]
+                    assigned_teams[bid].append(s_rep)
+                    for r in s_rep.get("matching_roles", []):
+                        role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
+                    assigned_instance_ids.add(s_iid)
+
+            # Agriculture Anchors: 1 Lullu (+50% growth) and 1 Prunelia (+50% harvest)
+            if (audit.get("agriculture_count") or 0) > 0:
+                for crop_booster in ["lullu", "prunelia"]:
+                    if len(assigned_teams[bid]) >= base_effective_caps[bid]:
+                        break
+                    crop_cands = [
+                        p for p in owned_pals
+                        if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
+                        and crop_booster in (p.get("species") or "").lower()
+                    ]
+                    if crop_cands:
+                        best_c = max(crop_cands, key=lambda p: scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"])
+                        c_iid = str(best_c.get("instance_id") or id(best_c))
+                        c_rep = scored_matrix[c_iid][bid]
+                        assigned_teams[bid].append(c_rep)
+                        for r in c_rep.get("matching_roles", []):
+                            role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
+                        assigned_instance_ids.add(c_iid)
+
+        # 3c. Critical Scarcity & Specialist Allocation
         for bid, demand_map in base_demands.items():
             for req_ws in demand_map.keys():
                 norm_req = normalize_suitability(req_ws)
@@ -547,6 +643,32 @@ class PalRecommender:
                         role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
                     assigned_instance_ids.add(cand_iid)
 
+        # 3d. Mandatory Full Suitability Coverage Pre-Pass
+        # Guarantees that every demanded suitability in the base receives at least 1 qualified worker
+        for bid, demand_map in base_demands.items():
+            for req_ws in demand_map.keys():
+                if role_counts[bid].get(req_ws, 0) == 0 and len(assigned_teams[bid]) < base_effective_caps[bid]:
+                    norm_req = normalize_suitability(req_ws)
+                    qualified = [
+                        p for p in owned_pals
+                        if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
+                        and norm_req in [normalize_suitability(k) for k in p.get("suitabilities", {}).keys()]
+                    ]
+                    if qualified:
+                        best_cov = max(
+                            qualified,
+                            key=lambda p: (
+                                p.get("suitabilities", {}).get(req_ws, 0) or p.get("suitabilities", {}).get(norm_req, 0),
+                                scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                            )
+                        )
+                        cov_iid = str(best_cov.get("instance_id") or id(best_cov))
+                        cov_rep = scored_matrix[cov_iid][bid]
+                        assigned_teams[bid].append(cov_rep)
+                        for r in cov_rep.get("matching_roles", []):
+                            role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
+                        assigned_instance_ids.add(cov_iid)
+
         # 4. Phase 2: Fast Analytical Global Maximum Marginal Gain Allocation
         unassigned_pals = [
             p for p in owned_pals if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
@@ -564,20 +686,35 @@ class PalRecommender:
                 iid = str(pal.get("instance_id") or id(pal))
                 for bid in open_bases:
                     sp = scored_matrix[iid][bid]
-                    gain = sp["total_score"]
+                    gain = 0.0
+                    has_role_fit = False
+
                     for r in sp.get("matching_roles", []):
                         wt = r["work_type"]
                         c_cnt = role_counts[bid].get(wt, 0)
                         tgt = base_quotas[bid].get(wt, 2)
-                        if c_cnt == 0:
-                            # Critical coverage bonus for uncovered demanded role
-                            gain += r["role_score"] * 3.0 + 150.0
-                        elif c_cnt < tgt:
-                            gain += r["role_score"] * 1.5
-                        else:
-                            gain -= r["role_score"] * 0.5
+                        phys_cap = base_demands[bid].get(wt, {}).get("physical_worker_slots", tgt)
 
-                    if gain > best_gain:
+                        if c_cnt == 0:
+                            # Critical coverage bonus for unstaffed demanded role
+                            gain += r["role_score"] * 3.5 + 300.0
+                            has_role_fit = True
+                        elif c_cnt < tgt:
+                            # Standard quota filling
+                            gain += r["role_score"] * 1.5
+                            has_role_fit = True
+                        elif c_cnt < phys_cap:
+                            # Diminishing utility before physical capacity is exhausted
+                            gain += r["role_score"] * 0.25
+                            has_role_fit = True
+                        else:
+                            # Hard workstation capacity ceiling penalty: ALL physical workstations full!
+                            gain -= r["role_score"] * 1.5
+
+                    # Add partner synergy bonus and food/SAN stability
+                    gain += (sp.get("partner_synergy_bonus", 0.0) * 0.4) + sp.get("stability_score", 0.0)
+
+                    if has_role_fit and gain > best_gain:
                         best_gain = gain
                         best_pair = (pal, bid, sp)
 
@@ -615,7 +752,7 @@ class PalRecommender:
 
         # 5. Phase 3: Inter-Base Pairwise Swap Optimization (Local Search)
         base_id_list = list(base_audits.keys())
-        for _ in range(25):
+        for _ in range(10):
             improved = False
             for i in range(len(base_id_list)):
                 for j in range(i + 1, len(base_id_list)):
@@ -623,15 +760,15 @@ class PalRecommender:
                     team_u = assigned_teams[bu]
                     team_v = assigned_teams[bv]
 
+                    curr_score = (
+                        self._evaluate_team_utility(bu, team_u, base_demands, base_quotas) +
+                        self._evaluate_team_utility(bv, team_v, base_demands, base_quotas)
+                    )
+
                     for idx_u, pal_u in enumerate(team_u):
                         iid_u = str(pal_u.get("instance_id"))
                         for idx_v, pal_v in enumerate(team_v):
                             iid_v = str(pal_v.get("instance_id"))
-
-                            curr_score = (
-                                self._evaluate_team_utility(bu, team_u, base_demands, base_quotas) +
-                                self._evaluate_team_utility(bv, team_v, base_demands, base_quotas)
-                            )
 
                             new_pal_u_for_v = scored_matrix[iid_u][bv]
                             new_pal_v_for_u = scored_matrix[iid_v][bu]
@@ -651,6 +788,18 @@ class PalRecommender:
                             v_is_ranch = any(r.get("work_type") in ("MonsterFarm", "Farming") for r in pal_v.get("matching_roles", []))
                             u_has_ranch = (base_audits[bu].get("ranch_count") or base_audits[bu].get("ranching_count") or 0) > 0
                             if v_is_ranch and not u_has_ranch:
+                                continue
+
+                            # Never swap Workshop / Production anchor (Sekhmet) or Agriculture anchors (Lullu/Prunelia) out of matching bases
+                            u_sp = (pal_u.get("species") or "").lower()
+                            v_sp = (pal_v.get("species") or "").lower()
+                            if "sekhmet" in u_sp and ((base_audits[bu].get("crafting_count") or 0) > 0 or (base_audits[bu].get("smelting_count") or 0) > 0):
+                                continue
+                            if "sekhmet" in v_sp and ((base_audits[bv].get("crafting_count") or 0) > 0 or (base_audits[bv].get("smelting_count") or 0) > 0):
+                                continue
+                            if any(b in u_sp for b in ("lullu", "prunelia")) and (base_audits[bu].get("agriculture_count") or 0) > 0:
+                                continue
+                            if any(b in v_sp for b in ("lullu", "prunelia")) and (base_audits[bv].get("agriculture_count") or 0) > 0:
                                 continue
 
                             swapped_u = team_u[:idx_u] + team_u[idx_u + 1:] + [new_pal_v_for_u]

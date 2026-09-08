@@ -143,6 +143,28 @@ class BaseOptimizer:
         electric_supplier_count = 0
         electric_consumer_count = 0
 
+        # Detailed physical facility slot counters
+        furnace_count = 0
+        cooking_facility_count = 0
+        ancient_blast_furnace_count = 0
+        cryo_crusher_count = 0
+        cooler_box_count = 0
+        medicine_bench_count = 0
+        ancient_workbench_count = 0
+        garden_count = 0
+        mill_crusher_count = 0
+        mining_pit_count = 0
+        logging_pit_count = 0
+        oil_pump_count = 0
+
+        # Assembly line & workbench hierarchy tracking
+        assembly_lines_dirty = 0
+        assembly_lines_clean = 0
+        sphere_lines_black = 0
+        sphere_lines_white = 0
+        factory_hard_lines = 0
+        primitive_workbench_count = 0
+
         for struct in structures:
             struct_name = struct["structure_name"]
             count = struct["count"]
@@ -162,18 +184,65 @@ class BaseOptimizer:
 
             if any(crop in s_lower for crop in ["garden", "farmblock", "berry", "tomato", "lettuce", "wheat", "onion"]):
                 agriculture_count += count
+                garden_count += count
 
-            if any(cook in s_lower for cook in ["kitchen", "cooking", "stove", "pot", "flourmill"]):
+            if any(cook in s_lower for cook in ["kitchen", "cooking", "stove", "pot"]):
                 cooking_count += count
+                cooking_facility_count += count
 
-            if any(smelt in s_lower for smelt in ["furnace", "blastfurnace"]):
+            if "ancientblastfurnace" in s_lower or s_lower == "blastfurnace5":
+                ancient_blast_furnace_count += count
+                furnace_count += count
                 smelting_count += count
+            elif any(smelt in s_lower for smelt in ["furnace", "blastfurnace"]):
+                smelting_count += count
+                furnace_count += count
 
-            if any(craft in s_lower for craft in ["factory", "workbench", "assembly"]):
+            if "icecrusher" in s_lower:
+                cryo_crusher_count += count
+            elif any(c in s_lower for c in ["cooler", "refrigerator"]):
+                cooler_box_count += count
+
+            if "ancientworkbench" in s_lower:
+                ancient_workbench_count += count
                 crafting_count += count
+            elif any(m in s_lower for m in ["medicine", "clinic"]):
+                medicine_bench_count += count
+            elif any(m in s_lower for m in ["flourmill", "woodcrusher"]) or (s_lower == "crusher"):
+                mill_crusher_count += count
+
+            # Workbench hierarchy classification
+            if "weaponfactory_dirty" in s_lower:
+                assembly_lines_dirty = max(assembly_lines_dirty, count)
+                crafting_count += count
+            elif "weaponfactory_clean" in s_lower:
+                assembly_lines_clean = max(assembly_lines_clean, count)
+                crafting_count += count
+            elif "spherefactory_black" in s_lower:
+                sphere_lines_black = max(sphere_lines_black, count)
+                crafting_count += count
+            elif "spherefactory_white" in s_lower:
+                sphere_lines_white = max(sphere_lines_white, count)
+                crafting_count += count
+            elif "factory_hard" in s_lower:
+                factory_hard_lines = max(factory_hard_lines, count)
+                crafting_count += count
+            elif any(craft in s_lower for craft in ["factory", "workbench", "assembly", "repairbench"]):
+                if "ancientworkbench" not in s_lower:
+                    primitive_workbench_count += count
+                    crafting_count += count
 
             # Dedicated player-built mining / extraction facilities (e.g. Stonepit, OrePit, CopperPit, CoalPit, DeforestStation, Crusher)
-            if any(ext in s_lower for ext in ["stonepit", "orepit", "copperpit", "coalpit", "sulfurpit", "quartzpit", "deforest", "crusher", "oilpump", "miningpit"]):
+            if any(ext in s_lower for ext in ["stonepit", "orepit", "copperpit", "coalpit", "sulfurpit", "quartzpit", "miningpit"]):
+                extraction_count += count
+                mining_pit_count += count
+            elif "deforest" in s_lower:
+                extraction_count += count
+                logging_pit_count += count
+            elif "oilpump" in s_lower:
+                extraction_count += count
+                oil_pump_count += count
+            elif "crusher" in s_lower:
                 extraction_count += count
 
             # Electric power check
@@ -214,12 +283,42 @@ class BaseOptimizer:
                 else:
                     player_initiated_demand[wt_name] = player_initiated_demand.get(wt_name, 0) + count
 
+        total_active_assembly_lines = (
+            assembly_lines_dirty + assembly_lines_clean +
+            sphere_lines_black + sphere_lines_white + factory_hard_lines
+        )
+
+        # Ensure dual-work facility coverage:
+        # 1. AncientBlastFurnace (Hexolite smelting requires both Kindling and Cooling!) & Cryogenic Crusher & Coolers
+        cooling_facility_total = ancient_blast_furnace_count + cryo_crusher_count + cooler_box_count
+        if cooling_facility_total > 0 and "Cooling" not in demand_by_suitability:
+            demand_by_suitability["Cooling"] = {
+                "work_type": "Cooling",
+                "facility_count": cooling_facility_total,
+                "workload_units": float((ancient_blast_furnace_count * 2.5) + (cryo_crusher_count * 1.5) + (cooler_box_count * 1.0)),
+                "is_automated": False,
+                "urgency_weight": 2.5 if ancient_blast_furnace_count > 0 else 1.5,
+            }
+            player_initiated_demand["Cooling"] = player_initiated_demand.get("Cooling", 0) + cooling_facility_total
+
+        # 2. AncientWorkBench (requires Handcraft and Medicine) & Clinics
+        medicine_facility_total = ancient_workbench_count + medicine_bench_count
+        if medicine_facility_total > 0 and "Medicine" not in demand_by_suitability:
+            demand_by_suitability["Medicine"] = {
+                "work_type": "Medicine",
+                "facility_count": medicine_facility_total,
+                "workload_units": float((ancient_workbench_count * 1.5) + (medicine_bench_count * 2.0)),
+                "is_automated": False,
+                "urgency_weight": 2.0 if medicine_bench_count > 0 else 1.5,
+            }
+            player_initiated_demand["Medicine"] = player_initiated_demand.get("Medicine", 0) + medicine_facility_total
+
         # Natural Node Extraction Outpost:
         # If extraction structures (e.g. Stonepit, OrePit) are NOT placed in the base,
         # but natural resource nodes exist in the base camp perimeter,
         # generate Mining and Transporting demand so workers are assigned to harvest the nodes!
+        natural_mining_count = 0
         if extraction_count == 0:
-            natural_mining_count = 0
             for s in structures:
                 s_name_lower = s["structure_name"].lower().replace(" ", "").replace("_", "")
                 if s_name_lower.startswith("natural") or "damagable" in s_name_lower:
@@ -277,6 +376,37 @@ class BaseOptimizer:
                 "urgency_weight": 3.0,
             }
             automated_demand["GeneratingElectricity"] = automated_demand.get("GeneratingElectricity", 0) + electric_supplier_count
+
+        # Calculate physical workstation capacity for each suitability
+        for wt, info in demand_by_suitability.items():
+            clean_wt = wt.lower().replace(" ", "").replace("_", "")
+            if clean_wt in ["kindling", "emitflame"]:
+                info["physical_worker_slots"] = max(1, furnace_count + cooking_facility_count)
+            elif clean_wt in ["cooling", "cool"]:
+                info["physical_worker_slots"] = max(1, ancient_blast_furnace_count + cryo_crusher_count + cooler_box_count)
+            elif clean_wt in ["medicine", "medicineproduction", "productmedicine"]:
+                info["physical_worker_slots"] = max(1, medicine_bench_count + ancient_workbench_count)
+            elif clean_wt in ["handcraft", "handiwork"]:
+                info["physical_worker_slots"] = max(1, (total_active_assembly_lines * 2) + (ancient_workbench_count * 2) + (1 if primitive_workbench_count else 0))
+            elif clean_wt in ["planting", "seeding"]:
+                info["physical_worker_slots"] = max(1, garden_count)
+            elif clean_wt in ["watering"]:
+                info["physical_worker_slots"] = max(1, garden_count + mill_crusher_count)
+            elif clean_wt in ["gathering", "collection"]:
+                info["physical_worker_slots"] = max(1, garden_count)
+            elif clean_wt in ["mining"]:
+                info["physical_worker_slots"] = max(1, (mining_pit_count * 3) + (natural_mining_count if extraction_count == 0 else 0))
+            elif clean_wt in ["lumbering", "deforest"]:
+                info["physical_worker_slots"] = max(1, logging_pit_count * 3)
+            elif clean_wt in ["generatingelectricity", "electricity"]:
+                info["physical_worker_slots"] = max(1, electric_supplier_count * (2 if electric_deficit > 0 else 1))
+            elif clean_wt in ["monsterfarm", "farming"]:
+                info["physical_worker_slots"] = max(1, ranching_count * 4)
+            elif clean_wt in ["transporting", "transport"]:
+                total_item_sources = garden_count + mining_pit_count + ranching_count + logging_pit_count + oil_pump_count
+                info["physical_worker_slots"] = max(2, min(5, (total_item_sources + 1) // 2))
+            else:
+                info["physical_worker_slots"] = max(1, info.get("facility_count", 1))
 
         # Determine nuanced 7-category base specialization using priority hierarchy
         base_category = "Balanced"

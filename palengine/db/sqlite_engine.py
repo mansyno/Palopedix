@@ -1117,9 +1117,16 @@ class SQLiteEngine:
             )
             cursor.execute(
                 """
-                UPDATE building_work_types SET work_type = 'Cooling' WHERE building_id = 'IceCrusher'
+                DELETE FROM building_work_types WHERE building_id = 'IceCrusher' AND work_type != 'Cooling'
             """
             )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('IceCrusher', 'Cooling', 0, 1.0)
+            """
+            )
+
 
             cursor.execute(
                 """
@@ -1332,7 +1339,13 @@ class SQLiteEngine:
             )
             cursor.execute(
                 """
-                UPDATE building_work_types SET work_type = 'Cooling' WHERE building_id = 'IceCrusher'
+                DELETE FROM building_work_types WHERE building_id = 'IceCrusher' AND work_type != 'Cooling'
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('IceCrusher', 'Cooling', 0, 1.0)
             """
             )
 

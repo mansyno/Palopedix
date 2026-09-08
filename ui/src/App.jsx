@@ -16,10 +16,21 @@ import { WorldOverviewView, WelcomeView } from './components/WorldOverviewView';
 import BaseMigrationView from './components/BaseMigrationView';
 import PalDetailModal from './components/common/PalDetailModal';
 
+function TabKeepAlive({ id, activeTab, mode, visitedTabs, children }) {
+  if (!visitedTabs.has(id)) return null;
+  const isVisible = mode !== 'home' && activeTab === id;
+  return (
+    <div style={{ display: isVisible ? 'contents' : 'none' }}>
+      {children}
+    </div>
+  );
+}
+
 function App() {
   // Navigation & World Modes
   const [mode, setMode] = useState('home'); // 'home', 'global', 'world', 'settings'
   const [activeTab, setActiveTab] = useState('paldex');
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]));
   const [worlds, setWorlds] = useState([]);
   const [selectedWorldId, setSelectedWorldId] = useState('');
   const [worldLoading, setWorldLoading] = useState(false);
@@ -229,6 +240,17 @@ function App() {
   useEffect(() => {
     initEngine();
   }, []);
+
+  useEffect(() => {
+    if (activeTab) {
+      setVisitedTabs(prev => {
+        if (prev.has(activeTab)) return prev;
+        const next = new Set(prev);
+        next.add(activeTab);
+        return next;
+      });
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (isEngineReady) {
@@ -455,144 +477,153 @@ function App() {
           />
         )}
 
-        {/* All Section Views (Only when mode !== 'home') */}
-        {mode !== 'home' && (
-          <>
-            {mode === 'world' && activeTab === 'world_overview' && (
-              <WorldOverviewView
-                currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
-                instancesCount={instances.length}
-                basesCount={bases.length}
-                inventoryCount={199}
-                onNavigate={(tab) => setActiveTab(tab)}
-              />
-            )}
-            {activeTab === 'welcome' && (
-              <WelcomeView
-                onNavigate={(tab) => setActiveTab(tab)}
-                currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
-                instancesCount={instances.length}
-                basesCount={bases.length}
-                inventoryCount={199}
-              />
-            )}
+        {/* All Section Views (Lazy Keep-Alive) */}
+        <TabKeepAlive id="world_overview" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <WorldOverviewView
+            currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
+            instancesCount={instances.length}
+            basesCount={bases.length}
+            inventoryCount={199}
+            onNavigate={(tab) => setActiveTab(tab)}
+          />
+        </TabKeepAlive>
 
-            {/* 📚 Paldex Tab */}
-            {activeTab === 'paldex' && (
-              <PaldexMasterView
-                pals={pals}
-                setSelectedPal={setSelectedPal}
-                elementFilter={elementFilter}
-                setElementFilter={setElementFilter}
-                sizeFilter={sizeFilter}
-                setSizeFilter={setSizeFilter}
-                nocturnalFilter={nocturnalFilter}
-                setNocturnalFilter={setNocturnalFilter}
-                suitabilityFilter={suitabilityFilter}
-                setSuitabilityFilter={setSuitabilityFilter}
-                partnerCategoryFilter={partnerCategoryFilter}
-                setPartnerCategoryFilter={setPartnerCategoryFilter}
-              />
-            )}
+        <TabKeepAlive id="welcome" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <WelcomeView
+            onNavigate={(tab) => setActiveTab(tab)}
+            currentWorld={worlds.find(w => w.world_id === selectedWorldId)}
+            instancesCount={instances.length}
+            basesCount={bases.length}
+            inventoryCount={199}
+          />
+        </TabKeepAlive>
 
-            {/* ⚡ Skills Database Catalog Tab */}
-            {activeTab === 'skills' && <SkillsCatalogView />}
+        {/* 📚 Paldex Tab */}
+        <TabKeepAlive id="paldex" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <PaldexMasterView
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+            elementFilter={elementFilter}
+            setElementFilter={setElementFilter}
+            sizeFilter={sizeFilter}
+            setSizeFilter={setSizeFilter}
+            nocturnalFilter={nocturnalFilter}
+            setNocturnalFilter={setNocturnalFilter}
+            suitabilityFilter={suitabilityFilter}
+            setSuitabilityFilter={setSuitabilityFilter}
+            partnerCategoryFilter={partnerCategoryFilter}
+            setPartnerCategoryFilter={setPartnerCategoryFilter}
+          />
+        </TabKeepAlive>
 
-            {/* 📦 Items & Recipes Catalog Tab */}
-            {activeTab === 'items' && <ItemsCatalogView />}
+        {/* ⚡ Skills Database Catalog Tab */}
+        <TabKeepAlive id="skills" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <SkillsCatalogView />
+        </TabKeepAlive>
 
-            {/* 🏗️ Base Facilities & Tech Tree Tab */}
-            {activeTab === 'buildings' && <BuildingsTechView />}
+        {/* 📦 Items & Recipes Catalog Tab */}
+        <TabKeepAlive id="items" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <ItemsCatalogView />
+        </TabKeepAlive>
 
-            {/* Selected Pal Detail Modal */}
-            {selectedPal && (
-              <PalDetailModal pal={selectedPal} onClose={() => setSelectedPal(null)} />
-            )}
+        {/* 🏗️ Base Facilities & Tech Tree Tab */}
+        <TabKeepAlive id="buildings" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BuildingsTechView />
+        </TabKeepAlive>
 
-            {/* 🎒 Save Inventory Tab */}
-            {activeTab === 'inventory' && <InventoryView />}
-
-            {/* 🐾 World Pals Tab */}
-            {activeTab === 'save_game' && (
-              <SaveGameExplorerView
-                instances={instances}
-                pals={pals}
-                saveLoaded={saveLoaded}
-                loadedPath={loadedPath}
-                handleLoadSave={handleLoadSave}
-                loading={loading}
-                setSelectedPal={setSelectedPal}
-                palSourceMode={palSourceMode}
-                handlePalSourceModeChange={handlePalSourceModeChange}
-                ownedSpecies={ownedSpecies}
-              />
-            )}
-
-            {/* 🏰 Base Camps Tab */}
-            {activeTab === 'bases' && (
-              <BaseCampsView
-                bases={bases}
-                saveLoaded={saveLoaded}
-                fetchBases={fetchBases}
-                fetchInstances={fetchInstances}
-                pals={pals}
-                setSelectedPal={setSelectedPal}
-              />
-            )}
-
-            {/* ⚡ Base Pal Optimizer Tab */}
-            {activeTab === 'base_optimizer' && (
-              <BaseOptimizerView
-                pals={pals}
-                setSelectedPal={setSelectedPal}
-              />
-            )}
-
-            {/* 🚚 Base Container Migration Tab */}
-            {activeTab === 'base_migration' && <BaseMigrationView />}
-
-            {/* ⭐ Condenser Tab */}
-            {activeTab === 'condenser' && (
-              <CondenserView
-                pals={pals}
-                setSelectedPal={setSelectedPal}
-                worldId={selectedWorldId}
-                saveLoaded={saveLoaded}
-              />
-            )}
-
-            {/* 📜 Sub-Missions Tab */}
-            {activeTab === 'missions' && <SubMissionsView />}
-
-            {/* ⚙️ Settings Tab */}
-            {activeTab === 'settings' && (
-              <SettingsView
-                savePath={savePath}
-                setSavePath={setSavePath}
-                handleLoadSave={handleLoadSave}
-                loading={loading}
-                errorMsg={errorMsg}
-                successMsg={successMsg}
-              />
-            )}
-
-            {/* 🐣 Breeding Center Tab */}
-            {activeTab === 'breeding' && (
-              <BreedingCenterView
-                pals={pals}
-                allMasterPals={allMasterPals}
-                ownedSpecies={ownedSpecies}
-                palSourceMode={palSourceMode}
-                handlePalSourceModeChange={handlePalSourceModeChange}
-                setSelectedPal={setSelectedPal}
-                availablePalOptions={availablePalOptions}
-                ownedPals={ownedPals}
-                setOwnedPals={setOwnedPals}
-                instances={instances}
-              />
-            )}
-          </>
+        {/* Selected Pal Detail Modal */}
+        {selectedPal && (
+          <PalDetailModal pal={selectedPal} onClose={() => setSelectedPal(null)} />
         )}
+
+        {/* 🎒 Save Inventory Tab */}
+        <TabKeepAlive id="inventory" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <InventoryView />
+        </TabKeepAlive>
+
+        {/* 🐾 World Pals Tab */}
+        <TabKeepAlive id="save_game" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <SaveGameExplorerView
+            instances={instances}
+            pals={pals}
+            saveLoaded={saveLoaded}
+            loadedPath={loadedPath}
+            handleLoadSave={handleLoadSave}
+            loading={loading}
+            setSelectedPal={setSelectedPal}
+            palSourceMode={palSourceMode}
+            handlePalSourceModeChange={handlePalSourceModeChange}
+            ownedSpecies={ownedSpecies}
+          />
+        </TabKeepAlive>
+
+        {/* 🏰 Base Camps Tab */}
+        <TabKeepAlive id="bases" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BaseCampsView
+            bases={bases}
+            saveLoaded={saveLoaded}
+            fetchBases={fetchBases}
+            fetchInstances={fetchInstances}
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+          />
+        </TabKeepAlive>
+
+        {/* ⚡ Base Pal Optimizer Tab */}
+        <TabKeepAlive id="base_optimizer" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BaseOptimizerView
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+          />
+        </TabKeepAlive>
+
+        {/* 🚚 Base Container Migration Tab */}
+        <TabKeepAlive id="base_migration" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BaseMigrationView />
+        </TabKeepAlive>
+
+        {/* ⭐ Condenser Tab */}
+        <TabKeepAlive id="condenser" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <CondenserView
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+            worldId={selectedWorldId}
+            saveLoaded={saveLoaded}
+          />
+        </TabKeepAlive>
+
+        {/* 📜 Sub-Missions Tab */}
+        <TabKeepAlive id="missions" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <SubMissionsView />
+        </TabKeepAlive>
+
+        {/* ⚙️ Settings Tab */}
+        <TabKeepAlive id="settings" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <SettingsView
+            savePath={savePath}
+            setSavePath={setSavePath}
+            handleLoadSave={handleLoadSave}
+            loading={loading}
+            errorMsg={errorMsg}
+            successMsg={successMsg}
+          />
+        </TabKeepAlive>
+
+        {/* 🐣 Breeding Center Tab */}
+        <TabKeepAlive id="breeding" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BreedingCenterView
+            pals={pals}
+            allMasterPals={allMasterPals}
+            ownedSpecies={ownedSpecies}
+            palSourceMode={palSourceMode}
+            handlePalSourceModeChange={handlePalSourceModeChange}
+            setSelectedPal={setSelectedPal}
+            availablePalOptions={availablePalOptions}
+            ownedPals={ownedPals}
+            setOwnedPals={setOwnedPals}
+            instances={instances}
+          />
+        </TabKeepAlive>
       </main>
     </div>
   );

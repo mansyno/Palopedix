@@ -588,6 +588,7 @@ function App() {
                 availablePalOptions={availablePalOptions}
                 ownedPals={ownedPals}
                 setOwnedPals={setOwnedPals}
+                instances={instances}
               />
             )}
           </>

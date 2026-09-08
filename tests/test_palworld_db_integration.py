@@ -132,6 +132,10 @@ def test_breeding_calculations_palworld_db():
     assert parents_query.status_code == 200
     assert len(parents_query.json()) > 0
 
+    parents_yakumo = client.get("/api/breeding/parents?child=Yakumo&owned=all")
+    assert parents_yakumo.status_code == 200
+    assert len(parents_yakumo.json()) > 100
+
     parents_path = client.get("/api/breeding/parents/Anubis?source=all")
     assert parents_path.status_code == 200
     assert len(parents_path.json()) > 0

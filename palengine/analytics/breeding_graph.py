@@ -1,7 +1,7 @@
 # Palopedix Breeding Graph Optimizer & Pathfinding Engine
 import math
 from typing import Optional, Any
-from palengine.db.utils import clean_species_name, normalize_passives, transform_icon_path
+from palengine.db.utils import clean_species_name, normalize_passives, transform_icon_path, is_playable_pal
 
 def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Optional[set[str]] = None) -> bool:
     """Helper to verify if Pal is eligible for mathematical breeding formula."""
@@ -276,14 +276,17 @@ class BreedingGraphOptimizer:
         pals_rows = self.engine.conn.execute(
             "SELECT display_name, internal_name, breeding_power, is_variant, index_order FROM pals"
         ).fetchall()
-        all_pals = [dict(r) for r in pals_rows]
+        all_pals = [dict(r) for r in pals_rows if is_playable_pal(dict(r))]
+
+        name_map = {p["internal_name"].lower(): p["display_name"] for p in all_pals}
+        name_map.update({p["display_name"].lower(): p["display_name"] for p in all_pals})
 
         combos_rows = self.engine.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
         special_combos: dict[tuple[str, str], str] = {}
         for r in combos_rows:
-            p1_l = r["parent1"].lower()
-            p2_l = r["parent2"].lower()
-            ch_name = r["child"]
+            p1_l = name_map.get(r["parent1"].lower(), r["parent1"]).lower()
+            p2_l = name_map.get(r["parent2"].lower(), r["parent2"]).lower()
+            ch_name = name_map.get(r["child"].lower(), r["child"])
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
@@ -291,13 +294,18 @@ class BreedingGraphOptimizer:
         candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
+        max_bp = max((p["breeding_power"] for p in all_pals if p.get("breeding_power") is not None), default=1500)
+        max_pow = max_bp + 100
+        power_to_child: list[str] = [""] * max_pow
+        for tp in range(max_pow):
+            best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - tp))
+            power_to_child[tp] = best["display_name"]
+
         def calc_standard_child(power1: int, power2: int) -> str:
             target_power = (power1 + power2 + 1) // 2
-            best_pal = min(
-                candidate_pals,
-                key=lambda p: abs(p["breeding_power"] - target_power)
-            )
-            return best_pal["display_name"]
+            if target_power < max_pow:
+                return power_to_child[target_power]
+            return candidate_pals[0]["display_name"]
 
         pool_set = {p.strip().lower() for p in pool} if pool else None
 
@@ -319,20 +327,20 @@ class BreedingGraphOptimizer:
                     result_child = p1_name
                 elif (p1_l, p2_l) in special_combos:
                     result_child = special_combos[(p1_l, p2_l)]
-                elif p1_name.lower() not in restricted_set and p2_name.lower() not in restricted_set:
+                elif all_pals[i]["breeding_power"] is not None and all_pals[j]["breeding_power"] is not None:
                     pow1 = all_pals[i]["breeding_power"]
                     pow2 = all_pals[j]["breeding_power"]
-                    if pow1 is not None and pow2 is not None:
-                        result_child = calc_standard_child(pow1, pow2)
-                    else:
-                        result_child = ""
+                    result_child = calc_standard_child(pow1, pow2)
                 else:
                     result_child = ""
 
                 if result_child.lower() == target_child_lower:
-                    results.add((p1_name, p2_name))
+                    p1_n, p2_n = p1_name, p2_name
+                    if p1_n.lower() > p2_n.lower():
+                        p1_n, p2_n = p2_n, p1_n
+                    results.add((p1_n, p2_n))
 
-        return sorted(list(results), key=lambda x: (x[0], x[1]))
+        return sorted(list(results), key=lambda x: (x[0].lower(), x[1].lower()))
 
     def get_uncaught_breeding_opportunities(self, source: str = "caught") -> list[dict[str, Any]]:
         """Find breedable species not yet in the player's caught roster."""
@@ -383,12 +391,15 @@ class BreedingGraphOptimizer:
         cased_names = {r["display_name"].lower(): r["display_name"] for r in all_pals}
         power_map = {r["display_name"].lower(): r["breeding_power"] for r in all_pals}
 
+        name_map = {p["internal_name"].lower(): p["display_name"] for p in all_pals}
+        name_map.update({p["display_name"].lower(): p["display_name"] for p in all_pals})
+
         combos_rows = self.engine.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
         special_combos: dict[tuple[str, str], str] = {}
         for r in combos_rows:
-            p1_l = r["parent1"].lower()
-            p2_l = r["parent2"].lower()
-            ch_name = r["child"]
+            p1_l = name_map.get(r["parent1"].lower(), r["parent1"]).lower()
+            p2_l = name_map.get(r["parent2"].lower(), r["parent2"]).lower()
+            ch_name = name_map.get(r["child"].lower(), r["child"])
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
@@ -396,17 +407,25 @@ class BreedingGraphOptimizer:
         candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
+        max_bp = max((p["breeding_power"] for p in all_pals if p.get("breeding_power") is not None), default=1500)
+        max_pow = max_bp + 100
+        power_to_child: list[str] = [""] * max_pow
+        for tp in range(max_pow):
+            best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - tp))
+            power_to_child[tp] = best["display_name"]
+
         def calc_child_fast(p1_l: str, p2_l: str) -> str:
             if p1_l == p2_l:
                 return cased_names.get(p1_l, p1_l)
             if (p1_l, p2_l) in special_combos:
                 return special_combos[(p1_l, p2_l)]
-            if p1_l not in restricted_set and p2_l not in restricted_set and p1_l in power_map and p2_l in power_map:
+            if p1_l in power_map and p2_l in power_map and power_map[p1_l] is not None and power_map[p2_l] is not None:
                 pow1 = power_map[p1_l]
                 pow2 = power_map[p2_l]
                 target_pow = (pow1 + pow2 + 1) // 2
-                best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - target_pow))
-                return best["display_name"]
+                if target_pow < max_pow:
+                    return power_to_child[target_pow]
+                return candidate_pals[0]["display_name"]
             return ""
 
         target_input = target_species.strip().lower()

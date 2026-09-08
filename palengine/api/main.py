@@ -288,7 +288,7 @@ def get_breed_parents(
     child: Optional[str] = None,
     owned: Optional[str] = None,
     source: Optional[str] = None,
-) -> list[tuple[str, str]]:
+) -> list[Any]:
     """Lists all breeding combinations that yield the target child, optionally filtered by owned inventory."""
     if not child:
         raise HTTPException(status_code=400, detail="Target child Pal is required.")
@@ -297,7 +297,8 @@ def get_breed_parents(
         return db_engine.find_parents_for_child(child)
     elif pool_param and pool_param.strip().lower() in ("auto", "caught"):
         owned_inv = list(db_engine.get_owned_pal_inventory().keys())
-        return db_engine.find_parents_for_child(child, pool=owned_inv)
+        combos = db_engine.find_parents_for_child(child, pool=owned_inv)
+        return db_engine.enrich_parent_combos_with_instances(combos)
     elif pool_param:
         owned_list = [s.strip() for s in pool_param.split(",") if s.strip()]
         return db_engine.find_parents_for_child(child, pool=owned_list)

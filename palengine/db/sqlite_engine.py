@@ -101,6 +101,28 @@ RESTRICTED_BREEDING_SPECIES = {
 }
 
 
+NON_PLAYABLE_SPECIES = {
+    # 9 Tower Boss Entities
+    "zoe & grizzbolt", "lily & lyleen", "marcus & faleris", "axel & orserk",
+    "victor & shadowbeak", "saya & selyne", "auri & shaolong", "bjorn & bastigor", "zenara & astralym",
+    # 6 Crossover Slimes
+    "green slime", "blue slime", "red slime", "purple slime", "illuminant slime", "rainbow slime",
+    # 7 Terraria Event Monsters
+    "enchanted sword", "cave bat", "illuminant bat", "eye of cthulhu", "demon eye", "true eye of cthulhu", "moon lord",
+    # 3 Cut / Unreleased NPCs
+    "boltmane", "dragostrophe", "pidf rider", "eleclion", "blackfurdragon", "police_palride",
+}
+
+
+def is_playable_pal(pal_dict: dict[str, Any]) -> bool:
+    """Returns True if the Pal is one of the 291 genuine playable in-game Pals."""
+    dn = str(pal_dict.get("display_name", "")).strip().lower()
+    in_name = str(pal_dict.get("internal_name", "")).strip().lower()
+    if "&" in dn or "boss" in in_name or in_name.startswith("police_") or in_name.startswith("yakushima") or in_name.startswith("raid_"):
+        return False
+    return dn not in NON_PLAYABLE_SPECIES and in_name not in NON_PLAYABLE_SPECIES
+
+
 def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Optional[set[str]] = None) -> bool:
     if pal_dict.get("is_variant", 0) != 0:
         return False
@@ -621,7 +643,7 @@ class SQLiteEngine:
 
         os.makedirs(os.path.dirname(db_file), exist_ok=True)
         self.conn = sqlite3.connect(
-            db_file, check_same_thread=False, timeout=30.0, cached_statements=0
+            db_file, check_same_thread=False, timeout=30.0
         )
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA journal_mode=WAL")
@@ -1644,7 +1666,7 @@ class SQLiteEngine:
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         
         self.conn = sqlite3.connect(
-            db_path, check_same_thread=False, timeout=30.0, cached_statements=0
+            db_path, check_same_thread=False, timeout=30.0
         )
         self.conn.row_factory = sqlite3.Row
         self._create_tables()
@@ -2240,14 +2262,17 @@ class SQLiteEngine:
         pals_rows = self.conn.execute(
             "SELECT display_name, internal_name, breeding_power, is_variant, index_order FROM pals"
         ).fetchall()
-        all_pals = [dict(r) for r in pals_rows]
+        all_pals = [dict(r) for r in pals_rows if is_playable_pal(dict(r))]
+
+        name_map = {p["internal_name"].lower(): p["display_name"] for p in all_pals}
+        name_map.update({p["display_name"].lower(): p["display_name"] for p in all_pals})
 
         combos_rows = self.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
         special_combos: dict[tuple[str, str], str] = {}
         for r in combos_rows:
-            p1_l = r["parent1"].lower()
-            p2_l = r["parent2"].lower()
-            ch_name = r["child"]
+            p1_l = name_map.get(r["parent1"].lower(), r["parent1"]).lower()
+            p2_l = name_map.get(r["parent2"].lower(), r["parent2"]).lower()
+            ch_name = name_map.get(r["child"].lower(), r["child"])
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
@@ -2255,13 +2280,18 @@ class SQLiteEngine:
         candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
+        max_bp = max((p["breeding_power"] for p in all_pals if p.get("breeding_power") is not None), default=1500)
+        max_pow = max_bp + 100
+        power_to_child: list[str] = [""] * max_pow
+        for tp in range(max_pow):
+            best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - tp))
+            power_to_child[tp] = best["display_name"]
+
         def calc_standard_child(power1: int, power2: int) -> str:
             target_power = (power1 + power2 + 1) // 2
-            best_pal = min(
-                candidate_pals,
-                key=lambda p: abs(p["breeding_power"] - target_power)
-            )
-            return best_pal["display_name"]
+            if target_power < max_pow:
+                return power_to_child[target_power]
+            return candidate_pals[0]["display_name"]
 
         pool_set = {p.strip().lower() for p in pool} if pool else None
 
@@ -2284,7 +2314,7 @@ class SQLiteEngine:
                     result_child = p1_name
                 elif (p1_l, p2_l) in special_combos:
                     result_child = special_combos[(p1_l, p2_l)]
-                elif p1_name.lower() not in restricted_set and p2_name.lower() not in restricted_set:
+                elif all_pals[i]["breeding_power"] is not None and all_pals[j]["breeding_power"] is not None:
                     pow1 = all_pals[i]["breeding_power"]
                     pow2 = all_pals[j]["breeding_power"]
                     result_child = calc_standard_child(pow1, pow2)
@@ -2298,6 +2328,80 @@ class SQLiteEngine:
                     results.add((p1_n, p2_n))
 
         return sorted(list(results), key=lambda x: (x[0].lower(), x[1].lower()))
+
+    def enrich_parent_combos_with_instances(
+        self, combos: list[tuple[str, str]]
+    ) -> list[dict[str, Any]]:
+        """Enriches breeding parent combinations with the best owned instances and their passives."""
+        if not combos:
+            return []
+
+        from collections import defaultdict
+        all_insts = self.query_instances({})
+        by_species: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for inst in all_insts:
+            disp = str(inst.get("display_name") or "").lower().strip()
+            spec = str(inst.get("species") or "").lower().strip()
+            if disp:
+                by_species[disp].append(inst)
+            if spec and spec != disp:
+                by_species[spec].append(inst)
+
+        for sp_key in by_species:
+            by_species[sp_key].sort(
+                key=lambda x: (
+                    len(x.get("matched_passives", [])),
+                    x.get("skill_score", 0),
+                    x.get("level", 0),
+                    x.get("rank", 0),
+                ),
+                reverse=True,
+            )
+
+        enriched = []
+        for p1_name, p2_name in combos:
+            p1_insts = by_species.get(p1_name.lower(), [])
+            p2_insts = by_species.get(p2_name.lower(), [])
+            b1 = p1_insts[0] if p1_insts else {}
+            b2 = {}
+
+            if p1_name.lower() == p2_name.lower() and len(p1_insts) > 1:
+                b1_gender = b1.get("gender")
+                opp_gender = "Female" if b1_gender == "Male" else "Male" if b1_gender == "Female" else None
+                opp_insts = [i for i in p1_insts[1:] if opp_gender and i.get("gender") == opp_gender]
+                b2 = opp_insts[0] if opp_insts else p1_insts[1]
+            elif p2_insts:
+                b1_gender = b1.get("gender")
+                opp_gender = "Female" if b1_gender == "Male" else "Male" if b1_gender == "Female" else None
+                opp_insts = [i for i in p2_insts if opp_gender and i.get("gender") == opp_gender]
+                b2 = opp_insts[0] if opp_insts else p2_insts[0]
+
+            p1_passives = [
+                p.get("name") if isinstance(p, dict) else str(p)
+                for p in b1.get("passives", [])
+            ]
+            p2_passives = [
+                p.get("name") if isinstance(p, dict) else str(p)
+                for p in b2.get("passives", [])
+            ]
+
+            enriched.append({
+                "0": p1_name,
+                "1": p2_name,
+                "parent1": p1_name,
+                "parent2": p2_name,
+                "parent1_passives": p1_passives,
+                "parent2_passives": p2_passives,
+                "parent1_score": b1.get("skill_score", 0),
+                "parent2_score": b2.get("skill_score", 0),
+                "parent1_level": b1.get("level"),
+                "parent2_level": b2.get("level"),
+                "parent1_gender": b1.get("gender"),
+                "parent2_gender": b2.get("gender"),
+                "parent1_location": b1.get("location"),
+                "parent2_location": b2.get("location"),
+            })
+        return enriched
 
     def get_uncaught_breeding_opportunities(
         self,
@@ -2385,7 +2489,7 @@ class SQLiteEngine:
                     result_child = p1_name
                 elif (p1_l, p2_l) in special_combos:
                     result_child = special_combos[(p1_l, p2_l)]
-                elif p1_l not in restricted_set and p2_l not in restricted_set:
+                elif p1.get("breeding_power") is not None and p2.get("breeding_power") is not None:
                     tp = (p1["breeding_power"] + p2["breeding_power"] + 1) // 2
                     result_child = power_to_child[tp] if tp < max_pow else candidate_pals[0]["display_name"]
                 else:
@@ -2481,12 +2585,15 @@ class SQLiteEngine:
         cased_names = {r["display_name"].lower(): r["display_name"] for r in all_pals}
         power_map = {r["display_name"].lower(): r["breeding_power"] for r in all_pals}
 
+        name_map = {p["internal_name"].lower(): p["display_name"] for p in all_pals}
+        name_map.update({p["display_name"].lower(): p["display_name"] for p in all_pals})
+
         combos_rows = self.conn.execute("SELECT parent1, parent2, child FROM breeding_combos").fetchall()
         special_combos: dict[tuple[str, str], str] = {}
         for r in combos_rows:
-            p1_l = r["parent1"].lower()
-            p2_l = r["parent2"].lower()
-            ch_name = r["child"]
+            p1_l = name_map.get(r["parent1"].lower(), r["parent1"]).lower()
+            p2_l = name_map.get(r["parent2"].lower(), r["parent2"]).lower()
+            ch_name = name_map.get(r["child"].lower(), r["child"])
             special_combos[(p1_l, p2_l)] = ch_name
             special_combos[(p2_l, p1_l)] = ch_name
 
@@ -2494,17 +2601,25 @@ class SQLiteEngine:
         candidate_pals = [p for p in all_pals if is_valid_standard_candidate(p, restricted_set)]
         candidate_pals.sort(key=lambda x: x["index_order"])
 
+        max_bp = max((p["breeding_power"] for p in all_pals if p.get("breeding_power") is not None), default=1500)
+        max_pow = max_bp + 100
+        power_to_child: list[str] = [""] * max_pow
+        for tp in range(max_pow):
+            best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - tp))
+            power_to_child[tp] = best["display_name"]
+
         def calc_child_fast(p1_l: str, p2_l: str) -> str:
             if p1_l == p2_l:
                 return cased_names.get(p1_l, p1_l)
             if (p1_l, p2_l) in special_combos:
                 return special_combos[(p1_l, p2_l)]
-            if p1_l not in restricted_set and p2_l not in restricted_set and p1_l in power_map and p2_l in power_map:
+            if p1_l in power_map and p2_l in power_map and power_map[p1_l] is not None and power_map[p2_l] is not None:
                 pow1 = power_map[p1_l]
                 pow2 = power_map[p2_l]
                 target_pow = (pow1 + pow2 + 1) // 2
-                best = min(candidate_pals, key=lambda p: abs(p["breeding_power"] - target_pow))
-                return best["display_name"]
+                if target_pow < max_pow:
+                    return power_to_child[target_pow]
+                return candidate_pals[0]["display_name"]
             return ""
 
         target_input = target_species.strip().lower()

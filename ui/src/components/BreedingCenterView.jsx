@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import { PassiveBadge } from './common/PassiveBadge';
+import { getSkillTierRank } from './common/PalFilterModal';
 
 export function BreedingCenterView({
   pals = [],
@@ -12,6 +13,7 @@ export function BreedingCenterView({
   availablePalOptions = [],
   ownedPals,
   setOwnedPals,
+  instances = [],
 }) {
   const [breedingSubTab, setBreedingSubTab] = useState('calculator'); // 'calculator', 'reverse', 'offspring', 'path', 'uncaught'
 
@@ -27,6 +29,7 @@ export function BreedingCenterView({
   const [reverseLoading, setReverseLoading] = useState(false);
   const [reverseSearched, setReverseSearched] = useState(false);
   const [reverseSearchTerm, setReverseSearchTerm] = useState('');
+  const [reverseSortMode, setReverseSortMode] = useState('default');
 
   // Possible Offspring Sub-tab State
   const [offspringParent, setOffspringParent] = useState('');
@@ -86,6 +89,14 @@ export function BreedingCenterView({
     }
     if (typeof palOrName === 'string') {
       const name = palOrName.trim();
+      if (palSourceMode === 'caught' && instances && instances.length > 0) {
+        const inst = instances.find(i => i.display_name?.toLowerCase() === name.toLowerCase() || i.species?.toLowerCase() === name.toLowerCase());
+        if (inst) {
+          const master = pals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id === inst.id) ||
+                         allMasterPals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id === inst.id);
+          return { ...(master || {}), ...inst, display_name: name || master?.display_name };
+        }
+      }
       const master = pals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase()) ||
                      allMasterPals.find(p => p.display_name?.toLowerCase() === name.toLowerCase() || p.id?.toLowerCase() === name.toLowerCase());
       return master || { display_name: name };
@@ -152,6 +163,47 @@ export function BreedingCenterView({
       setReverseLoading(false);
     }
   };
+
+  // Sort reverse lookup combinations by parent name or passive rarity
+  const sortedParentCombos = useMemo(() => {
+    if (!parentCombos || parentCombos.length === 0) return [];
+    if (reverseSortMode === 'default') {
+      return parentCombos;
+    }
+
+    const computeComboRarity = (combo) => {
+      const p1Passives = combo.parent1_passives || [];
+      const p2Passives = combo.parent2_passives || [];
+      const allPassives = [...p1Passives, ...p2Passives];
+      if (allPassives.length === 0) return -9999;
+
+      // 1. Highest individual passive tier rank (e.g. Legend = 4, Artisan = 3, etc.)
+      const ranks = allPassives.map(p => getSkillTierRank(p));
+      const maxTier = Math.max(...ranks, -99);
+
+      // 2. Sum of backend skill scores if present
+      const score = (combo.parent1_score || 0) + (combo.parent2_score || 0);
+
+      // 3. Sum of tier ranks as tiebreaker
+      const sumTiers = ranks.reduce((acc, r) => acc + r, 0);
+
+      return maxTier * 1000 + score * 10 + sumTiers;
+    };
+
+    const copy = [...parentCombos];
+    copy.sort((a, b) => {
+      const scoreA = computeComboRarity(a);
+      const scoreB = computeComboRarity(b);
+      if (scoreA !== scoreB) {
+        return reverseSortMode === 'rarity_asc' ? scoreA - scoreB : scoreB - scoreA;
+      }
+      const nameA = (a.parent1 || a[0] || '').toLowerCase();
+      const nameB = (b.parent1 || b[0] || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+
+    return copy;
+  }, [parentCombos, reverseSortMode]);
 
   // Possible Offspring Handler
   const handleCalculateOffspring = async () => {
@@ -436,7 +488,7 @@ export function BreedingCenterView({
               {(reverseChild || parentCombos.length > 0 || reverseSearched) && (
                 <button 
                   className="btn btn-secondary" 
-                  onClick={() => { setReverseChild(''); setParentCombos([]); setReverseSearched(false); setReverseSearchTerm(''); }}
+                  onClick={() => { setReverseChild(''); setParentCombos([]); setReverseSearched(false); setReverseSearchTerm(''); setReverseSortMode('default'); }}
                   style={{ padding: '0.5rem 0.85rem', fontSize: '0.88rem' }}
                 >
                   ✕ Clear
@@ -447,39 +499,141 @@ export function BreedingCenterView({
 
           {reverseSearched && !reverseLoading && (
             parentCombos.length > 0 ? (
-              <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 0, marginBottom: '1.5rem' }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '80px', textAlign: 'center' }}>#</th>
-                      <th>Parent 1</th>
-                      <th>Parent 2</th>
-                      <th style={{ textAlign: 'center', width: '140px' }}>Target Child</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {parentCombos.map((combo, idx) => (
-                      <tr key={idx}>
-                        <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>{idx + 1}</td>
-                        <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[0])}>
-                          <PalInstanceTooltip instance={resolvePalForTooltip(combo[0])}>
-                            <span>{combo[0]}</span>
-                          </PalInstanceTooltip>
-                        </td>
-                        <td style={{ fontWeight: 600, color: 'var(--accent-gold)', cursor: 'pointer' }} onClick={() => openPalDetails(combo[1])}>
-                          <PalInstanceTooltip instance={resolvePalForTooltip(combo[1])}>
-                            <span>{combo[1]}</span>
-                          </PalInstanceTooltip>
-                        </td>
-                        <td style={{ textAlign: 'center', color: '#34d399', fontWeight: 700, cursor: 'pointer' }} onClick={() => openPalDetails(reverseSearchTerm)}>
-                          <PalInstanceTooltip instance={resolvePalForTooltip(reverseSearchTerm)}>
-                            <span>{reverseSearchTerm}</span>
-                          </PalInstanceTooltip>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', padding: '0 0.25rem', flexShrink: 0, flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span>Breeding Combinations for:</span>
+                    <span style={{ color: '#34d399', fontWeight: 700 }}>{reverseSearchTerm}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>Sort:</label>
+                      <select
+                        value={reverseSortMode}
+                        onChange={e => setReverseSortMode(e.target.value)}
+                        style={{
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '6px',
+                          background: 'rgba(0,0,0,0.4)',
+                          border: '1px solid var(--border-color)',
+                          color: reverseSortMode.startsWith('rarity') ? 'var(--accent-gold)' : 'white',
+                          fontSize: '0.8rem',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <option value="default">Default (Parent 1 A-Z)</option>
+                        {palSourceMode === 'caught' && (
+                          <>
+                            <option value="rarity_desc">👑 Passive Rarity (Highest First)</option>
+                            <option value="rarity_asc">Passive Rarity (Lowest First)</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                    <div className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', border: '1px solid rgba(56, 189, 248, 0.35)', color: '#38bdf8', fontSize: '0.85rem', fontWeight: 700, padding: '0.3rem 0.85rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span>Total Pairs:</span>
+                      <span style={{ fontSize: '0.95rem', color: '#ffffff', fontWeight: 800 }}>{sortedParentCombos.length}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="glass-card table-container" style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: 0 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '60px', textAlign: 'center' }}>#</th>
+                        <th style={{ width: '50%' }}>Parent 1</th>
+                        <th style={{ width: '50%' }}>Parent 2</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedParentCombos.map((combo, idx) => {
+                        const p1Name = combo.parent1 || combo[0];
+                        const p2Name = combo.parent2 || combo[1];
+                        const p1Passives = combo.parent1_passives || [];
+                        const p2Passives = combo.parent2_passives || [];
+
+                        return (
+                          <tr key={idx}>
+                            <td style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.8rem', verticalAlign: 'top', paddingTop: '0.75rem' }}>
+                              {idx + 1}
+                            </td>
+                            <td style={{ verticalAlign: 'top', padding: '0.65rem 0.85rem' }}>
+                              <PalInstanceTooltip instance={resolvePalForTooltip(p1Name)}>
+                                <div onClick={() => openPalDetails(p1Name)} style={{ cursor: 'pointer' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: palSourceMode === 'caught' && p1Passives.length > 0 ? '0.35rem' : '0' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--accent-gold)', fontSize: '0.92rem' }}>{p1Name}</span>
+                                    {palSourceMode === 'caught' && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        {combo.parent1_level && (
+                                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Lv.{combo.parent1_level}</span>
+                                        )}
+                                        {combo.parent1_score !== undefined && combo.parent1_score !== 0 && (
+                                          <span className={`badge ${combo.parent1_score >= 0 ? 'badge-score-positive' : 'badge-score-negative'}`} style={{ fontSize: '0.65rem', padding: '0.05rem 0.25rem' }}>
+                                            {combo.parent1_score > 0 ? `+${combo.parent1_score}` : combo.parent1_score}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {palSourceMode === 'caught' && (
+                                    p1Passives.length > 0 ? (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', alignItems: 'center' }}>
+                                        {p1Passives.map((pName, pIdx) => (
+                                          <PassiveBadge key={pIdx} skill={pName} size="sm" />
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.75rem' }}>No passives recorded</span>
+                                    )
+                                  )}
+                                </div>
+                              </PalInstanceTooltip>
+                            </td>
+                            <td style={{ verticalAlign: 'top', padding: '0.65rem 0.85rem' }}>
+                              <PalInstanceTooltip instance={resolvePalForTooltip(p2Name)}>
+                                <div onClick={() => openPalDetails(p2Name)} style={{ cursor: 'pointer' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: palSourceMode === 'caught' && p2Passives.length > 0 ? '0.35rem' : '0' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--accent-gold)', fontSize: '0.92rem' }}>{p2Name}</span>
+                                    {palSourceMode === 'caught' && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                        {combo.parent2_level && (
+                                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>Lv.{combo.parent2_level}</span>
+                                        )}
+                                        {combo.parent2_score !== undefined && combo.parent2_score !== 0 && (
+                                          <span className={`badge ${combo.parent2_score >= 0 ? 'badge-score-positive' : 'badge-score-negative'}`} style={{ fontSize: '0.65rem', padding: '0.05rem 0.25rem' }}>
+                                            {combo.parent2_score > 0 ? `+${combo.parent2_score}` : combo.parent2_score}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  {palSourceMode === 'caught' && (
+                                    p2Passives.length > 0 ? (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', alignItems: 'center' }}>
+                                        {p2Passives.map((pName, pIdx) => (
+                                          <PassiveBadge key={pIdx} skill={pName} size="sm" />
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <span style={{ color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.75rem' }}>No passives recorded</span>
+                                    )
+                                  )}
+                                </div>
+                              </PalInstanceTooltip>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={3} style={{ textAlign: 'right', padding: '0.65rem 1.25rem', color: 'var(--text-secondary)', fontSize: '0.85rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                          Total Available Combinations: <strong style={{ color: '#38bdf8' }}>{sortedParentCombos.length}</strong>
                         </td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             ) : (
               <div style={{ color: 'var(--text-secondary)', padding: '2rem', background: 'rgba(255,255,255,0.03)', borderRadius: '12px', textAlign: 'center' }}>

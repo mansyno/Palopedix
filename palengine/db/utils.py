@@ -171,3 +171,26 @@ def normalize_passives(passives_raw: list) -> list[dict[str, Any]]:
                 'aptitude': calculate_aptitude(p, p, '')
             })
     return normalized
+
+
+NON_PLAYABLE_SPECIES = {
+    # 9 Tower Boss Entities
+    "zoe & grizzbolt", "lily & lyleen", "marcus & faleris", "axel & orserk",
+    "victor & shadowbeak", "saya & selyne", "auri & shaolong", "bjorn & bastigor", "zenara & astralym",
+    # 6 Crossover Slimes
+    "green slime", "blue slime", "red slime", "purple slime", "illuminant slime", "rainbow slime",
+    # 7 Terraria Event Monsters
+    "enchanted sword", "cave bat", "illuminant bat", "eye of cthulhu", "demon eye", "true eye of cthulhu", "moon lord",
+    # 3 Cut / Unreleased NPCs
+    "boltmane", "dragostrophe", "pidf rider", "eleclion", "blackfurdragon", "police_palride",
+}
+
+
+def is_playable_pal(pal_dict: dict[str, Any]) -> bool:
+    """Returns True if the Pal is one of the 291 genuine playable in-game Pals."""
+    dn = str(pal_dict.get("display_name", "")).strip().lower()
+    in_name = str(pal_dict.get("internal_name", "")).strip().lower()
+    if "&" in dn or "boss" in in_name or in_name.startswith("police_") or in_name.startswith("yakushima") or in_name.startswith("raid_"):
+        return False
+    return dn not in NON_PLAYABLE_SPECIES and in_name not in NON_PLAYABLE_SPECIES
+

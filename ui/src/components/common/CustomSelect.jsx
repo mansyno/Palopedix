@@ -151,8 +151,8 @@ export function CustomSelect({
         }}
         style={{
           width: '100%',
-          fontSize: '0.78rem',
-          padding: '0.25rem 0.5rem',
+          fontSize: '0.84rem',
+          padding: '0.3rem 0.6rem',
           background: 'rgba(15, 23, 42, 0.95)',
           border: isSelectedActive
             ? `1px solid ${accentColor}`
@@ -167,7 +167,7 @@ export function CustomSelect({
           boxShadow: isOpen ? `0 0 10px ${accentColor}40` : 'none',
           transition: 'all 0.15s ease',
           gap: '0.35rem',
-          minHeight: '30px',
+          minHeight: '34px',
         }}
       >
         <div
@@ -261,8 +261,8 @@ export function CustomSelect({
                     key={String(opt.value)}
                     onClick={() => handleSelect(opt.value)}
                     style={{
-                      padding: '0.06rem 0.6rem',
-                      fontSize: '0.78rem',
+                      padding: '0.15rem 0.6rem',
+                      fontSize: '0.82rem',
                       color: isSelected ? 'var(--accent-gold)' : 'var(--text-primary)',
                       background: isSelected
                         ? 'rgba(99, 102, 241, 0.25)'

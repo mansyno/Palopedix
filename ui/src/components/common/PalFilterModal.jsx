@@ -380,16 +380,16 @@ export function PalFilterModal({
       >
         <button className="modal-close-btn" onClick={onClose} title="Close (Esc)">✕</button>
 
-        {/* Modal Header (Condensed to half the previous space) */}
-        <div style={{ marginBottom: '0.45rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <span style={{ fontSize: '1.05rem' }}>⚡</span>
-              <h2 style={{ fontSize: '1.05rem', fontWeight: 800, background: 'linear-gradient(135deg, #fff, #a5b4fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+        {/* Modal Header */}
+        <div style={{ marginBottom: '0.65rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ fontSize: '1.2rem' }}>⚡</span>
+              <h2 style={{ fontSize: '1.2rem', fontWeight: 800, background: 'linear-gradient(135deg, #fff, #a5b4fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
                 Filter Pals
               </h2>
             </div>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
               All active filters are cumulative.
             </span>
           </div>
@@ -397,16 +397,16 @@ export function PalFilterModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <span
               style={{
-                fontSize: '0.68rem',
+                fontSize: '0.76rem',
                 fontWeight: 700,
-                padding: '0.15rem 0.5rem',
+                padding: '0.2rem 0.6rem',
                 borderRadius: '6px',
                 background: palSourceMode === 'caught' ? 'rgba(52, 211, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)',
                 border: palSourceMode === 'caught' ? '1px solid rgba(52, 211, 153, 0.35)' : '1px solid rgba(99, 102, 241, 0.35)',
                 color: palSourceMode === 'caught' ? '#34d399' : '#818cf8',
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '0.3rem',
+                gap: '0.35rem',
               }}
             >
               {palSourceMode === 'caught' ? '💼 Filter Scope: Caught Pals' : '🌐 Filter Scope: All Real In-Game Pals'}
@@ -414,23 +414,35 @@ export function PalFilterModal({
           </div>
         </div>
 
-        {/* Filter Body */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-          
+        {/* Filter Body - 2x2 Dashboard Grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(460px, 1fr))',
+          gap: '0.95rem',
+          alignItems: 'stretch'
+        }}>
           {/* ========================================================================= */}
-          {/* SECTION 1: GENERAL ATTRIBUTES (PARTNER GROUP, LOCATION, SPECIES, GENDER, MIN LV, RARITY, GEAR) */}
+          {/* CARD 1 (ROW 1, COL 1): SPECIES & GENERAL ATTRIBUTES                       */}
           {/* ========================================================================= */}
-          <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
-              <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
-                <span>📋</span> General Attributes
+          <div className="filter-modal-section" style={{
+            background: 'rgba(30, 41, 59, 0.45)',
+            padding: '1rem 1.15rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 style={{ fontSize: '1.02rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                <span>📋</span> Species & General Attributes
               </h3>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.45rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.65rem' }}>
               {/* Partner Group */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: partnerGroup ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: partnerGroup ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   🤝 Partner Group
                 </label>
                 <CustomSelect
@@ -444,7 +456,7 @@ export function PalFilterModal({
 
               {/* Location */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: location ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: location ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   📍 Location
                 </label>
                 <CustomSelect
@@ -458,7 +470,7 @@ export function PalFilterModal({
 
               {/* Species (Searchable) */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: species ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: species ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   🐾 Species
                 </label>
                 <CustomSelect
@@ -473,7 +485,7 @@ export function PalFilterModal({
 
               {/* Gender */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: gender ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: gender ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   ⚧ Gender
                 </label>
                 <CustomSelect
@@ -487,7 +499,7 @@ export function PalFilterModal({
 
               {/* Min Level */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: minLevel ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: minLevel ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   ⭐ Min Level
                 </label>
                 <input
@@ -499,13 +511,13 @@ export function PalFilterModal({
                   onChange={e => setMinLevel(e.target.value)}
                   style={{
                     width: '100%',
-                    fontSize: '0.78rem',
-                    padding: '0.32rem 0.5rem',
+                    fontSize: '0.84rem',
+                    padding: '0.32rem 0.6rem',
                     background: 'rgba(15, 23, 42, 0.95)',
                     border: minLevel ? '1px solid #818cf8' : '1px solid var(--border-color)',
                     borderRadius: '6px',
                     color: 'var(--text-primary)',
-                    minHeight: '30px',
+                    minHeight: '34px',
                     boxSizing: 'border-box'
                   }}
                 />
@@ -513,7 +525,7 @@ export function PalFilterModal({
 
               {/* Rarity Tier */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: rarity ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: rarity ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   👑 Rarity Tier
                 </label>
                 <CustomSelect
@@ -527,7 +539,7 @@ export function PalFilterModal({
 
               {/* Pal Gear Status */}
               <div>
-                <label style={{ display: 'block', marginBottom: '0.2rem', color: gearStatus ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.7rem', fontWeight: 700 }}>
+                <label style={{ display: 'block', marginBottom: '0.3rem', color: gearStatus ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
                   🪖 Pal Gear
                 </label>
                 <CustomSelect
@@ -542,13 +554,21 @@ export function PalFilterModal({
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 2: PASSIVE SKILLS (4 COMPACT DROPDOWNS IN ONE ROW - SEARCHABLE) */}
+          {/* CARD 2 (ROW 1, COL 2): PASSIVE SKILLS COMBINATION                         */}
           {/* ========================================================================= */}
-          <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+          <div className="filter-modal-section" style={{
+            background: 'rgba(30, 41, 59, 0.45)',
+            padding: '1rem 1.15rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <h3 style={{ fontSize: '1.02rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                 <span>🛡️</span> Passive Skills Combination
-                <span style={{ fontSize: '0.72rem', fontWeight: 600, color: activeSelectedPassives.length > 0 ? '#34d399' : 'var(--text-secondary)', marginLeft: '0.2rem' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 600, color: activeSelectedPassives.length > 0 ? '#34d399' : 'var(--text-secondary)', marginLeft: '0.3rem' }}>
                   ({activeSelectedPassives.length}/4 Selected)
                 </span>
               </h3>
@@ -564,8 +584,8 @@ export function PalFilterModal({
                       border: 'none',
                       background: passiveSortMode === 'rarity' ? 'var(--primary-gradient)' : 'transparent',
                       color: passiveSortMode === 'rarity' ? '#fff' : 'var(--text-secondary)',
-                      padding: '0.2rem 0.5rem',
-                      fontSize: '0.7rem',
+                      padding: '0.25rem 0.55rem',
+                      fontSize: '0.76rem',
                       fontWeight: passiveSortMode === 'rarity' ? 700 : 500,
                       borderRadius: '4px',
                       cursor: 'pointer',
@@ -583,8 +603,8 @@ export function PalFilterModal({
                       border: 'none',
                       background: passiveSortMode === 'name' ? 'var(--primary-gradient)' : 'transparent',
                       color: passiveSortMode === 'name' ? '#fff' : 'var(--text-secondary)',
-                      padding: '0.2rem 0.5rem',
-                      fontSize: '0.7rem',
+                      padding: '0.25rem 0.55rem',
+                      fontSize: '0.76rem',
                       fontWeight: passiveSortMode === 'name' ? 700 : 500,
                       borderRadius: '4px',
                       cursor: 'pointer',
@@ -599,7 +619,7 @@ export function PalFilterModal({
                 {activeSelectedPassives.length > 0 && (
                   <button 
                     onClick={() => { setSlot1(''); setSlot2(''); setSlot3(''); setSlot4(''); }} 
-                    style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                    style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}
                   >
                     Clear Skills
                   </button>
@@ -607,12 +627,12 @@ export function PalFilterModal({
               </div>
             </div>
 
-            {/* 4 Searchable Custom Selectors in a Single Horizontal Row */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+            {/* 4 Searchable Custom Selectors in a 2x2 Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.65rem' }}>
               
               {/* Dropdown 1 */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot1 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: slot1 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.3rem' }}>
                   Skill 1
                 </label>
                 <CustomSelect
@@ -630,7 +650,7 @@ export function PalFilterModal({
 
               {/* Dropdown 2 */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot2 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: slot2 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.3rem' }}>
                   Skill 2
                 </label>
                 <CustomSelect
@@ -648,7 +668,7 @@ export function PalFilterModal({
 
               {/* Dropdown 3 */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot3 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: slot3 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.3rem' }}>
                   Skill 3
                 </label>
                 <CustomSelect
@@ -666,7 +686,7 @@ export function PalFilterModal({
 
               {/* Dropdown 4 */}
               <div>
-                <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 700, color: slot4 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.2rem' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: slot4 ? 'var(--accent-gold)' : 'var(--text-secondary)', marginBottom: '0.3rem' }}>
                   Skill 4
                 </label>
                 <CustomSelect
@@ -686,14 +706,22 @@ export function PalFilterModal({
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 3: ELEMENTAL TYPES (UP TO 2) */}
+          {/* CARD 3 (ROW 2, COL 1): ELEMENTAL TYPES (UP TO 2)                          */}
           {/* ========================================================================= */}
-          <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div className="filter-modal-section" style={{
+            background: 'rgba(30, 41, 59, 0.45)',
+            padding: '1rem 1.15rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
               <div>
-                <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                <h3 style={{ fontSize: '1.02rem', fontWeight: 700, color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                   <span>🔥</span> Elemental Types
-                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: selectedElements.length === 2 ? '#34d399' : 'var(--text-secondary)', marginLeft: '0.2rem' }}>
+                  <span style={{ fontSize: '0.82rem', fontWeight: 600, color: selectedElements.length === 2 ? '#34d399' : 'var(--text-secondary)', marginLeft: '0.3rem' }}>
                     ({selectedElements.length}/2 Selected)
                   </span>
                 </h3>
@@ -701,15 +729,15 @@ export function PalFilterModal({
               {selectedElements.length > 0 && (
                 <button 
                   onClick={() => setSelectedElements([])} 
-                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Clear Elements
                 </button>
               )}
             </div>
 
-            {/* Elements Grid (9 Official Elements) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.45rem' }}>
+            {/* Elements Grid (9 Official Elements - 3x3) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
               {OFFICIAL_ELEMENTS.map(elem => {
                 const isSelected = selectedElements.includes(elem.name);
                 const isMaxReached = !isSelected && selectedElements.length >= 2;
@@ -723,7 +751,7 @@ export function PalFilterModal({
                       background: isSelected ? elem.bg : 'rgba(0, 0, 0, 0.3)',
                       border: isSelected ? `2px solid ${elem.color}` : '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '8px',
-                      padding: '0.4rem 0.65rem',
+                      padding: '0.45rem 0.65rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -733,19 +761,19 @@ export function PalFilterModal({
                       transition: 'all 0.15s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
                       <img
                         src={getElementIconUrl(elem.name)}
                         alt={elem.name}
-                        style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? elem.color : 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: isSelected ? elem.color : 'var(--text-primary)' }}>
                         {elem.name}
                       </span>
                     </div>
                     {isSelected && (
-                      <span style={{ color: '#34d399', fontWeight: 900, fontSize: '0.8rem' }}>✓</span>
+                      <span style={{ color: '#34d399', fontWeight: 900, fontSize: '0.88rem' }}>✓</span>
                     )}
                   </button>
                 );
@@ -754,15 +782,23 @@ export function PalFilterModal({
           </div>
 
           {/* ========================================================================= */}
-          {/* SECTION 4: WORK SUITABILITIES                                             */}
+          {/* CARD 4 (ROW 2, COL 2): WORK SUITABILITIES                                */}
           {/* ========================================================================= */}
-          <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <div className="filter-modal-section" style={{
+            background: 'rgba(30, 41, 59, 0.45)',
+            padding: '1rem 1.15rem',
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
               <div>
-                <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                <h3 style={{ fontSize: '1.02rem', fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
                   <span>🛠️</span> Work Suitabilities
                   {selectedSuitabilities.length > 0 && (
-                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#34d399', marginLeft: '0.2rem' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#34d399', marginLeft: '0.3rem' }}>
                       ({selectedSuitabilities.length} Selected)
                     </span>
                   )}
@@ -771,15 +807,15 @@ export function PalFilterModal({
               {selectedSuitabilities.length > 0 && (
                 <button 
                   onClick={() => setSelectedSuitabilities([])} 
-                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.78rem', cursor: 'pointer', fontWeight: 600 }}
                 >
                   Clear Work
                 </button>
               )}
             </div>
 
-            {/* Work Suitabilities Grid (12 Game Work Roles) */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.45rem' }}>
+            {/* Work Suitabilities Grid (12 Game Work Roles - 4x3) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
               {OFFICIAL_WORK_SUITABILITIES.map(work => {
                 const isSelected = selectedSuitabilities.includes(work.id);
 
@@ -791,7 +827,7 @@ export function PalFilterModal({
                       background: isSelected ? work.bg : 'rgba(0, 0, 0, 0.3)',
                       border: isSelected ? `2px solid ${work.color}` : '1px solid rgba(255,255,255,0.1)',
                       borderRadius: '8px',
-                      padding: '0.4rem 0.65rem',
+                      padding: '0.45rem 0.65rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -804,41 +840,40 @@ export function PalFilterModal({
                       <img
                         src={work.icon}
                         alt={work.label}
-                        style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                        style={{ width: '20px', height: '20px', objectFit: 'contain' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
-                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? work.color : 'var(--text-primary)' }}>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: isSelected ? work.color : 'var(--text-primary)' }}>
                         {work.label}
                       </span>
                     </div>
                     {isSelected && (
-                      <span style={{ color: '#34d399', fontWeight: 900, fontSize: '0.8rem' }}>✓</span>
+                      <span style={{ color: '#34d399', fontWeight: 900, fontSize: '0.88rem' }}>✓</span>
                     )}
                   </button>
                 );
               })}
             </div>
           </div>
-
         </div>
 
         {/* Modal Footer */}
-        <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ marginTop: '1.1rem', paddingTop: '0.85rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
           <div>
             <button
               className="btn btn-secondary"
               onClick={handleReset}
-              style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.9rem' }}
             >
               🔄 Reset All Filters
             </button>
           </div>
 
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
             <button
               className="btn btn-secondary"
               onClick={onClose}
-              style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem' }}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.9rem' }}
             >
               Cancel
             </button>
@@ -846,8 +881,8 @@ export function PalFilterModal({
               className="btn btn-primary"
               onClick={handleApply}
               style={{
-                fontSize: '0.8rem',
-                padding: '0.4rem 1.15rem',
+                fontSize: '0.88rem',
+                padding: '0.45rem 1.25rem',
                 fontWeight: 700,
                 background: 'var(--primary-gradient)',
                 boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'

@@ -1103,6 +1103,23 @@ class SQLiteEngine:
                 SELECT building_id, work_type, is_automated, work_amount_modifier FROM palworld_master.building_work_types
             """
             )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('AncientBlastFurnace', 'Cooling', 0, 1.0)
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('AncientWorkBench', 'Medicine', 0, 1.0)
+            """
+            )
+            cursor.execute(
+                """
+                UPDATE building_work_types SET work_type = 'Cooling' WHERE building_id = 'IceCrusher'
+            """
+            )
 
             cursor.execute(
                 """
@@ -1299,6 +1316,23 @@ class SQLiteEngine:
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_bwt_building_work
                 ON building_work_types(building_id, work_type)
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('AncientBlastFurnace', 'Cooling', 0, 1.0)
+            """
+            )
+            cursor.execute(
+                """
+                INSERT OR IGNORE INTO building_work_types (building_id, work_type, is_automated, work_amount_modifier)
+                VALUES ('AncientWorkBench', 'Medicine', 0, 1.0)
+            """
+            )
+            cursor.execute(
+                """
+                UPDATE building_work_types SET work_type = 'Cooling' WHERE building_id = 'IceCrusher'
             """
             )
 

@@ -35,7 +35,9 @@
   {"alias": "BlastFurnace2", "canonical_name": "BlastFurnace2", "display_name": "Improved Furnace", "work_type": "Kindling", "is_automated": 0},
   {"alias": "BlastFurnace3", "canonical_name": "BlastFurnace3", "display_name": "Electric Furnace", "work_type": "Kindling", "is_automated": 0},
   {"alias": "BlastFurnace4", "canonical_name": "BlastFurnace4", "display_name": "Blast Furnace", "work_type": "Kindling", "is_automated": 0},
-  {"alias": "BlastFurnace5", "canonical_name": "BlastFurnace5", "display_name": "Ancient Blast Furnace", "work_type": "Kindling", "is_automated": 0},
+  {"alias": "BlastFurnace5", "canonical_name": "AncientBlastFurnace", "display_name": "Ancient Blast Furnace", "work_type": "Kindling", "is_automated": 0},
+  {"alias": "AncientBlastFurnace", "canonical_name": "AncientBlastFurnace", "display_name": "Ancient Blast Furnace", "work_type": "Kindling", "is_automated": 0},
+  {"alias": "AncientWorkBench", "canonical_name": "AncientWorkBench", "display_name": "Ancient Workbench", "work_type": "Handcraft", "is_automated": 0},
   {"alias": "Furnace Primitive", "canonical_name": "Furnace_Primitive", "display_name": "Primitive Furnace", "work_type": "Kindling", "is_automated": 0},
   {"alias": "Furnace Electric", "canonical_name": "Furnace_Electric", "display_name": "Electric Furnace", "work_type": "Kindling", "is_automated": 0},
   {"alias": "CookingStove", "canonical_name": "WorkBench", "display_name": "Cooking Pot", "work_type": "Kindling", "is_automated": 0},
@@ -43,7 +45,7 @@
   {"alias": "FlourMill", "canonical_name": "FlourMill", "display_name": "Mill", "work_type": "Watering", "is_automated": 0},
   {"alias": "Crusher", "canonical_name": "Crusher", "display_name": "Crusher", "work_type": "Watering", "is_automated": 0},
   {"alias": "WoodCrusher", "canonical_name": "WoodCrusher", "display_name": "Wood Crusher", "work_type": "Watering", "is_automated": 0},
-  {"alias": "IceCrusher", "canonical_name": "IceCrusher", "display_name": "Ice Crusher", "work_type": "Watering", "is_automated": 0},
+  {"alias": "IceCrusher", "canonical_name": "IceCrusher", "display_name": "Cryogenic Crusher", "work_type": "Cooling", "is_automated": 0},
 
   {"alias": "Clinic", "canonical_name": "MedicineFactory_Primitive", "display_name": "Pal Medical Center", "work_type": "Medicine", "is_automated": 0},
   {"alias": "MedicineFactory Primitive", "canonical_name": "MedicineFactory_Primitive", "display_name": "Medieval Medicine Workbench", "work_type": "Medicine", "is_automated": 0},
@@ -53,7 +55,7 @@
   {"alias": "ElectricGenerator2", "canonical_name": "ElectricGenerator2", "display_name": "Power Generator II", "work_type": "GeneratingElectricity", "is_automated": 1},
   {"alias": "ElectricGenerator3", "canonical_name": "ElectricGenerator3", "display_name": "Power Generator III", "work_type": "GeneratingElectricity", "is_automated": 1},
   {"alias": "ElectricGenerator Large", "canonical_name": "ElectricGenerator_Large", "display_name": "Large Power Generator", "work_type": "GeneratingElectricity", "is_automated": 1},
-  {"alias": "OilPump", "canonical_name": "ElectricGenerator_Large", "display_name": "Crude Oil Extractor", "work_type": "Handcraft", "is_automated": 1},
+  {"alias": "OilPump", "canonical_name": "OilPump", "display_name": "Crude Oil Extractor", "work_type": null, "is_automated": 1},
 
   {"alias": "CharacterRankUp", "canonical_name": "CharacterRankUp", "display_name": "Pal Essence Condenser", "work_type": null, "is_automated": 0},
   {"alias": "BaseCampWorkHard", "canonical_name": "BaseCampWorkHard", "display_name": "Monitoring Stand", "work_type": null, "is_automated": 0},

@@ -26,6 +26,21 @@ export const OFFICIAL_ELEMENTS = [
   { name: 'Dragon', label: 'Dragon', emoji: '🐉', color: '#a78bfa', bg: 'rgba(139, 92, 246, 0.15)', border: 'rgba(139, 92, 246, 0.4)' },
 ];
 
+export const OFFICIAL_WORK_SUITABILITIES = [
+  { id: 'kindling', label: 'Kindling', icon: '/assets/work/Kindling.png', emoji: '🔥', color: '#f87171', bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.4)' },
+  { id: 'watering', label: 'Watering', icon: '/assets/work/Watering.png', emoji: '💧', color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.15)', border: 'rgba(59, 130, 246, 0.4)' },
+  { id: 'planting', label: 'Planting', icon: '/assets/work/Planting.png', emoji: '🌱', color: '#4ade80', bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.4)' },
+  { id: 'generating_electricity', label: 'Electricity', icon: '/assets/work/GeneratingElectricity.png', emoji: '⚡', color: '#facc15', bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.4)' },
+  { id: 'handiwork', label: 'Handiwork', icon: '/assets/work/Handcraft.png', emoji: '🔨', color: '#fb923c', bg: 'rgba(249, 115, 22, 0.15)', border: 'rgba(249, 115, 22, 0.4)' },
+  { id: 'gathering', label: 'Gathering', icon: '/assets/work/Gathering.png', emoji: '🧺', color: '#a3e635', bg: 'rgba(163, 230, 53, 0.15)', border: 'rgba(163, 230, 53, 0.4)' },
+  { id: 'lumbering', label: 'Lumbering', icon: '/assets/work/Lumbering.png', emoji: '🌲', color: '#2dd4bf', bg: 'rgba(45, 212, 191, 0.15)', border: 'rgba(45, 212, 191, 0.4)' },
+  { id: 'mining', label: 'Mining', icon: '/assets/work/Mining.png', emoji: '⛏️', color: '#94a3b8', bg: 'rgba(148, 163, 184, 0.15)', border: 'rgba(148, 163, 184, 0.4)' },
+  { id: 'medicine_production', label: 'Medicine', icon: '/assets/work/Medicine.png', emoji: '💊', color: '#f472b6', bg: 'rgba(244, 114, 182, 0.15)', border: 'rgba(244, 114, 182, 0.4)' },
+  { id: 'cooling', label: 'Cooling', icon: '/assets/work/Cooling.png', emoji: '❄️', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.15)', border: 'rgba(56, 189, 248, 0.4)' },
+  { id: 'transporting', label: 'Transport', icon: '/assets/work/Transport.png', emoji: '📦', color: '#e879f9', bg: 'rgba(232, 121, 249, 0.15)', border: 'rgba(232, 121, 249, 0.4)' },
+  { id: 'farming', label: 'Farming', icon: '/assets/work/MonsterFarm.png', emoji: '🍳', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)' },
+];
+
 export const PARTNER_GROUP_OPTIONS = [
   { value: '', label: 'All Partner Groups' },
   { value: 'flying_mount', label: '🦅 Flying Mounts' },
@@ -102,6 +117,7 @@ export function PalFilterModal({
     gearStatus: '',
     passives: [],
     elements: [],
+    suitabilities: [],
   },
   speciesOptions = [],
   onApply,
@@ -124,8 +140,9 @@ export function PalFilterModal({
   const [slot3, setSlot3] = useState('');
   const [slot4, setSlot4] = useState('');
 
-  // Elements
+  // Elements & Work Suitabilities
   const [selectedElements, setSelectedElements] = useState(initialFilters.elements || []);
+  const [selectedSuitabilities, setSelectedSuitabilities] = useState(initialFilters.suitabilities || []);
   const [allPassives, setAllPassives] = useState([]);
   const [loadingPassives, setLoadingPassives] = useState(false);
   const [passiveSortMode, setPassiveSortMode] = useState('rarity');
@@ -147,6 +164,7 @@ export function PalFilterModal({
       setSlot3(pList[2] ? (typeof pList[2] === 'string' ? pList[2] : (pList[2].name || pList[2].id || '')) : '');
       setSlot4(pList[3] ? (typeof pList[3] === 'string' ? pList[3] : (pList[3].name || pList[3].id || '')) : '');
       setSelectedElements(initialFilters.elements || []);
+      setSelectedSuitabilities(initialFilters.suitabilities || []);
     }
   }, [isOpen, initialFilters]);
 
@@ -289,6 +307,16 @@ export function PalFilterModal({
     }
   };
 
+  // Work Suitability Selection Handlers
+  const handleToggleSuitability = (suitabilityId) => {
+    const exists = selectedSuitabilities.includes(suitabilityId);
+    if (exists) {
+      setSelectedSuitabilities(selectedSuitabilities.filter(s => s !== suitabilityId));
+    } else {
+      setSelectedSuitabilities([...selectedSuitabilities, suitabilityId]);
+    }
+  };
+
   const handleReset = () => {
     setPartnerGroup('');
     setLocation('');
@@ -302,6 +330,7 @@ export function PalFilterModal({
     setSlot3('');
     setSlot4('');
     setSelectedElements([]);
+    setSelectedSuitabilities([]);
   };
 
   const handleApply = () => {
@@ -315,6 +344,7 @@ export function PalFilterModal({
       gearStatus,
       passives: activeSelectedPassives,
       elements: selectedElements,
+      suitabilities: selectedSuitabilities,
     });
     onClose();
   };
@@ -712,6 +742,73 @@ export function PalFilterModal({
                       />
                       <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? elem.color : 'var(--text-primary)' }}>
                         {elem.name}
+                      </span>
+                    </div>
+                    {isSelected && (
+                      <span style={{ color: '#34d399', fontWeight: 900, fontSize: '0.8rem' }}>✓</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ========================================================================= */}
+          {/* SECTION 4: WORK SUITABILITIES                                             */}
+          {/* ========================================================================= */}
+          <div className="filter-modal-section" style={{ background: 'rgba(255,255,255,0.02)', padding: '0.85rem 1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <div>
+                <h3 style={{ fontSize: '0.88rem', fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.35rem', margin: 0 }}>
+                  <span>🛠️</span> Work Suitabilities
+                  {selectedSuitabilities.length > 0 && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: '#34d399', marginLeft: '0.2rem' }}>
+                      ({selectedSuitabilities.length} Selected)
+                    </span>
+                  )}
+                </h3>
+              </div>
+              {selectedSuitabilities.length > 0 && (
+                <button 
+                  onClick={() => setSelectedSuitabilities([])} 
+                  style={{ background: 'transparent', border: 'none', color: '#f87171', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  Clear Work
+                </button>
+              )}
+            </div>
+
+            {/* Work Suitabilities Grid (12 Game Work Roles) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.45rem' }}>
+              {OFFICIAL_WORK_SUITABILITIES.map(work => {
+                const isSelected = selectedSuitabilities.includes(work.id);
+
+                return (
+                  <button
+                    key={work.id}
+                    onClick={() => handleToggleSuitability(work.id)}
+                    style={{
+                      background: isSelected ? work.bg : 'rgba(0, 0, 0, 0.3)',
+                      border: isSelected ? `2px solid ${work.color}` : '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '8px',
+                      padding: '0.4rem 0.65rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      boxShadow: isSelected ? `0 0 10px ${work.border}` : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <img
+                        src={work.icon}
+                        alt={work.label}
+                        style={{ width: '18px', height: '18px', objectFit: 'contain' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                      <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isSelected ? work.color : 'var(--text-primary)' }}>
+                        {work.label}
                       </span>
                     </div>
                     {isSelected && (

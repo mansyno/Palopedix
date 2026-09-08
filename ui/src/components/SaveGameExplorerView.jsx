@@ -9,6 +9,7 @@ import {
   GENDER_OPTIONS,
   RARITY_OPTIONS,
   GEAR_STATUS_OPTIONS,
+  OFFICIAL_WORK_SUITABILITIES,
 } from './common/PalFilterModal';
 import { getElementIconUrl } from '../constants/gameData';
 
@@ -45,6 +46,7 @@ const DEFAULT_FILTERS = {
   gearStatus: '',
   passives: [],
   elements: [],
+  suitabilities: [],
 };
 
 export function SaveGameExplorerView({
@@ -145,7 +147,8 @@ export function SaveGameExplorerView({
       (activeFilters.rarity ? 1 : 0) +
       (activeFilters.gearStatus ? 1 : 0) +
       (activeFilters.passives?.length || 0) +
-      (activeFilters.elements?.length || 0)
+      (activeFilters.elements?.length || 0) +
+      (activeFilters.suitabilities?.length || 0)
     );
   }, [activeFilters]);
 
@@ -267,6 +270,31 @@ export function SaveGameExplorerView({
         }
       }
 
+      // Work Suitabilities Filter (Must possess ALL selected work suitabilities)
+      if (activeFilters.suitabilities && activeFilters.suitabilities.length > 0) {
+        const masterPal = pals.find(p => 
+          (p.internal_name && (p.internal_name === pi.character_id || p.internal_name === pi.character_id_raw || p.internal_name === pi.species)) ||
+          (p.id && (p.id === pi.character_id || p.id === pi.character_id_raw || p.id === pi.species)) ||
+          (p.display_name && p.display_name.toLowerCase() === (pi.display_name || '').toLowerCase())
+        );
+        const palWs = pi.work_suitabilities || masterPal?.work_suitabilities || {};
+        const hasAllSuitabilities = activeFilters.suitabilities.every(reqWork => {
+          const key = reqWork.toLowerCase().trim();
+          return (palWs[key] && palWs[key] > 0) ||
+                 (key === 'handiwork' && palWs['handcraft'] > 0) ||
+                 (key === 'kindling' && palWs['emitflame'] > 0) ||
+                 (key === 'transporting' && (palWs['transport'] > 0 || palWs['transporting'] > 0)) ||
+                 (key === 'farming' && (palWs['monsterfarm'] > 0 || palWs['farming'] > 0)) ||
+                 (key === 'planting' && (palWs['seeding'] > 0 || palWs['planting'] > 0)) ||
+                 (key === 'gathering' && (palWs['collection'] > 0 || palWs['gathering'] > 0)) ||
+                 (key === 'lumbering' && (palWs['deforest'] > 0 || palWs['lumbering'] > 0)) ||
+                 (key === 'cooling' && (palWs['cool'] > 0 || palWs['cooling'] > 0)) ||
+                 (key === 'medicine_production' && (palWs['medicine'] > 0 || palWs['productmedicine'] > 0 || palWs['medicine_production'] > 0)) ||
+                 (key === 'generating_electricity' && (palWs['electricity'] > 0 || palWs['generateelectricity'] > 0 || palWs['generating_electricity'] > 0));
+        });
+        if (!hasAllSuitabilities) return false;
+      }
+
       // Passive Skills Combination Filter (Must possess ALL selected passives in any slot order)
       if (activeFilters.passives && activeFilters.passives.length > 0) {
         const palPassives = pi.passives || [];
@@ -358,6 +386,26 @@ export function SaveGameExplorerView({
           const target2 = activeFilters.elements[1].toLowerCase().trim();
           if (!palElemSet.has(target1) || !palElemSet.has(target2)) return false;
         }
+      }
+
+      // Work Suitabilities Filter
+      if (activeFilters.suitabilities && activeFilters.suitabilities.length > 0) {
+        const palWs = pal.work_suitabilities || {};
+        const hasAllSuitabilities = activeFilters.suitabilities.every(reqWork => {
+          const key = reqWork.toLowerCase().trim();
+          return (palWs[key] && palWs[key] > 0) ||
+                 (key === 'handiwork' && palWs['handcraft'] > 0) ||
+                 (key === 'kindling' && palWs['emitflame'] > 0) ||
+                 (key === 'transporting' && (palWs['transport'] > 0 || palWs['transporting'] > 0)) ||
+                 (key === 'farming' && (palWs['monsterfarm'] > 0 || palWs['farming'] > 0)) ||
+                 (key === 'planting' && (palWs['seeding'] > 0 || palWs['planting'] > 0)) ||
+                 (key === 'gathering' && (palWs['collection'] > 0 || palWs['gathering'] > 0)) ||
+                 (key === 'lumbering' && (palWs['deforest'] > 0 || palWs['lumbering'] > 0)) ||
+                 (key === 'cooling' && (palWs['cool'] > 0 || palWs['cooling'] > 0)) ||
+                 (key === 'medicine_production' && (palWs['medicine'] > 0 || palWs['productmedicine'] > 0 || palWs['medicine_production'] > 0)) ||
+                 (key === 'generating_electricity' && (palWs['electricity'] > 0 || palWs['generateelectricity'] > 0 || palWs['generating_electricity'] > 0));
+        });
+        if (!hasAllSuitabilities) return false;
       }
 
       return true;
@@ -466,26 +514,7 @@ export function SaveGameExplorerView({
       {(saveLoaded || palSourceMode === 'global') && (
         <div style={{ flexShrink: 0, marginBottom: '0.35rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap', marginBottom: activeModalFiltersCount > 0 ? '0.3rem' : 0 }}>
-            {/* Pal Source Mode Toggle: [ 🌐 All Game Pals | 💼 My Caught Pals ] */}
-            <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
-              <button 
-                type="button"
-                className={`btn ${palSourceMode === 'global' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
-                onClick={() => handlePalSourceModeChange('global')}
-              >
-                🌐 All Game Pals ({realInGamePals.length})
-              </button>
-              <button 
-                type="button"
-                className={`btn ${palSourceMode === 'caught' ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
-                onClick={() => handlePalSourceModeChange('caught')}
-              >
-                💼 My Caught Pals ({instances.length})
-              </button>
-            </div>
-
+            {/* ⚡ Filter Button (First on the left) */}
             <button
               className="btn"
               onClick={() => setIsFilterModalOpen(true)}
@@ -511,6 +540,26 @@ export function SaveGameExplorerView({
                 </span>
               )}
             </button>
+
+            {/* Pal Source Mode Toggle: [ 🌐 All Game Pals | 💼 My Caught Pals ] */}
+            <div style={{ display: 'inline-flex', background: 'rgba(0, 0, 0, 0.4)', borderRadius: '8px', padding: '2px', border: '1px solid var(--border-color)' }}>
+              <button 
+                type="button"
+                className={`btn ${palSourceMode === 'global' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
+                onClick={() => handlePalSourceModeChange('global')}
+              >
+                🌐 All Game Pals ({realInGamePals.length})
+              </button>
+              <button 
+                type="button"
+                className={`btn ${palSourceMode === 'caught' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ padding: '0.28rem 0.65rem', fontSize: '0.74rem', fontWeight: 700, borderRadius: '6px' }}
+                onClick={() => handlePalSourceModeChange('caught')}
+              >
+                💼 My Caught Pals ({instances.length})
+              </button>
+            </div>
 
             {/* ↶ Undo / Back Button */}
             <button
@@ -798,6 +847,37 @@ export function SaveGameExplorerView({
                   </button>
                 </span>
               ))}
+
+              {/* Work Suitabilities Chips */}
+              {(activeFilters.suitabilities || []).map((workId, wIdx) => {
+                const wsObj = OFFICIAL_WORK_SUITABILITIES.find(w => w.id === workId) || { label: workId };
+                return (
+                  <span
+                    key={wIdx}
+                    className="badge"
+                    style={{
+                      ...chipBadgeStyle,
+                      background: 'rgba(245, 158, 11, 0.25)',
+                      border: '1px solid rgba(245, 158, 11, 0.5)',
+                      color: '#fde68a',
+                    }}
+                  >
+                    <span>🛠️ {wsObj.label || workId}</span>
+                    <button
+                      onClick={() => {
+                        pushFilterState({
+                          ...activeFilters,
+                          suitabilities: (activeFilters.suitabilities || []).filter(w => w !== workId)
+                        });
+                      }}
+                      style={chipCloseBtnStyle}
+                      title="Remove filter"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                );
+              })}
 
               {/* Clear All Button */}
               <button

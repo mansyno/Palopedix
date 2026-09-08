@@ -1075,8 +1075,26 @@ class SQLiteEngine:
                     building_id TEXT,
                     work_type TEXT,
                     is_automated INTEGER,
-                    work_amount_modifier REAL
+                    work_amount_modifier REAL,
+                    PRIMARY KEY (building_id, work_type)
                 )
+            """
+            )
+            # Idempotently clean up any duplicate rows if the table already existed without PK
+            cursor.execute(
+                """
+                DELETE FROM building_work_types
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid)
+                    FROM building_work_types
+                    GROUP BY building_id, work_type
+                )
+            """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_bwt_building_work
+                ON building_work_types(building_id, work_type)
             """
             )
             cursor.execute(
@@ -1272,8 +1290,15 @@ class SQLiteEngine:
                     building_id TEXT,
                     work_type TEXT,
                     is_automated INTEGER,
-                    work_amount_modifier REAL
+                    work_amount_modifier REAL,
+                    PRIMARY KEY (building_id, work_type)
                 )
+            """
+            )
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_bwt_building_work
+                ON building_work_types(building_id, work_type)
             """
             )
 
@@ -4416,6 +4441,7 @@ class SQLiteEngine:
         
         # Group by structure_name (ignoring natural clutter, terrain nodes, and drop items)
         structures_map: dict[str, dict[str, Any]] = {}
+        seen_work_types: dict[str, set[str]] = {}
         for r in rows:
             s_name = r["structure_name"]
             count = r["count"]
@@ -4431,12 +4457,16 @@ class SQLiteEngine:
                     "count": count,
                     "work_types": [],
                 }
+                seen_work_types[s_name] = set()
             if r["work_type"]:
-                structures_map[s_name]["work_types"].append({
-                    "work_type": r["work_type"],
-                    "is_automated": r["is_automated"],
-                    "work_amount_modifier": r["work_amount_modifier"],
-                })
+                wt = r["work_type"]
+                if wt not in seen_work_types[s_name]:
+                    seen_work_types[s_name].add(wt)
+                    structures_map[s_name]["work_types"].append({
+                        "work_type": wt,
+                        "is_automated": r["is_automated"],
+                        "work_amount_modifier": r["work_amount_modifier"],
+                    })
 
         result_list = list(structures_map.values())
 

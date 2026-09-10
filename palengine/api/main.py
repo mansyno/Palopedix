@@ -470,8 +470,11 @@ def get_base_camp_recommendations(
     base_camp_id: str,
     max_team_size: Optional[int] = Query(None, description="Optional max team size capacity override"),
     reserved_breeding: Optional[int] = Query(None, description="Optional reserved breeding slots override"),
+    recalculate: bool = Query(False, description="Forces fresh calculation bypassing cache"),
 ) -> dict[str, Any]:
     """Generates optimal recommended Pal team for a given base camp using holistic multi-base optimization."""
+    if recalculate:
+        db_engine._cached_base_recommendations = None
     from palengine.analytics.pal_recommender import PalRecommender
     recommender = PalRecommender(db_engine)
     return recommender.recommend_pals_for_base(

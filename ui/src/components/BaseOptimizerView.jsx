@@ -73,6 +73,25 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
       });
   }, [selectedBaseId, queryParams, cacheKey]);
 
+  const handleRecalculate = () => {
+    recsCache.current = {};
+    if (!selectedBaseId) return;
+    setLoading(true);
+    setError(null);
+    const sep = queryParams ? `${queryParams}&recalculate=true` : '?recalculate=true';
+    fetch(`/api/base_camps/${encodeURIComponent(selectedBaseId)}/recommendations${sep}`)
+      .then(res => res.json())
+      .then(data => {
+        recsCache.current[cacheKey] = data;
+        setRecommendation(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  };
+
   const handleSort = (col) => {
     if (sortCol === col) {
       setSortDesc(prev => !prev);
@@ -238,6 +257,31 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
                 <span style={{ color: 'var(--text-secondary)' }}>SAN:</span>
                 <strong style={{ color: recommendation.food_and_san_summary?.san_stability_status === 'Warning' ? '#ef4444' : '#a78bfa' }}>{recommendation.food_and_san_summary?.san_stability_status}</strong>
               </div>
+
+              {/* Recalculate Button */}
+              <button
+                onClick={handleRecalculate}
+                disabled={loading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  color: '#6ee7b7',
+                  padding: '0.25rem 0.6rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1,
+                  transition: 'background 0.15s ease'
+                }}
+                title="Force a fresh recalculation of base recommendations across all bases"
+              >
+                <span>🔄</span>
+                <span>{loading ? 'Calculating...' : 'Recalculate'}</span>
+              </button>
 
               {/* Export JSON Button */}
               <button

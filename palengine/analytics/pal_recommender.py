@@ -91,6 +91,19 @@ def normalize_suitability(name: str) -> str:
     return SUITABILITY_ALIAS_MAP.get(clean, clean)
 
 
+def get_pal_cake_role(pal: Dict[str, Any]) -> Optional[str]:
+    """Returns 'milk', 'egg', or 'honey' if the Pal produces essential cake ingredients in a ranch."""
+    sp = (pal.get("species") or "").lower().replace("boss_", "")
+    disp = (pal.get("display_name") or "").lower()
+    if any(k in sp or k in disp for k in ["cow", "mozzarina"]):
+        return "milk"
+    if any(k in sp or k in disp for k in ["chicken", "chikipi"]):
+        return "egg"
+    if any(k in sp or k in disp for k in ["soldierbee", "beegarde"]):
+        return "honey"
+    return None
+
+
 class PalRecommender:
     """Recommends optimal Pal team assignments for base camps."""
 
@@ -358,10 +371,12 @@ class PalRecommender:
 
             if clean_ws in ["generatingelectricity", "electricity"]:
                 base_q = max(1, min(phys_slots, electric_deficit + 1 if electric_deficit > 0 else 1))
-            elif clean_ws in ["planting", "seeding", "gathering", "collection"]:
-                base_q = max(1, min(phys_slots, f_count))
+            elif clean_ws in ["planting", "seeding"]:
+                base_q = max(1, min(phys_slots, (f_count + 3) // 4))
+            elif clean_ws in ["gathering", "collection"]:
+                base_q = max(1, min(phys_slots, (f_count + 4) // 5))
             elif clean_ws in ["watering"]:
-                base_q = max(1, min(phys_slots, max(2, f_count)))
+                base_q = max(2, min(phys_slots, (f_count + 2) // 3))
             elif clean_ws in ["mining", "lumbering"]:
                 base_q = max(1, min(phys_slots, max(2, f_count)))
             elif clean_ws in ["transporting", "transport"]:
@@ -542,10 +557,49 @@ class PalRecommender:
 
         # 3. Phase 1: Critical Ranch Producers & Specialist Allocation
         # 3a. In bases with built Ranch facilities (MonsterFarm), allocate up to physical ranch capacity
+        # First: For all Breeding & Food bases, guarantee the Cake Trio (Honey, Milk, Egg)
+        for bid, audit in base_audits.items():
+            ranch_count = audit.get("ranch_count") or audit.get("ranching_count") or 0
+            is_breeding_base = audit.get("base_category") == "Breeding & Food"
+            if ranch_count > 0 and is_breeding_base:
+                for cake_type in ["honey", "milk", "egg"]:
+                    if len(assigned_teams[bid]) >= base_effective_caps[bid]:
+                        break
+                    cake_cands = [
+                        p for p in owned_pals
+                        if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
+                        and get_pal_cake_role(p) == cake_type
+                    ]
+                    if cake_cands:
+                        best_cake_pal = max(
+                            cake_cands,
+                            key=lambda p: (
+                                scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                                p.get("level", 0),
+                                str(p.get("instance_id", "")),
+                            ),
+                        )
+                        c_iid = str(best_cake_pal.get("instance_id") or id(best_cake_pal))
+                        c_scored = scored_matrix[c_iid][bid]
+                        assigned_teams[bid].append(c_scored)
+                        for r in c_scored.get("matching_roles", []):
+                            role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
+                        assigned_instance_ids.add(c_iid)
+
+        # Allocate remaining ranch capacity up to quota ceiling
         for bid, audit in base_audits.items():
             ranch_count = audit.get("ranch_count") or audit.get("ranching_count") or 0
             if ranch_count > 0:
                 max_ranch_slots = min(4 * ranch_count, base_quotas[bid].get("Farming", base_quotas[bid].get("MonsterFarm", 2 * ranch_count)), base_effective_caps[bid])
+                existing_ranch_count = sum(
+                    1 for p in assigned_teams[bid]
+                    if any(r.get("work_type") in ("MonsterFarm", "Farming") for r in p.get("matching_roles", []))
+                )
+                assigned_ranch_species = {
+                    (p.get("species") or "").lower().replace("boss_", "")
+                    for p in assigned_teams[bid]
+                    if any(r.get("work_type") in ("MonsterFarm", "Farming") for r in p.get("matching_roles", []))
+                }
                 ranch_cands = [
                     p for p in owned_pals
                     if str(p.get("instance_id") or id(p)) not in assigned_instance_ids
@@ -556,22 +610,19 @@ class PalRecommender:
                         or p.get("suitabilities", {}).get("monsterfarm", 0) > 0
                     )
                 ]
-                assigned_ranch_species: set[str] = set()
                 is_breeding_base = audit.get("base_category") == "Breeding & Food"
-                def _is_cake_cand(p):
-                    sp = (p.get("species") or "").lower()
-                    disp = (p.get("display_name") or "").lower()
-                    return any(k in sp or k in disp for k in ["cow", "mozzarina", "soldierbee", "beegarde", "chicken", "chikipi"])
 
                 ranch_cands.sort(
                     key=lambda p: (
-                        1 if is_breeding_base and _is_cake_cand(p) else 0,
+                        1 if is_breeding_base and get_pal_cake_role(p) is not None else 0,
                         scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                        p.get("level", 0),
+                        str(p.get("instance_id", "")),
                     ),
                     reverse=True,
                 )
                 for cand in ranch_cands:
-                    if len(assigned_ranch_species) >= max_ranch_slots or len(assigned_teams[bid]) >= base_effective_caps[bid]:
+                    if existing_ranch_count >= max_ranch_slots or len(assigned_teams[bid]) >= base_effective_caps[bid]:
                         break
                     cand_sp = (cand.get("species") or "").lower().replace("boss_", "")
                     if cand_sp not in assigned_ranch_species:
@@ -582,6 +633,7 @@ class PalRecommender:
                             role_counts[bid][r["work_type"]] = role_counts[bid].get(r["work_type"], 0) + 1
                         assigned_instance_ids.add(cand_iid)
                         assigned_ranch_species.add(cand_sp)
+                        existing_ranch_count += 1
 
         # 3b. Base Partner Skill Anchor Allocation (Non-Stacking Buffers)
         for bid, audit in base_audits.items():
@@ -681,6 +733,7 @@ class PalRecommender:
 
             best_pair = None
             best_gain = -1e9
+            best_gain_key = None
 
             for pal in unassigned_pals:
                 iid = str(pal.get("instance_id") or id(pal))
@@ -714,9 +767,12 @@ class PalRecommender:
                     # Add partner synergy bonus and food/SAN stability
                     gain += (sp.get("partner_synergy_bonus", 0.0) * 0.4) + sp.get("stability_score", 0.0)
 
-                    if has_role_fit and gain > best_gain:
-                        best_gain = gain
-                        best_pair = (pal, bid, sp)
+                    if has_role_fit:
+                        cand_key = (gain, pal.get("level", 0), str(pal.get("instance_id", "")))
+                        if best_pair is None or cand_key > best_gain_key:
+                            best_gain = gain
+                            best_gain_key = cand_key
+                            best_pair = (pal, bid, sp)
 
             if best_pair and best_gain > 0:
                 pal_to_add, target_bid, scored_rep = best_pair
@@ -739,7 +795,11 @@ class PalRecommender:
                             break
                         best_scorer = max(
                             valid_unassigned,
-                            key=lambda p: scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"]
+                            key=lambda p: (
+                                scored_matrix[str(p.get("instance_id") or id(p))][bid]["total_score"],
+                                p.get("level", 0),
+                                str(p.get("instance_id", "")),
+                            ),
                         )
                         s_iid = str(best_scorer.get("instance_id") or id(best_scorer))
                         s_rep = scored_matrix[s_iid][bid]
@@ -802,6 +862,19 @@ class PalRecommender:
                             if any(b in v_sp for b in ("lullu", "prunelia")) and (base_audits[bv].get("agriculture_count") or 0) > 0:
                                 continue
 
+                            # Never swap a base's only Milk, Egg, or Honey producer away from a Breeding & Food base
+                            u_cake = get_pal_cake_role(pal_u)
+                            if u_cake and base_audits[bu].get("base_category") == "Breeding & Food" and (base_audits[bu].get("ranch_count") or 0) > 0:
+                                u_cake_count = sum(1 for p in team_u if get_pal_cake_role(p) == u_cake)
+                                if u_cake_count <= 1 and get_pal_cake_role(new_pal_v_for_u) != u_cake:
+                                    continue
+
+                            v_cake = get_pal_cake_role(pal_v)
+                            if v_cake and base_audits[bv].get("base_category") == "Breeding & Food" and (base_audits[bv].get("ranch_count") or 0) > 0:
+                                v_cake_count = sum(1 for p in team_v if get_pal_cake_role(p) == v_cake)
+                                if v_cake_count <= 1 and get_pal_cake_role(new_pal_u_for_v) != v_cake:
+                                    continue
+
                             swapped_u = team_u[:idx_u] + team_u[idx_u + 1:] + [new_pal_v_for_u]
                             swapped_v = team_v[:idx_v] + team_v[idx_v + 1:] + [new_pal_u_for_v]
 
@@ -834,7 +907,14 @@ class PalRecommender:
                     covered.add(r["work_type"])
 
             uncovered = [req_ws for req_ws in audit.keys() if req_ws not in covered]
-            team.sort(key=lambda x: x.get("total_score", 0.0), reverse=True)
+            team.sort(
+                key=lambda x: (
+                    x.get("total_score", 0.0),
+                    x.get("level", 0),
+                    str(x.get("instance_id", "")),
+                ),
+                reverse=True,
+            )
             food_san = self.optimizer.calculate_team_food_and_san(team)
 
             matching_bc = next((c for c in base_camps if c["base_camp_id"] == bid), {})

@@ -206,7 +206,10 @@ class BaseOptimizer:
             if "ancientworkbench" in s_lower:
                 ancient_workbench_count += count
                 crafting_count += count
-            elif any(m in s_lower for m in ["medicine", "clinic"]):
+            elif (
+                any(m in s_lower for m in ["medicinefactory", "medievalmedicine", "electricmedicine", "clinic", "operatingtable"])
+                or ("medicine" in s_lower and not any(ign in s_lower for ign in ["box", "chest", "storage", "bed"]))
+            ):
                 medicine_bench_count += count
             elif any(m in s_lower for m in ["flourmill", "woodcrusher"]) or (s_lower == "crusher"):
                 mill_crusher_count += count
@@ -389,11 +392,11 @@ class BaseOptimizer:
             elif clean_wt in ["handcraft", "handiwork"]:
                 info["physical_worker_slots"] = max(1, (total_active_assembly_lines * 2) + (ancient_workbench_count * 2) + (1 if primitive_workbench_count else 0))
             elif clean_wt in ["planting", "seeding"]:
-                info["physical_worker_slots"] = max(1, garden_count)
+                info["physical_worker_slots"] = max(1, min(4, (garden_count + 3) // 4))
             elif clean_wt in ["watering"]:
-                info["physical_worker_slots"] = max(1, garden_count + mill_crusher_count)
+                info["physical_worker_slots"] = max(2, min(6, (garden_count + mill_crusher_count + 2) // 3))
             elif clean_wt in ["gathering", "collection"]:
-                info["physical_worker_slots"] = max(1, garden_count)
+                info["physical_worker_slots"] = max(1, min(4, (garden_count + 3) // 4))
             elif clean_wt in ["mining"]:
                 info["physical_worker_slots"] = max(1, (mining_pit_count * 3) + (natural_mining_count if extraction_count == 0 else 0))
             elif clean_wt in ["lumbering", "deforest"]:

@@ -3725,7 +3725,7 @@ class SQLiteEngine:
             )"""
             params.append(filters["passive_id"].lower())
 
-        query += " ORDER BY level DESC, species ASC"
+        query += " ORDER BY level DESC, species ASC, instance_id ASC"
 
         rows = self.conn.execute(query, params).fetchall()
         if not rows:

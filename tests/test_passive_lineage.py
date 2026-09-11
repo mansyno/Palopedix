@@ -113,10 +113,38 @@ def test_passive_lineage_three_passives():
         assert "ferocious" in final_passives
 
 
-def test_passive_lineage_api_rejects_four_passives():
-    """Verify endpoint rejects more than 3 passives."""
+def test_passive_lineage_four_passives():
+    """Verify 4-passive lineage calculation converges all 4 traits into the target Pal."""
     client = TestClient(app)
-    res = client.get("/api/breeding/lineage-path?target=Eidrolon&passives=Legend,Artisan,Ferocious,Swift")
+    res = client.get("/api/breeding/lineage-path?target=Eidrolon&passives=Legend,Artisan,Ferocious,Swift&max_depth=5&max_results=3")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["target_species"] == "Eidrolon"
+    assert len(data["target_passives"]) == 4
+
+    paths = data.get("paths", [])
+    for p in paths:
+        assert p["strategy"] in (
+            "4 + 0 Quad Carrier Convergence",
+            "3 + 1 Trait Convergence",
+            "2 + 2 Dual Carrier Convergence",
+            "1 + 1 + 1 + 1 Two-Line Intermediate Tree",
+        )
+        assert p["total_steps"] <= 5
+        final_step = p["steps"][-1]
+        assert final_step["child"]["species"] == "Eidrolon"
+        assert final_step["child"]["is_target"] is True
+        final_passives = [tp.lower() for tp in final_step["child"]["target_passives"]]
+        assert "legend" in final_passives
+        assert "artisan" in final_passives
+        assert "ferocious" in final_passives
+        assert "swift" in final_passives
+
+
+def test_passive_lineage_api_rejects_five_passives():
+    """Verify endpoint rejects more than 4 passives."""
+    client = TestClient(app)
+    res = client.get("/api/breeding/lineage-path?target=Eidrolon&passives=Legend,Artisan,Ferocious,Swift,Runner")
     assert res.status_code == 400
-    assert "Maximum 3" in res.json()["detail"]
+    assert "Maximum 4" in res.json()["detail"]
 

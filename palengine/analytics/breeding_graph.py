@@ -768,16 +768,18 @@ class BreedingGraphOptimizer:
         if not dedup_passives:
             return []
 
-        # Focus on up to 3 target passives
-        wanted_passives = dedup_passives[:3]
+        # Focus on up to 4 target passives
+        wanted_passives = dedup_passives[:4]
         cased_passives = {p.lower(): p for p in wanted_passives}
         wanted_lower = [p.lower() for p in wanted_passives]
         p1_wanted = wanted_lower[0]
         p2_wanted = wanted_lower[1] if len(wanted_lower) > 1 else None
         p3_wanted = wanted_lower[2] if len(wanted_lower) > 2 else None
+        p4_wanted = wanted_lower[3] if len(wanted_lower) > 3 else None
         p1_display = cased_passives.get(p1_wanted, p1_wanted)
         p2_display = cased_passives.get(p2_wanted, p2_wanted) if p2_wanted else ""
         p3_display = cased_passives.get(p3_wanted, p3_wanted) if p3_wanted else ""
+        p4_display = cased_passives.get(p4_wanted, p4_wanted) if p4_wanted else ""
 
         # 2. Setup breeding database cache
         pals_rows = self.engine.conn.execute(
@@ -843,11 +845,15 @@ class BreedingGraphOptimizer:
         p1_donors: list[dict[str, Any]] = []
         p2_donors: list[dict[str, Any]] = []
         both_donors: list[dict[str, Any]] = []
-        # Additional donor lists for 3-passive mode
+        # Additional donor lists for 3/4-passive mode
         p3_donors: list[dict[str, Any]] = []
         triple_donors: list[dict[str, Any]] = []
+        p4_donors: list[dict[str, Any]] = []
+        quad_donors: list[dict[str, Any]] = []
         # dual_donors_by_pair: maps frozenset of 2 trait indices -> list of donors carrying exactly that pair
         dual_donors_by_pair: dict[frozenset, list[dict[str, Any]]] = {}
+        # trio_donors_by_trio: maps frozenset of 3 trait indices -> list of donors carrying that trio
+        trio_donors_by_trio: dict[frozenset, list[dict[str, Any]]] = {}
         owned_by_sp_gender: dict[tuple[str, str], list[dict[str, Any]]] = {}
 
         for inst in active_instances:
@@ -878,6 +884,7 @@ class BreedingGraphOptimizer:
             has_p1 = p1_wanted in p_set
             has_p2 = (p2_wanted in p_set) if p2_wanted else False
             has_p3 = (p3_wanted in p_set) if p3_wanted else False
+            has_p4 = (p4_wanted in p_set) if p4_wanted else False
             junk_passives = [p for p in p_names if p.lower() not in wanted_lower]
 
             item = {
@@ -896,7 +903,7 @@ class BreedingGraphOptimizer:
                 "junk_count": len(junk_passives),
                 "score": (inst.get("iv_hp") or 0) + (inst.get("iv_melee") or 0) + (inst.get("iv_defense") or 0) + (inst.get("level") or 1),
                 "is_from_palbox": True,
-                "is_donor": (has_p1 or has_p2 or has_p3),
+                "is_donor": (has_p1 or has_p2 or has_p3 or has_p4),
             }
 
             key = (sp_l, gender)
@@ -904,7 +911,40 @@ class BreedingGraphOptimizer:
                 owned_by_sp_gender[key] = []
             owned_by_sp_gender[key].append(item)
 
-            if p3_wanted:
+            if p4_wanted:
+                trait_flags = [has_p1, has_p2, has_p3, has_p4]
+                trait_count = sum(trait_flags)
+                if trait_count == 4:
+                    quad_donors.append(item)
+                    triple_donors.append(item)
+                    both_donors.append(item)
+                if trait_count >= 3:
+                    triple_donors.append(item)
+                    for i_idx in range(4):
+                        for j_idx in range(i_idx + 1, 4):
+                            for k_idx in range(j_idx + 1, 4):
+                                if trait_flags[i_idx] and trait_flags[j_idx] and trait_flags[k_idx]:
+                                    trio_key = frozenset([i_idx, j_idx, k_idx])
+                                    if trio_key not in trio_donors_by_trio:
+                                        trio_donors_by_trio[trio_key] = []
+                                    trio_donors_by_trio[trio_key].append(item)
+                if trait_count >= 2:
+                    for i_idx in range(4):
+                        for j_idx in range(i_idx + 1, 4):
+                            if trait_flags[i_idx] and trait_flags[j_idx]:
+                                pair_key = frozenset([i_idx, j_idx])
+                                if pair_key not in dual_donors_by_pair:
+                                    dual_donors_by_pair[pair_key] = []
+                                dual_donors_by_pair[pair_key].append(item)
+                if has_p1:
+                    p1_donors.append(item)
+                if has_p2:
+                    p2_donors.append(item)
+                if has_p3:
+                    p3_donors.append(item)
+                if has_p4:
+                    p4_donors.append(item)
+            elif p3_wanted:
                 # 3-passive mode categorization
                 trait_flags = [has_p1, has_p2, has_p3]
                 trait_count = sum(trait_flags)
@@ -946,13 +986,24 @@ class BreedingGraphOptimizer:
         p1_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
         p2_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
         p3_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
+        p4_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
         both_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
         triple_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
+        quad_donors.sort(key=lambda x: (x["junk_count"], -x["score"]))
         for pk in dual_donors_by_pair:
             dual_donors_by_pair[pk].sort(key=lambda x: (x["junk_count"], -x["score"]))
+        for tk in trio_donors_by_trio:
+            trio_donors_by_trio[tk].sort(key=lambda x: (x["junk_count"], -x["score"]))
 
         # Validate that we have at least one donor source for each trait
-        if p3_wanted:
+        if p4_wanted:
+            has_any_p1 = bool(p1_donors)
+            has_any_p2 = bool(p2_donors)
+            has_any_p3 = bool(p3_donors)
+            has_any_p4 = bool(p4_donors)
+            if not (has_any_p1 and has_any_p2 and has_any_p3 and has_any_p4):
+                return []
+        elif p3_wanted:
             # In 3-passive mode, we need at least one donor per trait (single, dual, or triple)
             has_any_p1 = bool(p1_donors) or bool(triple_donors) or any(0 in pk for pk in dual_donors_by_pair if dual_donors_by_pair[pk])
             has_any_p2 = bool(p2_donors) or bool(triple_donors) or any(1 in pk for pk in dual_donors_by_pair if dual_donors_by_pair[pk])
@@ -1117,10 +1168,20 @@ class BreedingGraphOptimizer:
         branches_p2 = build_trait_branches(p2_donors, [p2_wanted], max_branch_depth=max_depth - 1) if p2_wanted else {}
         branches_both = build_trait_branches(both_donors, wanted_passives[:2], max_branch_depth=max_depth - 1) if both_donors else {}
         branches_p3 = build_trait_branches(p3_donors, [p3_wanted], max_branch_depth=max_depth - 1) if p3_wanted else {}
-        branches_triple = build_trait_branches(triple_donors, wanted_passives, max_branch_depth=max_depth - 1) if triple_donors else {}
+        branches_p4 = build_trait_branches(p4_donors, [p4_wanted], max_branch_depth=max_depth - 1) if p4_wanted else {}
+        branches_triple = build_trait_branches(triple_donors, wanted_passives[:3], max_branch_depth=max_depth - 1) if triple_donors else {}
+        branches_quad = build_trait_branches(quad_donors, wanted_passives, max_branch_depth=max_depth - 1) if quad_donors else {}
+
+        # Per-trio branches (for 3+1 in 4-passive mode)
+        branches_trio: dict[frozenset, dict[str, list[dict[str, Any]]]] = {}
+        if p4_wanted:
+            for trio_key, trio_donors in trio_donors_by_trio.items():
+                trio_traits = [wanted_lower[i] for i in sorted(trio_key)]
+                branches_trio[trio_key] = build_trait_branches(trio_donors, trio_traits, max_branch_depth=max_depth - 2)
+
         # Per-pair dual-carrier branches: key = frozenset of trait indices, value = branches dict
         branches_dual_pair: dict[frozenset, dict[str, list[dict[str, Any]]]] = {}
-        if p3_wanted:
+        if p3_wanted or p4_wanted:
             for pair_key, pair_donors in dual_donors_by_pair.items():
                 pair_traits = [wanted_lower[i] for i in sorted(pair_key)]
                 branches_dual_pair[pair_key] = build_trait_branches(pair_donors, pair_traits, max_branch_depth=max_depth - 2)
@@ -1427,7 +1488,7 @@ class BreedingGraphOptimizer:
                         })
 
         # ── 3-Passive Strategies ──────────────────────────────────────────────
-        if p3_wanted:
+        if p3_wanted and not p4_wanted:
             single_donors_by_idx = [p1_donors, p2_donors, p3_donors]
             single_branches_by_idx = [branches_p1, branches_p2, branches_p3]
             display_by_idx = [p1_display, p2_display, p3_display]
@@ -1821,6 +1882,673 @@ class BreedingGraphOptimizer:
                                             "purity_score": purity,
                                             "steps": combined_steps,
                                         })
+
+        # ── 4-Passive Strategies ──────────────────────────────────────────────
+        if p4_wanted:
+            single_donors_by_idx = [p1_donors, p2_donors, p3_donors, p4_donors]
+            single_branches_by_idx = [branches_p1, branches_p2, branches_p3, branches_p4]
+            display_by_idx = [p1_display, p2_display, p3_display, p4_display]
+            all_4_str = ", ".join(wanted_passives)
+
+            # ── Strategy 7 (4 + 0): Quad carrier → clean bridge to target ──
+            if branches_quad:
+                for s_l, routes in branches_quad.items():
+                    for partner_sp in owned_partner_species:
+                        child_sp = calc_child_fast(s_l, partner_sp)
+                        if child_sp.lower() != target:
+                            continue
+
+                        for r in routes:
+                            d = len(r["steps"])
+                            total_steps = d + 1
+                            if total_steps > max_depth:
+                                continue
+
+                            if d == 0:
+                                donor = r["donor"]
+                                req_g = "Female" if donor["gender"] == "Male" else "Male"
+                                partner_inst = get_best_partner(partner_sp, req_g)
+                                if not partner_inst or partner_inst["instance_id"] == donor["instance_id"]:
+                                    continue
+                                p1_fin = dict(donor)
+                                aligned_steps: list[dict[str, Any]] = []
+                            else:
+                                partner_inst = get_best_partner(partner_sp)
+                                if not partner_inst:
+                                    continue
+                                p2_gender = partner_inst.get("gender", "Female")
+                                req_p1_gender = "Female" if p2_gender == "Male" else "Male"
+                                prev = r["steps"][-1]["child"]
+                                p1_fin = {
+                                    "species": prev["species"],
+                                    "species_lower": s_l,
+                                    "gender": req_p1_gender,
+                                    "target_passives": wanted_passives,
+                                    "is_from_palbox": False,
+                                    "is_donor": False,
+                                    "icon_path": icon_map.get(s_l, ""),
+                                }
+                                aligned_steps = propagate_branch_genders(r["steps"], req_p1_gender)
+
+                            p2_fin = dict(partner_inst)
+                            combined_steps = [dict(s) for s in aligned_steps]
+                            final_step = {
+                                "step_number": len(combined_steps) + 1,
+                                "description": f"Breed {p1_fin['species']} ({all_4_str}) with clean {p2_fin['species']} to obtain target {target_display} ({all_4_str})",
+                                "parent1": p1_fin,
+                                "parent2": p2_fin,
+                                "child": {
+                                    "species": target_display,
+                                    "species_lower": target,
+                                    "target_passives": wanted_passives,
+                                    "required_gender": "Any",
+                                    "hatch_odds": {"hatch_chance_pct": "100%", "avg_eggs": "~1 egg", "gender_note": "Either gender completes the goal"},
+                                    "icon_path": icon_map.get(target, ""),
+                                    "is_target": True,
+                                },
+                            }
+                            combined_steps.append(final_step)
+                            total_junk = r["total_junk"] + partner_inst["junk_count"]
+                            purity = max(0, 100 - (total_junk * 10))
+
+                            candidate_roadmaps.append({
+                                "strategy": "4 + 0 Quad Carrier Convergence",
+                                "total_steps": total_steps,
+                                "total_junk": total_junk,
+                                "purity_score": purity,
+                                "steps": combined_steps,
+                            })
+
+            # ── Strategy 8 (3 + 1): Trio carrier + single carrier → target ──
+            trio_configs = [
+                (frozenset([0, 1, 2]), 3),
+                (frozenset([0, 1, 3]), 2),
+                (frozenset([0, 2, 3]), 1),
+                (frozenset([1, 2, 3]), 0),
+            ]
+            for trio_key, single_idx in trio_configs:
+                if trio_key not in branches_trio:
+                    continue
+                trio_routes = branches_trio[trio_key]
+                single_routes = single_branches_by_idx[single_idx]
+                trio_traits = [display_by_idx[i] for i in sorted(trio_key)]
+                trio_str = ", ".join(trio_traits)
+                single_str = display_by_idx[single_idx]
+
+                for s_trio, r_t_list in trio_routes.items():
+                    for s_single, r_s_list in single_routes.items():
+                        child_sp = calc_child_fast(s_trio, s_single)
+                        if child_sp.lower() != target:
+                            continue
+
+                        for r_t in r_t_list:
+                            for r_s in r_s_list:
+                                d_t = len(r_t["steps"])
+                                d_s = len(r_s["steps"])
+                                total_steps = d_t + d_s + 1
+                                if total_steps > max_depth:
+                                    continue
+
+                                # Gender alignment
+                                if d_t == 0 and d_s == 0:
+                                    d_t_inst = r_t["donor"]
+                                    d_s_inst = r_s["donor"]
+                                    if d_t_inst["instance_id"] == d_s_inst["instance_id"]:
+                                        continue
+                                    if d_t_inst["gender"] == d_s_inst["gender"]:
+                                        continue
+                                    p1_fin = dict(d_t_inst)
+                                    p2_fin = dict(d_s_inst)
+                                    aligned_t = []
+                                    aligned_s = []
+                                elif d_t > 0 and d_s == 0:
+                                    d_s_inst = r_s["donor"]
+                                    req_t_gender = "Female" if d_s_inst["gender"] == "Male" else "Male"
+                                    prev_t = r_t["steps"][-1]["child"]
+                                    p1_fin = {
+                                        "species": prev_t["species"],
+                                        "species_lower": s_trio,
+                                        "gender": req_t_gender,
+                                        "target_passives": trio_traits,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_trio, ""),
+                                    }
+                                    p2_fin = dict(d_s_inst)
+                                    aligned_t = propagate_branch_genders(r_t["steps"], req_t_gender)
+                                    aligned_s = []
+                                elif d_t == 0 and d_s > 0:
+                                    d_t_inst = r_t["donor"]
+                                    req_s_gender = "Female" if d_t_inst["gender"] == "Male" else "Male"
+                                    p1_fin = dict(d_t_inst)
+                                    p2_fin = {
+                                        "species": r_s["steps"][-1]["child"]["species"],
+                                        "species_lower": s_single,
+                                        "gender": req_s_gender,
+                                        "target_passives": [single_str],
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_single, ""),
+                                    }
+                                    aligned_t = []
+                                    aligned_s = propagate_branch_genders(r_s["steps"], req_s_gender)
+                                else:
+                                    # Both branches have steps
+                                    p1_fin = {
+                                        "species": r_t["steps"][-1]["child"]["species"],
+                                        "species_lower": s_trio,
+                                        "gender": "Male",
+                                        "target_passives": trio_traits,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_trio, ""),
+                                    }
+                                    p2_fin = {
+                                        "species": r_s["steps"][-1]["child"]["species"],
+                                        "species_lower": s_single,
+                                        "gender": "Female",
+                                        "target_passives": [single_str],
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_single, ""),
+                                    }
+                                    aligned_t = propagate_branch_genders(r_t["steps"], "Male")
+                                    aligned_s = propagate_branch_genders(r_s["steps"], "Female")
+
+                                combined_steps = []
+                                step_num = 1
+                                for s in aligned_t:
+                                    sc = dict(s)
+                                    sc["step_number"] = step_num
+                                    sc["description"] = f"[Line A] {sc['description']}"
+                                    step_num += 1
+                                    combined_steps.append(sc)
+                                for s in aligned_s:
+                                    sc = dict(s)
+                                    sc["step_number"] = step_num
+                                    sc["description"] = f"[Line B] {sc['description']}"
+                                    step_num += 1
+                                    combined_steps.append(sc)
+
+                                final_step = {
+                                    "step_number": step_num,
+                                    "description": f"[Final Goal] Breed {p1_fin['species']} ({trio_str}) with {p2_fin['species']} ({single_str}) to obtain target {target_display} ({all_4_str})",
+                                    "parent1": p1_fin,
+                                    "parent2": p2_fin,
+                                    "child": {
+                                        "species": target_display,
+                                        "species_lower": target,
+                                        "target_passives": wanted_passives,
+                                        "required_gender": "Any",
+                                        "hatch_odds": {"hatch_chance_pct": "100%", "avg_eggs": "~1 egg", "gender_note": "Either gender completes the goal"},
+                                        "icon_path": icon_map.get(target, ""),
+                                        "is_target": True,
+                                    },
+                                }
+                                combined_steps.append(final_step)
+                                total_junk = r_t["total_junk"] + r_s["total_junk"]
+                                purity = max(0, 100 - (total_junk * 10))
+
+                                candidate_roadmaps.append({
+                                    "strategy": "3 + 1 Trait Convergence",
+                                    "total_steps": total_steps,
+                                    "total_junk": total_junk,
+                                    "purity_score": purity,
+                                    "steps": combined_steps,
+                                })
+
+            # ── Strategy 9 (2 + 2): Dual carrier + Dual carrier → target ──
+            pair_partitions = [
+                (frozenset([0, 1]), frozenset([2, 3])),
+                (frozenset([0, 2]), frozenset([1, 3])),
+                (frozenset([0, 3]), frozenset([1, 2])),
+            ]
+            for pair_a, pair_b in pair_partitions:
+                if pair_a not in branches_dual_pair or pair_b not in branches_dual_pair:
+                    continue
+                routes_a = branches_dual_pair[pair_a]
+                routes_b = branches_dual_pair[pair_b]
+                traits_a = [display_by_idx[i] for i in sorted(pair_a)]
+                traits_b = [display_by_idx[i] for i in sorted(pair_b)]
+                str_a = ", ".join(traits_a)
+                str_b = ", ".join(traits_b)
+
+                for s_a, r_a_list in routes_a.items():
+                    for s_b, r_b_list in routes_b.items():
+                        child_sp = calc_child_fast(s_a, s_b)
+                        if child_sp.lower() != target:
+                            continue
+
+                        for r_a in r_a_list:
+                            for r_b in r_b_list:
+                                d_a = len(r_a["steps"])
+                                d_b = len(r_b["steps"])
+                                total_steps = d_a + d_b + 1
+                                if total_steps > max_depth:
+                                    continue
+
+                                # Gender alignment
+                                if d_a == 0 and d_b == 0:
+                                    d_a_inst = r_a["donor"]
+                                    d_b_inst = r_b["donor"]
+                                    if d_a_inst["instance_id"] == d_b_inst["instance_id"]:
+                                        continue
+                                    if d_a_inst["gender"] == d_b_inst["gender"]:
+                                        continue
+                                    p1_fin = dict(d_a_inst)
+                                    p2_fin = dict(d_b_inst)
+                                    aligned_a = []
+                                    aligned_b = []
+                                elif d_a > 0 and d_b == 0:
+                                    d_b_inst = r_b["donor"]
+                                    req_a_gender = "Female" if d_b_inst["gender"] == "Male" else "Male"
+                                    prev_a = r_a["steps"][-1]["child"]
+                                    p1_fin = {
+                                        "species": prev_a["species"],
+                                        "species_lower": s_a,
+                                        "gender": req_a_gender,
+                                        "target_passives": traits_a,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_a, ""),
+                                    }
+                                    p2_fin = dict(d_b_inst)
+                                    aligned_a = propagate_branch_genders(r_a["steps"], req_a_gender)
+                                    aligned_b = []
+                                elif d_a == 0 and d_b > 0:
+                                    d_a_inst = r_a["donor"]
+                                    req_b_gender = "Female" if d_a_inst["gender"] == "Male" else "Male"
+                                    prev_b = r_b["steps"][-1]["child"]
+                                    p1_fin = dict(d_a_inst)
+                                    p2_fin = {
+                                        "species": prev_b["species"],
+                                        "species_lower": s_b,
+                                        "gender": req_b_gender,
+                                        "target_passives": traits_b,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_b, ""),
+                                    }
+                                    aligned_a = []
+                                    aligned_b = propagate_branch_genders(r_b["steps"], req_b_gender)
+                                else:
+                                    # Both branches have steps
+                                    p1_fin = {
+                                        "species": r_a["steps"][-1]["child"]["species"],
+                                        "species_lower": s_a,
+                                        "gender": "Male",
+                                        "target_passives": traits_a,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_a, ""),
+                                    }
+                                    p2_fin = {
+                                        "species": r_b["steps"][-1]["child"]["species"],
+                                        "species_lower": s_b,
+                                        "gender": "Female",
+                                        "target_passives": traits_b,
+                                        "is_from_palbox": False,
+                                        "is_donor": False,
+                                        "icon_path": icon_map.get(s_b, ""),
+                                    }
+                                    aligned_a = propagate_branch_genders(r_a["steps"], "Male")
+                                    aligned_b = propagate_branch_genders(r_b["steps"], "Female")
+
+                                combined_steps = []
+                                step_num = 1
+                                for s in aligned_a:
+                                    sc = dict(s)
+                                    sc["step_number"] = step_num
+                                    sc["description"] = f"[Line A] {sc['description']}"
+                                    step_num += 1
+                                    combined_steps.append(sc)
+                                for s in aligned_b:
+                                    sc = dict(s)
+                                    sc["step_number"] = step_num
+                                    sc["description"] = f"[Line B] {sc['description']}"
+                                    step_num += 1
+                                    combined_steps.append(sc)
+
+                                final_step = {
+                                    "step_number": step_num,
+                                    "description": f"[Final Goal] Breed {p1_fin['species']} ({str_a}) with {p2_fin['species']} ({str_b}) to obtain target {target_display} ({all_4_str})",
+                                    "parent1": p1_fin,
+                                    "parent2": p2_fin,
+                                    "child": {
+                                        "species": target_display,
+                                        "species_lower": target,
+                                        "target_passives": wanted_passives,
+                                        "required_gender": "Any",
+                                        "hatch_odds": {"hatch_chance_pct": "100%", "avg_eggs": "~1 egg", "gender_note": "Either gender completes the goal"},
+                                        "icon_path": icon_map.get(target, ""),
+                                        "is_target": True,
+                                    },
+                                }
+                                combined_steps.append(final_step)
+                                total_junk = r_a["total_junk"] + r_b["total_junk"]
+                                purity = max(0, 100 - (total_junk * 10))
+
+                                candidate_roadmaps.append({
+                                    "strategy": "2 + 2 Dual Carrier Convergence",
+                                    "total_steps": total_steps,
+                                    "total_junk": total_junk,
+                                    "purity_score": purity,
+                                    "steps": combined_steps,
+                                })
+
+            # ── Strategy 10 (1 + 1 + 1 + 1): Two-Line Intermediate Tree for 4 Singles ──
+            # Automatically calculates intermediate species when starting with single-trait donors
+            if len(candidate_roadmaps) < 3:
+                target_parents = self.engine.find_parents_for_child(target_display)
+                target_parents_set: set[tuple[str, str]] = set()
+                for pa, pb in target_parents:
+                    pa_l = pa.lower()
+                    pb_l = pb.lower()
+                    if pa_l in cased_names and pb_l in cased_names:
+                        target_parents_set.add((pa_l, pb_l))
+                        target_parents_set.add((pb_l, pa_l))
+
+                for pair_a, pair_b in pair_partitions:
+                    if len(candidate_roadmaps) >= 3:
+                        break
+                    idx_a1, idx_a2 = sorted(pair_a)
+                    idx_b1, idx_b2 = sorted(pair_b)
+                    b_a1 = single_branches_by_idx[idx_a1]
+                    b_a2 = single_branches_by_idx[idx_a2]
+                    b_b1 = single_branches_by_idx[idx_b1]
+                    b_b2 = single_branches_by_idx[idx_b2]
+                    traits_a = [display_by_idx[idx_a1], display_by_idx[idx_a2]]
+                    traits_b = [display_by_idx[idx_b1], display_by_idx[idx_b2]]
+                    str_a = ", ".join(traits_a)
+                    str_b = ", ".join(traits_b)
+
+                    # Build map of (intermediate_species -> list of (r1, r2)) for Line A
+                    inter_a_map: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+                    for s1, r1_list in b_a1.items():
+                        for s2, r2_list in b_a2.items():
+                            child_inter = calc_child_fast(s1, s2).lower()
+                            if not child_inter:
+                                continue
+                            for r1 in r1_list:
+                                for r2 in r2_list:
+                                    if len(r1["steps"]) + len(r2["steps"]) + 1 >= max_depth:
+                                        continue
+                                    if child_inter not in inter_a_map:
+                                        inter_a_map[child_inter] = []
+                                    if len(inter_a_map[child_inter]) < 2:
+                                        inter_a_map[child_inter].append((r1, r2))
+
+                    # Build map of (intermediate_species -> list of (r3, r4)) for Line B
+                    inter_b_map: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = {}
+                    for s3, r3_list in b_b1.items():
+                        for s4, r4_list in b_b2.items():
+                            child_inter = calc_child_fast(s3, s4).lower()
+                            if not child_inter:
+                                continue
+                            for r3 in r3_list:
+                                for r4 in r4_list:
+                                    if len(r3["steps"]) + len(r4["steps"]) + 1 >= max_depth:
+                                        continue
+                                    if child_inter not in inter_b_map:
+                                        inter_b_map[child_inter] = []
+                                    if len(inter_b_map[child_inter]) < 2:
+                                        inter_b_map[child_inter].append((r3, r4))
+
+                    # Intersect Line A intermediates with Line B intermediates against target parent pairs
+                    for inter_a, a_combos in inter_a_map.items():
+                        for inter_b, b_combos in inter_b_map.items():
+                            if (inter_a, inter_b) not in target_parents_set:
+                                continue
+
+                            inter_a_display = cased_names.get(inter_a, inter_a)
+                            inter_b_display = cased_names.get(inter_b, inter_b)
+
+                            for r1, r2 in a_combos:
+                                for r3, r4 in b_combos:
+                                    d_a = len(r1["steps"]) + len(r2["steps"]) + 1
+                                    d_b = len(r3["steps"]) + len(r4["steps"]) + 1
+                                    total_steps = d_a + d_b + 1
+                                    if total_steps > max_depth:
+                                        continue
+
+                                    # Gender alignment for Line A (Intermediate A is Male)
+                                    req_inter_a_gender = "Male"
+                                    req_inter_b_gender = "Female"
+
+                                    d1_inst = r1["donor"]
+                                    d2_inst = r2["donor"]
+                                    if len(r1["steps"]) == 0 and len(r2["steps"]) == 0:
+                                        if d1_inst["instance_id"] == d2_inst["instance_id"] or d1_inst["gender"] == d2_inst["gender"]:
+                                            continue
+                                        p_a1 = dict(d1_inst)
+                                        p_a2 = dict(d2_inst)
+                                        aligned_r1 = []
+                                        aligned_r2 = []
+                                    elif len(r1["steps"]) > 0 and len(r2["steps"]) == 0:
+                                        p_a2 = dict(d2_inst)
+                                        needed_r1_g = "Female" if d2_inst["gender"] == "Male" else "Male"
+                                        p_a1 = {
+                                            "species": r1["steps"][-1]["child"]["species"],
+                                            "species_lower": r1["species_lower"],
+                                            "gender": needed_r1_g,
+                                            "target_passives": [display_by_idx[idx_a1]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r1["species_lower"], ""),
+                                        }
+                                        aligned_r1 = propagate_branch_genders(r1["steps"], needed_r1_g)
+                                        aligned_r2 = []
+                                    elif len(r1["steps"]) == 0 and len(r2["steps"]) > 0:
+                                        p_a1 = dict(d1_inst)
+                                        needed_r2_g = "Female" if d1_inst["gender"] == "Male" else "Male"
+                                        p_a2 = {
+                                            "species": r2["steps"][-1]["child"]["species"],
+                                            "species_lower": r2["species_lower"],
+                                            "gender": needed_r2_g,
+                                            "target_passives": [display_by_idx[idx_a2]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r2["species_lower"], ""),
+                                        }
+                                        aligned_r1 = []
+                                        aligned_r2 = propagate_branch_genders(r2["steps"], needed_r2_g)
+                                    else:
+                                        p_a1 = {
+                                            "species": r1["steps"][-1]["child"]["species"],
+                                            "species_lower": r1["species_lower"],
+                                            "gender": "Male",
+                                            "target_passives": [display_by_idx[idx_a1]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r1["species_lower"], ""),
+                                        }
+                                        p_a2 = {
+                                            "species": r2["steps"][-1]["child"]["species"],
+                                            "species_lower": r2["species_lower"],
+                                            "gender": "Female",
+                                            "target_passives": [display_by_idx[idx_a2]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r2["species_lower"], ""),
+                                        }
+                                        aligned_r1 = propagate_branch_genders(r1["steps"], "Male")
+                                        aligned_r2 = propagate_branch_genders(r2["steps"], "Female")
+
+                                    # Setup Line B parents
+                                    d3_inst = r3["donor"]
+                                    d4_inst = r4["donor"]
+                                    if len(r3["steps"]) == 0 and len(r4["steps"]) == 0:
+                                        if d3_inst["instance_id"] == d4_inst["instance_id"] or d3_inst["gender"] == d4_inst["gender"]:
+                                            continue
+                                        p_b1 = dict(d3_inst)
+                                        p_b2 = dict(d4_inst)
+                                        aligned_r3 = []
+                                        aligned_r4 = []
+                                    elif len(r3["steps"]) > 0 and len(r4["steps"]) == 0:
+                                        p_b2 = dict(d4_inst)
+                                        needed_r3_g = "Female" if d4_inst["gender"] == "Male" else "Male"
+                                        p_b1 = {
+                                            "species": r3["steps"][-1]["child"]["species"],
+                                            "species_lower": r3["species_lower"],
+                                            "gender": needed_r3_g,
+                                            "target_passives": [display_by_idx[idx_b1]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r3["species_lower"], ""),
+                                        }
+                                        aligned_r3 = propagate_branch_genders(r3["steps"], needed_r3_g)
+                                        aligned_r4 = []
+                                    elif len(r3["steps"]) == 0 and len(r4["steps"]) > 0:
+                                        p_b1 = dict(d3_inst)
+                                        needed_r4_g = "Female" if d3_inst["gender"] == "Male" else "Male"
+                                        p_b2 = {
+                                            "species": r4["steps"][-1]["child"]["species"],
+                                            "species_lower": r4["species_lower"],
+                                            "gender": needed_r4_g,
+                                            "target_passives": [display_by_idx[idx_b2]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r4["species_lower"], ""),
+                                        }
+                                        aligned_r3 = []
+                                        aligned_r4 = propagate_branch_genders(r4["steps"], needed_r4_g)
+                                    else:
+                                        p_b1 = {
+                                            "species": r3["steps"][-1]["child"]["species"],
+                                            "species_lower": r3["species_lower"],
+                                            "gender": "Male",
+                                            "target_passives": [display_by_idx[idx_b1]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r3["species_lower"], ""),
+                                        }
+                                        p_b2 = {
+                                            "species": r4["steps"][-1]["child"]["species"],
+                                            "species_lower": r4["species_lower"],
+                                            "gender": "Female",
+                                            "target_passives": [display_by_idx[idx_b2]],
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(r4["species_lower"], ""),
+                                        }
+                                        aligned_r3 = propagate_branch_genders(r3["steps"], "Male")
+                                        aligned_r4 = propagate_branch_genders(r4["steps"], "Female")
+
+                                    combined_steps = []
+                                    step_num = 1
+
+                                    # Line A steps
+                                    for s in aligned_r1:
+                                        sc = dict(s)
+                                        sc["step_number"] = step_num
+                                        sc["description"] = f"[Line A] {sc['description']}"
+                                        step_num += 1
+                                        combined_steps.append(sc)
+                                    for s in aligned_r2:
+                                        sc = dict(s)
+                                        sc["step_number"] = step_num
+                                        sc["description"] = f"[Line A] {sc['description']}"
+                                        step_num += 1
+                                        combined_steps.append(sc)
+
+                                    # Stage 1A step: Hatch Intermediate A
+                                    hatch_a_info = self.get_hatch_odds(inter_a_display, req_inter_a_gender)
+                                    step_inter_a = {
+                                        "step_number": step_num,
+                                        "description": f"[Line A Hatch] Breed {p_a1['species']} ({display_by_idx[idx_a1]}) with {p_a2['species']} ({display_by_idx[idx_a2]}) to hatch intermediate {inter_a_display} ({str_a})",
+                                        "parent1": p_a1,
+                                        "parent2": p_a2,
+                                        "child": {
+                                            "species": inter_a_display,
+                                            "species_lower": inter_a,
+                                            "target_passives": traits_a,
+                                            "required_gender": req_inter_a_gender,
+                                            "hatch_odds": hatch_a_info,
+                                            "icon_path": icon_map.get(inter_a, ""),
+                                            "is_target": False,
+                                        },
+                                    }
+                                    step_num += 1
+                                    combined_steps.append(step_inter_a)
+
+                                    # Line B steps
+                                    for s in aligned_r3:
+                                        sc = dict(s)
+                                        sc["step_number"] = step_num
+                                        sc["description"] = f"[Line B] {sc['description']}"
+                                        step_num += 1
+                                        combined_steps.append(sc)
+                                    for s in aligned_r4:
+                                        sc = dict(s)
+                                        sc["step_number"] = step_num
+                                        sc["description"] = f"[Line B] {sc['description']}"
+                                        step_num += 1
+                                        combined_steps.append(sc)
+
+                                    # Stage 1B step: Hatch Intermediate B
+                                    hatch_b_info = self.get_hatch_odds(inter_b_display, req_inter_b_gender)
+                                    step_inter_b = {
+                                        "step_number": step_num,
+                                        "description": f"[Line B Hatch] Breed {p_b1['species']} ({display_by_idx[idx_b1]}) with {p_b2['species']} ({display_by_idx[idx_b2]}) to hatch intermediate {inter_b_display} ({str_b})",
+                                        "parent1": p_b1,
+                                        "parent2": p_b2,
+                                        "child": {
+                                            "species": inter_b_display,
+                                            "species_lower": inter_b,
+                                            "target_passives": traits_b,
+                                            "required_gender": req_inter_b_gender,
+                                            "hatch_odds": hatch_b_info,
+                                            "icon_path": icon_map.get(inter_b, ""),
+                                            "is_target": False,
+                                        },
+                                    }
+                                    step_num += 1
+                                    combined_steps.append(step_inter_b)
+
+                                    # Final Step: Intermediate A + Intermediate B → Target
+                                    final_step = {
+                                        "step_number": step_num,
+                                        "description": f"[Final Goal] Breed {inter_a_display} ({str_a}) with {inter_b_display} ({str_b}) to obtain target {target_display} ({all_4_str})",
+                                        "parent1": {
+                                            "species": inter_a_display,
+                                            "species_lower": inter_a,
+                                            "gender": req_inter_a_gender,
+                                            "target_passives": traits_a,
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(inter_a, ""),
+                                        },
+                                        "parent2": {
+                                            "species": inter_b_display,
+                                            "species_lower": inter_b,
+                                            "gender": req_inter_b_gender,
+                                            "target_passives": traits_b,
+                                            "is_from_palbox": False,
+                                            "is_donor": False,
+                                            "icon_path": icon_map.get(inter_b, ""),
+                                        },
+                                        "child": {
+                                            "species": target_display,
+                                            "species_lower": target,
+                                            "target_passives": wanted_passives,
+                                            "required_gender": "Any",
+                                            "hatch_odds": {"hatch_chance_pct": "100%", "avg_eggs": "~1 egg", "gender_note": "Either gender completes the goal"},
+                                            "icon_path": icon_map.get(target, ""),
+                                            "is_target": True,
+                                        },
+                                    }
+                                    combined_steps.append(final_step)
+
+                                    total_junk = r1["total_junk"] + r2["total_junk"] + r3["total_junk"] + r4["total_junk"]
+                                    purity = max(0, 100 - (total_junk * 10))
+
+                                    candidate_roadmaps.append({
+                                        "strategy": "1 + 1 + 1 + 1 Two-Line Intermediate Tree",
+                                        "total_steps": total_steps,
+                                        "total_junk": total_junk,
+                                        "purity_score": purity,
+                                        "steps": combined_steps,
+                                    })
 
         # 6. Sort and Deduplicate
         # Minimum steps is first priority, then fewest junk passives

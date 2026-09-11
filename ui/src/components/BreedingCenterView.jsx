@@ -137,8 +137,8 @@ export function BreedingCenterView({
       if (prev.includes(pName)) {
         return prev.filter(p => p !== pName);
       }
-      if (prev.length >= 3) {
-        return [prev[1], prev[2], pName];
+      if (prev.length >= 4) {
+        return [prev[1], prev[2], prev[3], pName];
       }
       return [...prev, pName];
     });
@@ -1519,7 +1519,7 @@ export function BreedingCenterView({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600 }}>
-                    Target Passives ({lineageSelectedPassives.length}/3 selected)
+                    Target Passives ({lineageSelectedPassives.length}/4 selected)
                   </label>
                   {lineageSelectedPassives.length > 0 && (
                     <button

@@ -30,6 +30,13 @@ export function SettingsView({ savePath, setSavePath, handleLoadSave, loading, e
           </button>
         </div>
 
+        {loading && (
+          <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(245, 158, 11, 0.1)', padding: '0.6rem 0.85rem', borderRadius: '6px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            <span>⏳</span>
+            <span>Parsing save file into database... Please remain on this page until complete.</span>
+          </div>
+        )}
+
         {errorMsg && (
           <div style={{ marginTop: '1rem', color: 'var(--accent-red)', background: 'rgba(239,68,68,0.1)', padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--accent-red)' }}>
             {errorMsg}

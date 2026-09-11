@@ -1,12 +1,13 @@
 """Module to extract Base Camp structures from Level.sav."""
 
 import re
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from palengine.parser.extract_pals import load_gvas_from_sav
+from palworld_save_tools.gvas import GvasFile
 
 
-def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
+def extract_bases(sav_path: str, gvas_file: Optional[GvasFile] = None) -> dict[str, dict[str, Any]]:
     """Reads Level.sav and counts placed structures per Base Camp ID.
 
     Returns:
@@ -14,11 +15,12 @@ def extract_bases(sav_path: str) -> dict[str, dict[str, Any]]:
             - 'name': str (base camp name)
             - 'structures': dict[str, int] (counts of each structure type)
     """
-    custom_props: list[str] = [
-        ".worldSaveData.MapObjectSaveData",
-        ".worldSaveData.BaseCampSaveData.Value.RawData",
-    ]
-    gvas_file = load_gvas_from_sav(sav_path, custom_props)
+    if gvas_file is None:
+        custom_props: list[str] = [
+            ".worldSaveData.MapObjectSaveData",
+            ".worldSaveData.BaseCampSaveData.Value.RawData",
+        ]
+        gvas_file = load_gvas_from_sav(sav_path, custom_props)
 
     # Cast properties to dict to avoid unknown member access warnings
     properties = cast(dict[str, Any], gvas_file.properties)

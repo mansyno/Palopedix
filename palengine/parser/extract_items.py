@@ -5,7 +5,7 @@ and chests placed at player base camps). Skips NPC/enemy containers.
 """
 
 import struct
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 from palengine.parser.extract_pals import load_gvas_from_sav, clean_value
 
@@ -149,7 +149,7 @@ def _decode_slot_bytes(raw_bytes: tuple | bytes) -> dict[str, Any] | None:
         return None
 
 
-def extract_items(sav_path: str) -> list[dict[str, Any]]:
+def extract_items(sav_path: str, gvas_file: Optional[GvasFile] = None) -> list[dict[str, Any]]:
     """Reads Level.sav and extracts player-owned item inventories.
 
     Identifies player containers from Players/*.sav InventoryInfo,
@@ -165,8 +165,9 @@ def extract_items(sav_path: str) -> list[dict[str, Any]]:
     # 1. Get known player container IDs from Players/*.sav
     player_containers = _read_player_container_ids(sav_path)
 
-    # 2. Load the main Level.sav (no custom properties needed for items)
-    gvas_file = load_gvas_from_sav(sav_path, [])
+    # 2. Load the main Level.sav if not provided
+    if gvas_file is None:
+        gvas_file = load_gvas_from_sav(sav_path, [])
     properties = cast(dict[str, Any], gvas_file.properties)
     world_save_data = cast(
         dict[str, Any], properties["worldSaveData"]["value"]

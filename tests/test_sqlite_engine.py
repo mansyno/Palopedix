@@ -132,6 +132,10 @@ def test_breeding_logic_and_tie_breaker():
     res = engine.get_breeding_result("Pal A", "Pal B")
     assert res is not None
     assert res["display_name"] == "Pal A"
+    engine.conn.execute("DROP TABLE IF EXISTS pals")
+    engine.conn.commit()
+    engine._create_tables()
+    engine._load_static_metadata()
 
 
 def test_breeding_path_finder():
@@ -175,6 +179,11 @@ def test_breeding_path_finder():
     assert path[0]["child"] == "Bushy"
     assert "parent1_gender" in path[0] and "parent2_gender" in path[0]
     assert path[1]["child"] == "Anubis"
+    engine.conn.execute("DROP TABLE IF EXISTS pals")
+    engine.conn.execute("DROP TABLE IF EXISTS breeding_combos")
+    engine.conn.commit()
+    engine._create_tables()
+    engine._load_static_metadata()
 
 
 def test_query_apis():

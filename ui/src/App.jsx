@@ -45,6 +45,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [saveVersion, setSaveVersion] = useState(0);
 
   // Master Data State
   const [pals, setPals] = useState([]);
@@ -178,6 +179,7 @@ function App() {
       if (res.ok) {
         setSelectedWorldId(data.world_id);
         setSaveLoaded(true);
+        setSaveVersion(v => v + 1);
         fetchInstances();
         fetchBases();
         fetchOwnedSpecies();
@@ -204,6 +206,7 @@ function App() {
         setSaveLoaded(true);
         setLoadedPath(data.path);
         setSuccessMsg(data.message);
+        setSaveVersion(v => v + 1);
         fetchInstances();
         fetchBases();
         fetchOwnedSpecies();
@@ -574,6 +577,7 @@ function App() {
           <BaseOptimizerView
             pals={pals}
             setSelectedPal={setSelectedPal}
+            saveVersion={saveVersion}
           />
         </TabKeepAlive>
 

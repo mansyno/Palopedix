@@ -18,4 +18,7 @@ All AI coding agents (Antigravity) operating within this repository MUST follow 
    - Verify the exact shape of database rows and analytics outputs across callers before invoking string/list methods.
 8. **Clean Workspace**: Do not leave temporary scripts, json dumps, or scratch logs in the workspace root.
 
-
+9. **using expressions** never use expressions like these to show a formula or calculation:
+   The total number of unique unordered parent pairs is: $$\frac{291 \times (291 + 1)}{2} = \mathbf{42{,}486\text{ 
+combinations}}$$
+   use the numbers

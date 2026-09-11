@@ -4,7 +4,7 @@ import { PassiveBadge } from './common/PassiveBadge';
 import { WORK_TYPE_ASSET_MAP, CATEGORY_STYLES } from '../constants/gameData';
 import { exportToJson } from '../utils/exportJson';
 
-export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
+export default function BaseOptimizerView({ pals = [], setSelectedPal, saveVersion = 0 }) {
   const [baseCamps, setBaseCamps] = useState([]);
   const [selectedBaseId, setSelectedBaseId] = useState('');
   const [targetTeamSize, setTargetTeamSize] = useState('max'); // 'max', 'current', or custom number
@@ -18,18 +18,29 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
   const [sortCol, setSortCol] = useState('#');
   const [sortDesc, setSortDesc] = useState(false);
 
-  useEffect(() => {
+  const fetchBaseCamps = () => {
     fetch('/api/base_camps')
       .then(res => res.json())
       .then(data => {
         const arr = Array.isArray(data) ? data : [];
         setBaseCamps(arr);
         if (arr.length > 0) {
-          setSelectedBaseId(arr[0].base_camp_id);
+          setSelectedBaseId(prev => (arr.some(b => b.base_camp_id === prev) ? prev : arr[0].base_camp_id));
         }
       })
       .catch(err => setError(err.message));
+  };
+
+  useEffect(() => {
+    fetchBaseCamps();
   }, []);
+
+  useEffect(() => {
+    if (saveVersion > 0) {
+      recsCache.current = {};
+      fetchBaseCamps();
+    }
+  }, [saveVersion]);
 
   const activeBase = baseCamps.find(bc => bc.base_camp_id === selectedBaseId) || null;
 
@@ -75,6 +86,7 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal }) {
 
   const handleRecalculate = () => {
     recsCache.current = {};
+    fetchBaseCamps();
     if (!selectedBaseId) return;
     setLoading(true);
     setError(null);

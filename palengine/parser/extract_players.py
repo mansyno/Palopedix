@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Optional, cast
 from palworld_save_tools.gvas import GvasFile
 from palworld_save_tools.palsav import decompress_sav_to_gvas
 from palworld_save_tools.paltypes import PALWORLD_TYPE_HINTS
@@ -16,13 +16,16 @@ def _extract_status_points(prop: Any) -> dict[str, int]:
             pts_dict[str(stat_name)] = stat_val
     return pts_dict
 
-def extract_players(level_sav_path: str) -> list[dict[str, Any]]:
+def extract_players(level_sav_path: str, gvas_file: Optional[GvasFile] = None) -> list[dict[str, Any]]:
     """Extracts player character data from Level.sav and Players/*.sav files."""
     if not level_sav_path or not os.path.exists(level_sav_path):
         return []
 
     # 1. Parse Level.sav for Player character states
-    gvas = load_gvas_from_sav(level_sav_path, [".worldSaveData.CharacterSaveParameterMap.Value.RawData"])
+    if gvas_file is None:
+        gvas = load_gvas_from_sav(level_sav_path, [".worldSaveData.CharacterSaveParameterMap.Value.RawData"])
+    else:
+        gvas = gvas_file
     world_save_data = gvas.properties.get("worldSaveData", {}).get("value", {})
     char_map = world_save_data.get("CharacterSaveParameterMap", {}).get("value", [])
 

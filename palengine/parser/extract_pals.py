@@ -2,7 +2,7 @@
 # pyright: basic
 """Module to extract Pal instances from Level.sav."""
 
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Compatibility patches for Palworld v0.6+ / v1.0 save format.
@@ -350,79 +350,6 @@ def load_player_containers(level_sav_path: str) -> dict[str, tuple[str, str]]:
     return containers
 
 
-
-
-
-def extract_pals(sav_path: str) -> list[dict[str, Any]]:
-    """Reads Level.sav and extracts all Pal instances.
-
-    Differentiates between party, Palbox, and base camp locations.
-    """
-    custom_props: list[str] = [
-        ".worldSaveData.CharacterSaveParameterMap.Value.RawData",
-        ".worldSaveData.GroupSaveDataMap",
-        ".worldSaveData.BaseCampSaveData.Value.RawData",
-        ".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData",
-    ]
-    gvas_file = load_gvas_from_sav(sav_path, custom_props)
-
-    properties = cast(dict[str, Any], gvas_file.properties)
-    world_save_data = cast(dict[str, Any], properties["worldSaveData"]["value"])
-
-    # 1. Parse base camps to identify base camp worker containers
-    base_camp_containers: dict[str, dict[str, str]] = {}
-    base_camp_save_data = cast(
-        list[dict[str, Any]],
-        world_save_data.get("BaseCampSaveData", {}).get("value", []),
-    )
-    for entry in base_camp_save_data:
-        val = cast(dict[str, Any], entry.get("value", {}))
-        raw_data = cast(dict[str, Any], val.get("RawData", {}).get("value") or {})
-        base_id = raw_data.get("id")
-        base_name = cast(str, raw_data.get("name", "Unnamed Base"))
-        if not base_name or "新規生成拠点" in base_name:
-            base_name = "Unnamed Base"
-
-        worker_director = cast(dict[str, Any], val.get("WorkerDirector", {}).get("value", {}))
-        wd_raw_data = cast(
-            dict[str, Any], worker_director.get("RawData", {}).get("value") or {}
-        )
-        worker_container_id = wd_raw_data.get("container_id")
-
-        if worker_container_id is not None and base_id is not None:
-            base_camp_containers[str(worker_container_id)] = {
-                "base_camp_id": str(base_id),
-                "base_camp_name": base_name,
-            }
-
-
-    # 2. Load player container IDs from Players/*.sav and CharacterSaveParameterMap
-    player_containers: dict[str, tuple[str, str]] = load_player_containers(sav_path)
-
-    char_save_parameter_map = cast(
-        list[dict[str, Any]],
-        world_save_data.get("CharacterSaveParameterMap", {}).get("value", []),
-    )
-
-    for char_entry in char_save_parameter_map:
-        val = cast(dict[str, Any], char_entry.get("value", {}))
-        raw_data = cast(dict[str, Any], val.get("RawData", {}).get("value") or {})
-        char_obj = cast(dict[str, Any], raw_data.get("object") or {})
-        save_param = cast(dict[str, Any], char_obj.get("SaveParameter", {}).get("value") or {})
-        is_player = bool(clean_value(save_param.get("IsPlayer", {}).get("value", False)))
-        if is_player:
-            key_struct = clean_value(char_entry.get("key")) or {}
-            player_uid = clean_value(key_struct.get("PlayerUId"))
-            if player_uid is not None:
-                p_uid_str = str(player_uid)
-                otomo_id = clean_value(save_param.get("OtomoCharacterContainerId"))
-                if otomo_id:
-                    player_containers[str(otomo_id)] = (p_uid_str, "party")
-
-                storage_id = clean_value(save_param.get("PalStorageContainerId"))
-                if storage_id:
-                    player_containers[str(storage_id)] = (p_uid_str, "palbox")
-
 def _parse_pal_data(
     save_param: dict[str, Any],
     instance_id: Any,
@@ -503,7 +430,7 @@ def _parse_pal_data(
     }
 
 
-def extract_pals(sav_path: str) -> list[dict[str, Any]]:
+def extract_pals(sav_path: str, gvas_file: Optional[GvasFile] = None) -> list[dict[str, Any]]:
     """Reads Level.sav and Players/*_dps.sav to extract all Pal instances.
 
     Differentiates between party, Palbox, base camp, viewing cage, and Dimensional Pal Storage.
@@ -512,13 +439,14 @@ def extract_pals(sav_path: str) -> list[dict[str, Any]]:
     import contextlib
     from pathlib import Path
 
-    custom_props: list[str] = [
-        ".worldSaveData.CharacterSaveParameterMap.Value.RawData",
-        ".worldSaveData.GroupSaveDataMap",
-        ".worldSaveData.BaseCampSaveData.Value.RawData",
-        ".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData",
-    ]
-    gvas_file = load_gvas_from_sav(sav_path, custom_props)
+    if gvas_file is None:
+        custom_props: list[str] = [
+            ".worldSaveData.CharacterSaveParameterMap.Value.RawData",
+            ".worldSaveData.GroupSaveDataMap",
+            ".worldSaveData.BaseCampSaveData.Value.RawData",
+            ".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData",
+        ]
+        gvas_file = load_gvas_from_sav(sav_path, custom_props)
 
     properties = cast(dict[str, Any], gvas_file.properties)
     world_save_data = cast(dict[str, Any], properties["worldSaveData"]["value"])

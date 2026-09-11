@@ -18,7 +18,7 @@ from palengine.config import (
     get_static_data_source,
 )
 from palengine.parser.extract_bases import extract_bases
-from palengine.parser.extract_pals import extract_pals
+from palengine.parser.extract_pals import extract_pals, load_gvas_from_sav
 from palengine.parser.extract_items import extract_items
 from palengine.parser.extract_players import extract_players
 from palengine.parser.extract_quests import extract_active_quests
@@ -1782,10 +1782,22 @@ class SQLiteEngine:
         self.clear_instance_data()
         self.current_save_path = sav_path
 
-        pals = extract_pals(sav_path)
-        bases = extract_bases(sav_path)
-        items_data = extract_items(sav_path)
-        players = extract_players(sav_path)
+        # Single-pass GVAS load with union of all required custom properties
+        gvas_file = None
+        if os.path.exists(sav_path):
+            level_custom_props = [
+                ".worldSaveData.CharacterSaveParameterMap.Value.RawData",
+                ".worldSaveData.GroupSaveDataMap",
+                ".worldSaveData.BaseCampSaveData.Value.RawData",
+                ".worldSaveData.BaseCampSaveData.Value.WorkerDirector.RawData",
+                ".worldSaveData.MapObjectSaveData",
+            ]
+            gvas_file = load_gvas_from_sav(sav_path, level_custom_props)
+
+        pals = extract_pals(sav_path, gvas_file=gvas_file)
+        bases = extract_bases(sav_path, gvas_file=gvas_file)
+        items_data = extract_items(sav_path, gvas_file=gvas_file)
+        players = extract_players(sav_path, gvas_file=gvas_file)
         active_quests = extract_active_quests(sav_path)
         world_settings = extract_world_settings(sav_path)
 

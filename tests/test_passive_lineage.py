@@ -81,3 +81,42 @@ def test_passive_lineage_single_passive():
     for p in paths:
         assert p["strategy"] == "Direct Trait Convergence" or p["strategy"] == "2 + 0 Clean Convergence"
         assert p["total_steps"] <= 3
+
+
+def test_passive_lineage_three_passives():
+    """Verify 3-passive lineage calculation converges all 3 traits into the target Pal."""
+    client = TestClient(app)
+    res = client.get("/api/breeding/lineage-path?target=Eidrolon&passives=Legend,Artisan,Ferocious&max_depth=5&max_results=3")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["target_species"] == "Eidrolon"
+    assert len(data["target_passives"]) == 3
+
+    paths = data.get("paths", [])
+    # It's valid for the engine to find no paths if the player's inventory doesn't have donors for all 3 traits.
+    # But if paths exist, they must satisfy the structural constraints.
+    for p in paths:
+        assert p["strategy"] in (
+            "3 + 0 Triple Carrier Convergence",
+            "2 + 1 Trait Convergence",
+            "1 + 1 + 1 Hierarchical Convergence",
+        )
+        assert p["total_steps"] <= 5
+        # Final step must produce the target species
+        final_step = p["steps"][-1]
+        assert final_step["child"]["species"] == "Eidrolon"
+        assert final_step["child"]["is_target"] is True
+        # All 3 passives present in the final child target_passives
+        final_passives = [tp.lower() for tp in final_step["child"]["target_passives"]]
+        assert "legend" in final_passives
+        assert "artisan" in final_passives
+        assert "ferocious" in final_passives
+
+
+def test_passive_lineage_api_rejects_four_passives():
+    """Verify endpoint rejects more than 3 passives."""
+    client = TestClient(app)
+    res = client.get("/api/breeding/lineage-path?target=Eidrolon&passives=Legend,Artisan,Ferocious,Swift")
+    assert res.status_code == 400
+    assert "Maximum 3" in res.json()["detail"]
+

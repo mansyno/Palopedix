@@ -378,6 +378,10 @@ def get_passive_lineage_path(
     if not passives:
         raise HTTPException(status_code=400, detail="At least one target passive skill is required.")
 
+    passives_list = [p.strip() for p in passives.split(",") if p.strip()]
+    if len(passives_list) > 3:
+        raise HTTPException(status_code=400, detail="Maximum 3 target passive skills are supported.")
+
     paths = db_engine.find_passive_lineage_paths(
         target_species=target,
         target_passives=passives,
@@ -386,7 +390,7 @@ def get_passive_lineage_path(
     )
     return {
         "target_species": target,
-        "target_passives": [p.strip() for p in passives.split(",") if p.strip()],
+        "target_passives": passives_list,
         "paths": paths,
     }
 

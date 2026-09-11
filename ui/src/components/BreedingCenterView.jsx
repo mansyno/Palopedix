@@ -66,6 +66,7 @@ export function BreedingCenterView({
   const [lineageLoading, setLineageLoading] = useState(false);
   const [lineageError, setLineageError] = useState('');
   const [lineageSearched, setLineageSearched] = useState(false);
+  const [lineagePassivesFolded, setLineagePassivesFolded] = useState(false);
 
   const allTargetPalOptions = useMemo(() => {
     const set = new Set();
@@ -91,7 +92,7 @@ export function BreedingCenterView({
         const tier = getSkillTierRank(name);
         return { name, count, tier };
       })
-      .sort((a, b) => b.tier - a.tier || b.count - a.count || a.name.localeCompare(b.name));
+      .sort((a, b) => b.tier - a.tier || a.name.localeCompare(b.name));
   }, [instances]);
 
   const handleFindLineagePaths = async () => {
@@ -136,8 +137,8 @@ export function BreedingCenterView({
       if (prev.includes(pName)) {
         return prev.filter(p => p !== pName);
       }
-      if (prev.length >= 2) {
-        return [prev[1], pName];
+      if (prev.length >= 3) {
+        return [prev[1], prev[2], pName];
       }
       return [...prev, pName];
     });
@@ -380,88 +381,65 @@ export function BreedingCenterView({
     }
   };
 
+  const handleSubTabChange = (tab) => {
+    setBreedingSubTab(tab);
+    if (tab === 'uncaught') {
+      fetchUncaughtOpportunities();
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      {/* Top Fixed Header: Source Selector & Sub-Navigation Tabs */}
-      <div style={{ flexShrink: 0, marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-        {/* Top Source Switch Bar */}
-        <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', padding: '0.75rem 1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>🐣</span>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, margin: 0 }}>Breeding Center Suite</h3>
-              <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem' }}>
-                Calculators, reverse lookup, offspring explorer, and BFS multi-step pathfinder
-              </span>
-            </div>
+      {/* Top Fixed Header: Title, Tool Dropdown & Source Selector on ONE single row */}
+      <div style={{ flexShrink: 0, marginBottom: '0.5rem' }}>
+        <div className="glass-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', padding: '0.45rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <span style={{ fontSize: '1.15rem' }}>🐣</span>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0, whiteSpace: 'nowrap' }}>
+              Breeding Center Suite
+            </h3>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <select
+              value={breedingSubTab}
+              onChange={e => handleSubTabChange(e.target.value)}
+              style={{
+                padding: '0.35rem 0.75rem',
+                borderRadius: '8px',
+                background: breedingSubTab === 'lineage' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(0, 0, 0, 0.35)',
+                border: breedingSubTab === 'lineage' ? '1.5px solid #10b981' : '1px solid var(--border-color)',
+                color: 'white',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Select Breeding Tool"
+            >
+              <option value="calculator" style={{ background: '#1e293b', color: '#fff' }}>🐣 Direct Pair Calculator</option>
+              <option value="reverse" style={{ background: '#1e293b', color: '#fff' }}>🔍 Reverse Combos Lookup</option>
+              <option value="offspring" style={{ background: '#1e293b', color: '#fff' }}>🌱 Possible Offspring</option>
+              <option value="path" style={{ background: '#1e293b', color: '#fff' }}>🧬 Multi-Step Path Finder</option>
+              <option value="uncaught" style={{ background: '#1e293b', color: '#fff' }}>✨ Uncaught Species Finder</option>
+              <option value="lineage" style={{ background: '#1e293b', color: '#fff' }}>🎯 Passive Lineage Planner</option>
+            </select>
+
             <button 
               className={`btn ${palSourceMode === 'global' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem', fontWeight: 600 }}
+              style={{ padding: '0.35rem 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
               onClick={() => handlePalSourceModeChange('global')}
             >
               🌐 All Game Pals ({allMasterPals ? allMasterPals.length : (pals ? pals.length : effectivePalOptions.length)})
             </button>
             <button 
               className={`btn ${palSourceMode === 'caught' ? 'btn-primary' : 'btn-secondary'}`}
-              style={{ padding: '0.35rem 0.85rem', fontSize: '0.78rem', fontWeight: 600 }}
+              style={{ padding: '0.35rem 0.8rem', fontSize: '0.78rem', fontWeight: 600 }}
               onClick={() => handlePalSourceModeChange('caught')}
             >
               💼 My Caught Pals ({ownedSpecies.length})
             </button>
           </div>
         </div>
-
-        {/* Sub-Navigation Ribbon */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', width: '100%' }}>
-          <button
-            className={`btn ${breedingSubTab === 'calculator' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
-            onClick={() => setBreedingSubTab('calculator')}
-          >
-            🐣 Direct Pair Calculator
-          </button>
-          <button
-            className={`btn ${breedingSubTab === 'reverse' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
-            onClick={() => setBreedingSubTab('reverse')}
-          >
-            🔍 Reverse Combos Lookup
-          </button>
-          <button
-            className={`btn ${breedingSubTab === 'offspring' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
-            onClick={() => setBreedingSubTab('offspring')}
-          >
-            🌱 Possible Offspring
-          </button>
-          <button
-            className={`btn ${breedingSubTab === 'path' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
-            onClick={() => setBreedingSubTab('path')}
-          >
-            🧬 Multi-Step Path Finder
-          </button>
-          <button
-            className={`btn ${breedingSubTab === 'uncaught' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px' }}
-            onClick={() => {
-              setBreedingSubTab('uncaught');
-              fetchUncaughtOpportunities();
-            }}
-          >
-            ✨ Uncaught Species Finder
-          </button>
-          <button
-            className={`btn ${breedingSubTab === 'lineage' ? 'btn-primary' : 'btn-secondary'}`}
-            style={{ padding: '0.4rem 0.9rem', fontSize: '0.82rem', fontWeight: 700, borderRadius: '8px', background: breedingSubTab === 'lineage' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : undefined, borderColor: breedingSubTab === 'lineage' ? '#10b981' : undefined }}
-            onClick={() => setBreedingSubTab('lineage')}
-          >
-            🎯 Passive Lineage Planner
-          </button>
-        </div>
-
       </div>
 
       {/* 1. DIRECT CALCULATOR SUB-TAB */}
@@ -1500,16 +1478,14 @@ export function BreedingCenterView({
       {breedingSubTab === 'lineage' && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'auto', gap: '1rem' }}>
           {/* Header & Controls Card */}
-          <div className="glass-card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981' }}>
-                  <span>🧬</span> Passive Lineage Breeding Planner
-                </h3>
-                <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-                  Trait-first multi-generation roadmap engine. Calculates the shortest path (1+1 or 2+0 convergence, max 5 generations) to breed any target Pal with specified passives from your Palbox.
-                </p>
-              </div>
+          <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <h3
+                title="Trait-first multi-generation roadmap engine. Calculates the shortest path (1+1 or 2+0 convergence, max 5 generations) to breed any target Pal with specified passives from your Palbox."
+                style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#10b981', cursor: 'help' }}
+              >
+                <span>🧬</span> Passive Lineage Breeding Planner
+              </h3>
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                 <span style={{ fontSize: '0.78rem', padding: '0.25rem 0.6rem', borderRadius: '6px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)', fontWeight: 600 }}>
                   ⚡ Shortest Path Priority
@@ -1543,7 +1519,7 @@ export function BreedingCenterView({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                   <label style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 600 }}>
-                    Target Passives ({lineageSelectedPassives.length}/2 selected)
+                    Target Passives ({lineageSelectedPassives.length}/3 selected)
                   </label>
                   {lineageSelectedPassives.length > 0 && (
                     <button
@@ -1629,77 +1605,100 @@ export function BreedingCenterView({
 
             {/* Quick-Pick Owned Passives in Palbox */}
             <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '0.85rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  📦 Available Passives in Your Palbox ({availablePalboxPassives.length} unique traits):
-                </span>
-                <input
-                  type="text"
-                  placeholder="Filter passives..."
-                  value={lineagePassiveSearch}
-                  onChange={e => setLineagePassiveSearch(e.target.value)}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: lineagePassivesFolded ? 0 : '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span
+                  onClick={() => setLineagePassivesFolded(prev => !prev)}
                   style={{
-                    padding: '0.2rem 0.6rem',
-                    borderRadius: '6px',
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid var(--border-color)',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                    width: '160px',
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.15rem 0.35rem',
+                    borderRadius: '4px',
+                    transition: 'all 0.15s ease',
                   }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', maxHeight: '160px', overflowY: 'auto', padding: '0.35rem 0.2rem' }}>
-                {availablePalboxPassives
-                  .filter(p => !lineagePassiveSearch || p.name.toLowerCase().includes(lineagePassiveSearch.toLowerCase()))
-                  .map(p => {
-                    const isSelected = lineageSelectedPassives.includes(p.name);
-                    return (
-                      <div
-                        key={p.name}
-                        onClick={() => toggleLineagePassive(p.name)}
-                        style={{
-                          position: 'relative',
-                          cursor: 'pointer',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          borderRadius: '4px',
-                          border: isSelected ? '2px solid #10b981' : '1px solid transparent',
-                          boxShadow: isSelected ? '0 0 10px rgba(16, 185, 129, 0.7)' : 'none',
-                          transform: isSelected ? 'scale(1.03)' : 'none',
-                          transition: 'all 0.15s ease',
-                          padding: '1px',
-                        }}
-                        title={`${p.name} (${p.count} in Palbox) - Click to ${isSelected ? 'remove' : 'select'}`}
-                      >
-                        <PassiveBadge skill={p.name} size="sm" isMatched={isSelected} />
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: '-5px',
-                            right: '-5px',
-                            background: isSelected ? '#10b981' : 'rgba(15, 23, 42, 0.9)',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            color: 'white',
-                            fontSize: '0.62rem',
-                            fontWeight: 700,
-                            padding: '0.05rem 0.28rem',
-                            borderRadius: '8px',
-                            lineHeight: 1,
-                            pointerEvents: 'none',
-                            zIndex: 2,
-                          }}
-                        >
-                          {p.count}
-                        </span>
-                      </div>
-                    );
-                  })}
-                {availablePalboxPassives.length === 0 && (
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No Palbox instances loaded yet. Please ensure your save file is active.</span>
+                  onMouseEnter={e => (e.currentTarget.style.color = '#fff')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}
+                  title={lineagePassivesFolded ? 'Click to expand passives' : 'Click to fold passives'}
+                >
+                  <span style={{ fontSize: '0.7rem' }}>{lineagePassivesFolded ? '▶' : '▼'}</span>
+                  <span>📦 Available Passives in Your Palbox ({availablePalboxPassives.length} unique traits)</span>
+                </span>
+                {!lineagePassivesFolded && (
+                  <input
+                    type="text"
+                    placeholder="Filter passives..."
+                    value={lineagePassiveSearch}
+                    onChange={e => setLineagePassiveSearch(e.target.value)}
+                    style={{
+                      padding: '0.2rem 0.6rem',
+                      borderRadius: '6px',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: '1px solid var(--border-color)',
+                      color: 'white',
+                      fontSize: '0.75rem',
+                      width: '160px',
+                    }}
+                  />
                 )}
               </div>
+
+              {!lineagePassivesFolded && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', maxHeight: '160px', overflowY: 'auto', padding: '0.35rem 0.2rem' }}>
+                  {availablePalboxPassives
+                    .filter(p => !lineagePassiveSearch || p.name.toLowerCase().includes(lineagePassiveSearch.toLowerCase()))
+                    .map(p => {
+                      const isSelected = lineageSelectedPassives.includes(p.name);
+                      return (
+                        <div
+                          key={p.name}
+                          onClick={() => toggleLineagePassive(p.name)}
+                          style={{
+                            position: 'relative',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            borderRadius: '4px',
+                            border: isSelected ? '2px solid #10b981' : '1px solid transparent',
+                            boxShadow: isSelected ? '0 0 10px rgba(16, 185, 129, 0.7)' : 'none',
+                            transform: isSelected ? 'scale(1.03)' : 'none',
+                            transition: 'all 0.15s ease',
+                            padding: '1px',
+                          }}
+                          title={`${p.name} (${p.count} in Palbox) - Click to ${isSelected ? 'remove' : 'select'}`}
+                        >
+                          <PassiveBadge skill={p.name} size="sm" isMatched={isSelected} />
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: '-5px',
+                              right: '-5px',
+                              background: isSelected ? '#10b981' : 'rgba(15, 23, 42, 0.9)',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              color: 'white',
+                              fontSize: '0.62rem',
+                              fontWeight: 700,
+                              padding: '0.05rem 0.28rem',
+                              borderRadius: '8px',
+                              lineHeight: 1,
+                              pointerEvents: 'none',
+                              zIndex: 2,
+                            }}
+                          >
+                            {p.count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  {availablePalboxPassives.length === 0 && (
+                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>No Palbox instances loaded yet. Please ensure your save file is active.</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Error Message */}

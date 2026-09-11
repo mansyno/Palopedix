@@ -365,6 +365,32 @@ def get_breeding_path(
     return {"target": target, "target_skills": target_skills, "paths": paths}
 
 
+@app.get("/api/breeding/lineage-path")
+def get_passive_lineage_path(
+    target: str,
+    passives: str,
+    max_depth: int = Query(5, ge=1, le=10),
+    max_results: int = Query(3, ge=1, le=10),
+) -> dict[str, Any]:
+    """Calculates shortest multi-generation breeding roadmaps to produce target Pal with specified passives from player inventory."""
+    if not target:
+        raise HTTPException(status_code=400, detail="Target Pal species is required.")
+    if not passives:
+        raise HTTPException(status_code=400, detail="At least one target passive skill is required.")
+
+    paths = db_engine.find_passive_lineage_paths(
+        target_species=target,
+        target_passives=passives,
+        max_depth=max_depth,
+        max_results=max_results,
+    )
+    return {
+        "target_species": target,
+        "target_passives": [p.strip() for p in passives.split(",") if p.strip()],
+        "paths": paths,
+    }
+
+
 @app.get("/api/items")
 def get_items(
     category: Optional[str] = None,

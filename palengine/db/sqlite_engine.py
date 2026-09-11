@@ -3026,6 +3026,22 @@ class SQLiteEngine:
             return all_paths[0]["steps"]
         return []
 
+    def find_passive_lineage_paths(
+        self,
+        target_species: str,
+        target_passives: Any,
+        max_depth: int = 5,
+        max_results: int = 3,
+    ) -> list[dict[str, Any]]:
+        """Calculates multi-generation lineage breeding paths to produce target Pal carrying specified passives."""
+        return self.breeding_optimizer.find_passive_lineage_paths(
+            target_species=target_species,
+            target_passives=target_passives,
+            max_depth=max_depth,
+            max_results=max_results,
+        )
+
+
     # ---------- Querying APIs ----------
 
     def query_pals(self, filters: dict[str, Any]) -> list[dict[str, Any]]:

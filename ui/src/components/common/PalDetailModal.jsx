@@ -1,5 +1,5 @@
 import React from 'react';
-import { WORK_SUITABILITY_MAP, getElementIconUrl } from '../../constants/gameData';
+import { WORK_SUITABILITY_MAP, getElementIconUrl, getJobIcon, getJobName } from '../../constants/gameData';
 import { PassiveBadge, getPassiveMeta } from './PassiveBadge';
 
 export function PalDetailModal({ pal, onClose }) {
@@ -155,15 +155,19 @@ export function PalDetailModal({ pal, onClose }) {
                   🛠️ Work Suitabilities
                 </h3>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {pal.work_suitability_details.map(wsd => (
-                    <span key={wsd.id} className="suitability-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-                      {wsd.icon_path && (
-                        <img src={wsd.icon_path} alt={wsd.name} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
-                      )}
-                      <span>{wsd.name}</span>
-                      <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {wsd.level}</span>
-                    </span>
-                  ))}
+                  {pal.work_suitability_details.map(wsd => {
+                    const iconUrl = getJobIcon(wsd.id || wsd.name) || wsd.icon_path;
+                    const jobTitle = getJobName(wsd.id || wsd.name) || wsd.name;
+                    return (
+                      <span key={wsd.id} className="suitability-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {iconUrl && (
+                          <img src={iconUrl} alt={jobTitle} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
+                        )}
+                        <span>{jobTitle}</span>
+                        <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {wsd.level}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             ) : (pal.work_suitabilities && Object.keys(pal.work_suitabilities).length > 0) && (
@@ -172,12 +176,19 @@ export function PalDetailModal({ pal, onClose }) {
                   🛠️ Work Suitabilities
                 </h3>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {Object.entries(pal.work_suitabilities).map(([work, level]) => (
-                    <span key={work} className="suitability-pill">
-                      <span>{WORK_SUITABILITY_MAP[work] || work}</span>
-                      <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {level}</span>
-                    </span>
-                  ))}
+                  {Object.entries(pal.work_suitabilities).map(([work, level]) => {
+                    const iconUrl = getJobIcon(work);
+                    const jobTitle = getJobName(work);
+                    return (
+                      <span key={work} className="suitability-pill" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {iconUrl && (
+                          <img src={iconUrl} alt={jobTitle} className="work-hud-icon" onError={(e) => { e.target.style.display = 'none'; }} />
+                        )}
+                        <span>{jobTitle}</span>
+                        <span style={{ color: 'var(--accent-gold)', fontWeight: 800 }}>Lv. {level}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}

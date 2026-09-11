@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { PassiveBadge } from './PassiveBadge';
-import { getElementIconUrl } from '../../constants/gameData';
+import { getElementIconUrl, getJobIcon, getJobName } from '../../constants/gameData';
 
-export function PalInstanceTooltip({ instance, children }) {
+export function PalInstanceTooltip({ instance, masterPal, children }) {
   const [pos, setPos] = useState(null);
 
   if (!instance) return children;
 
   const updatePosition = (e) => {
     const cardWidth = 400;
-    const cardHeight = 240;
+    const cardHeight = 280;
     const offset = 14;
 
     let left = e.clientX + offset;
@@ -81,6 +81,61 @@ export function PalInstanceTooltip({ instance, children }) {
   const elem1 = instance.element_1 || instance.element1 || instance.element;
   const elem2 = instance.element_2 || instance.element2;
 
+  // Extract Jobs (work suitabilities)
+  const rawJobsList = [];
+  const details = instance.work_suitability_details || masterPal?.work_suitability_details;
+  if (Array.isArray(details) && details.length > 0) {
+    for (const d of details) {
+      const lvl = typeof d.level === 'number' ? d.level : parseInt(d.level, 10) || 0;
+      if (lvl > 0) {
+        rawJobsList.push({
+          id: d.id || d.name,
+          name: d.name || getJobName(d.id),
+          level: lvl,
+          icon: getJobIcon(d.id || d.name) || d.icon_path,
+        });
+      }
+    }
+  } else {
+    const dict = instance.work_suitabilities || instance.suitabilities || masterPal?.work_suitabilities || masterPal?.suitabilities;
+    if (dict && typeof dict === 'object' && !Array.isArray(dict)) {
+      for (const [key, val] of Object.entries(dict)) {
+        const lvl = typeof val === 'number' ? val : parseInt(val, 10) || 0;
+        if (lvl > 0) {
+          rawJobsList.push({
+            id: key,
+            name: getJobName(key),
+            level: lvl,
+            icon: getJobIcon(key),
+          });
+        }
+      }
+    } else if (Array.isArray(dict)) {
+      for (const d of dict) {
+        const key = d.name || d.id || d.suitability_name || d.work_type;
+        const lvl = typeof d.level === 'number' ? d.level : parseInt(d.level, 10) || 0;
+        if (key && lvl > 0) {
+          rawJobsList.push({
+            id: key,
+            name: getJobName(key),
+            level: lvl,
+            icon: getJobIcon(key),
+          });
+        }
+      }
+    }
+  }
+
+  // Deduplicate by canonical name and sort by level descending
+  const jobsMap = new Map();
+  for (const j of rawJobsList) {
+    const canonicalKey = getJobName(j.id);
+    if (!jobsMap.has(canonicalKey) || jobsMap.get(canonicalKey).level < j.level) {
+      jobsMap.set(canonicalKey, { ...j, canonicalName: canonicalKey });
+    }
+  }
+  const jobsList = Array.from(jobsMap.values()).sort((a, b) => b.level - a.level);
+
   return (
     <span 
       className="pal-tooltip-wrapper" 
@@ -139,6 +194,39 @@ export function PalInstanceTooltip({ instance, children }) {
                     {elem2}
                   </span>
                 )}
+              </div>
+            </div>
+          )}
+
+          {jobsList.length > 0 && (
+            <div className="pal-tooltip-row" style={{ alignItems: 'center' }}>
+              <span className="pal-tooltip-label">🛠️ Jobs:</span>
+              <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {jobsList.map((job) => (
+                  <span
+                    key={job.canonicalName || job.id}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      borderRadius: '4px',
+                      padding: '0.1rem 0.35rem',
+                      lineHeight: 1,
+                    }}
+                  >
+                    <img
+                      src={job.icon}
+                      alt={job.name}
+                      style={{ width: '15px', height: '15px', objectFit: 'contain' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                    <span style={{ fontWeight: 800, fontSize: '0.75rem', color: '#fbbf24' }}>
+                      {job.level}
+                    </span>
+                  </span>
+                ))}
               </div>
             </div>
           )}

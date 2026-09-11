@@ -54,8 +54,62 @@ export const WORK_TYPE_ASSET_MAP = {
   Transporting: { icon: '/assets/work/Transport.png', label: 'Transporting', emoji: '📦' },
   Transport: { icon: '/assets/work/Transport.png', label: 'Transporting', emoji: '📦' },
   Farming: { icon: '/assets/work/MonsterFarm.png', label: 'Farming', emoji: '🍳' },
-  MonsterFarm: { icon: '/assets/work/MonsterFarm.png', label: 'Farming', emoji: '🍳' },
 };
+
+export const JOB_ICON_MAP = {
+  kindling: '/assets/work/Kindling.png',
+  emitflame: '/assets/work/Kindling.png',
+  watering: '/assets/work/Watering.png',
+  planting: '/assets/work/Planting.png',
+  seeding: '/assets/work/Planting.png',
+  generatingelectricity: '/assets/work/GeneratingElectricity.png',
+  generating_electricity: '/assets/work/GeneratingElectricity.png',
+  electricity: '/assets/work/GeneratingElectricity.png',
+  handcraft: '/assets/work/Handcraft.png',
+  handiwork: '/assets/work/Handcraft.png',
+  gathering: '/assets/work/Gathering.png',
+  collection: '/assets/work/Gathering.png',
+  lumbering: '/assets/work/Lumbering.png',
+  deforest: '/assets/work/Lumbering.png',
+  wood: '/assets/work/Lumbering.png',
+  mining: '/assets/work/Mining.png',
+  mine: '/assets/work/Mining.png',
+  medicine: '/assets/work/Medicine.png',
+  medicineproduction: '/assets/work/Medicine.png',
+  medicine_production: '/assets/work/Medicine.png',
+  productmedicine: '/assets/work/Medicine.png',
+  product_medicine: '/assets/work/Medicine.png',
+  cooling: '/assets/work/Cooling.png',
+  cool: '/assets/work/Cooling.png',
+  transporting: '/assets/work/Transport.png',
+  transport: '/assets/work/Transport.png',
+  farming: '/assets/work/MonsterFarm.png',
+  monsterfarm: '/assets/work/MonsterFarm.png',
+  monster_farm: '/assets/work/MonsterFarm.png',
+  oilextraction: '/assets/work/OilExtraction.png',
+  oil_extraction: '/assets/work/OilExtraction.png',
+};
+
+export function getJobIcon(jobKey) {
+  if (!jobKey) return '';
+  const clean = String(jobKey).toLowerCase().trim().replace(/[\s-]+/g, '_');
+  if (JOB_ICON_MAP[clean]) return JOB_ICON_MAP[clean];
+  const noUnderscore = clean.replace(/_/g, '');
+  if (JOB_ICON_MAP[noUnderscore]) return JOB_ICON_MAP[noUnderscore];
+  return `/assets/work/${jobKey}.png`;
+}
+
+export function getJobName(jobKey) {
+  if (!jobKey) return '';
+  const clean = String(jobKey).toLowerCase().trim().replace(/[\s-]+/g, '_');
+  const noUnderscore = clean.replace(/_/g, '');
+  const found = Object.entries(WORK_TYPE_ASSET_MAP).find(([k]) => {
+    const kClean = k.toLowerCase().replace(/[\s-]+/g, '_');
+    return kClean === clean || kClean === noUnderscore;
+  });
+  if (found) return found[1].label || found[0];
+  return WORK_SUITABILITY_MAP[jobKey] || jobKey;
+}
 
 export const LEGEND_PASSIVES = new Set([
   'legend', 'celestial emperor', 'lord of lightning', 'divine dragon',

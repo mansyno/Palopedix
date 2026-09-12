@@ -425,13 +425,14 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal, saveVersi
               </thead>
               <tbody>
                 {sortedTeam.map((pal) => {
+                  const masterPal = pals.find(p => 
+                    (p.internal_name && (p.internal_name === pal.character_id || p.internal_name === pal.character_id_raw || p.internal_name === pal.species)) ||
+                    (p.id && (p.id === pal.character_id || p.id === pal.character_id_raw || p.id === pal.species)) ||
+                    (p.display_name && p.display_name.toLowerCase() === (pal.display_name || pal.species || '').toLowerCase())
+                  );
+
                   const handlePalClick = () => {
                     if (!setSelectedPal) return;
-                    const masterPal = pals.find(p => 
-                      (p.internal_name && (p.internal_name === pal.character_id || p.internal_name === pal.character_id_raw || p.internal_name === pal.species)) ||
-                      (p.id && (p.id === pal.character_id || p.id === pal.character_id_raw || p.id === pal.species)) ||
-                      (p.display_name && p.display_name.toLowerCase() === (pal.display_name || pal.species || '').toLowerCase())
-                    );
                     setSelectedPal({
                       ...(masterPal || {}),
                       ...pal,
@@ -451,7 +452,7 @@ export default function BaseOptimizerView({ pals = [], setSelectedPal, saveVersi
                         {pal._origRank}
                       </td>
                       <td>
-                        <PalInstanceTooltip instance={pal}>
+                        <PalInstanceTooltip instance={pal} masterPal={masterPal}>
                           <div className="pal-avatar-container">
                             {pal.icon_path && (
                               <img src={pal.icon_path} alt={pal.display_name} className="pal-avatar-small" onError={(e) => { e.target.style.display = 'none'; }} />

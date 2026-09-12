@@ -2,6 +2,8 @@
 import re
 from typing import Optional, Any
 
+from palengine.config import get_assets_dir
+
 def clean_species_name(species: str) -> str:
     """Normalize species name by stripping prefixes like 'boss_'."""
     if not species:
@@ -12,22 +14,44 @@ def clean_species_name(species: str) -> str:
     return sp
 
 def transform_icon_path(path: Optional[str]) -> Optional[str]:
-    """Transform internal Unreal Engine asset path to local web asset path."""
+    """Converts internal Unreal Engine asset paths or absolute local asset paths into web-accessible URL paths (/assets/...)."""
     if not path:
         return None
-    # If already a web path, return as is
-    if path.startswith("/assets/") or path.startswith("http"):
-        return path
-    
-    # Extract asset name from UE path: /Game/Pal/Texture/PalIcon/T_Anubis_icon.T_Anubis_icon -> /assets/pals/T_Anubis_icon.png
-    parts = path.split(".")
-    base_name = parts[-1] if len(parts) > 1 else path.split("/")[-1]
-    if base_name.startswith("T_"):
-        base_name = base_name[2:]
-    if base_name.endswith("_icon"):
-        base_name = base_name[:-5]
-        
-    return f"/assets/pals/{base_name}.png"
+    normalized = path.replace("\\", "/")
+    if not (normalized.startswith("http://") or normalized.startswith("https://")):
+        normalized = re.sub(r"/+", "/", normalized)
+    if normalized.startswith("/assets/") or normalized.startswith("http://") or normalized.startswith("https://"):
+        return normalized
+
+    # Handle local filesystem asset directory
+    try:
+        assets_dir = get_assets_dir().replace("\\", "/").rstrip("/")
+        if normalized.lower().startswith(assets_dir.lower()):
+            rel_path = normalized[len(assets_dir):]
+            if not rel_path.startswith("/"):
+                rel_path = "/" + rel_path
+            return f"/assets{rel_path}"
+    except Exception:
+        pass
+
+    if "palworld_assets" in normalized.lower():
+        idx = normalized.lower().find("palworld_assets")
+        rel_path = normalized[idx + len("palworld_assets"):]
+        if not rel_path.startswith("/"):
+            rel_path = "/" + rel_path
+        return f"/assets{rel_path}"
+
+    # Extract asset name from UE path: /Game/Pal/Texture/PalIcon/T_Anubis_icon.T_Anubis_icon -> /assets/pals/Anubis.png
+    if "/game/" in normalized.lower():
+        parts = normalized.split(".")
+        base_name = parts[-1] if len(parts) > 1 else normalized.split("/")[-1]
+        if base_name.startswith("T_"):
+            base_name = base_name[2:]
+        if base_name.endswith("_icon"):
+            base_name = base_name[:-5]
+        return f"/assets/pals/{base_name}.png"
+
+    return normalized if normalized.startswith("/") else None
 
 def clean_skill_text(text: Optional[str]) -> Optional[str]:
     """Clean rich text formatting tags and resolve elements properly from skill descriptions."""

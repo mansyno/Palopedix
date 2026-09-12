@@ -171,13 +171,14 @@ export function CondenserView({ pals = [], setSelectedPal, worldId, saveLoaded }
             ivs: { hp: c.iv_hp, melee: c.iv_attack, defense: c.iv_defense },
           };
 
+          const masterPal = pals.find(p => 
+            (p.internal_name && (p.internal_name === c.character_id || p.internal_name === c.species)) ||
+            (p.id && (p.id === c.character_id || p.id === c.species)) ||
+            (p.display_name && p.display_name.toLowerCase() === (c.species || '').toLowerCase())
+          );
+
           const handlePalClick = () => {
             if (!setSelectedPal) return;
-            const masterPal = pals.find(p => 
-              (p.internal_name && (p.internal_name === c.character_id || p.internal_name === c.species)) ||
-              (p.id && (p.id === c.character_id || p.id === c.species)) ||
-              (p.display_name && p.display_name.toLowerCase() === (c.species || '').toLowerCase())
-            );
             setSelectedPal({
               ...(masterPal || {}),
               ...candPal,
@@ -194,7 +195,7 @@ export function CondenserView({ pals = [], setSelectedPal, worldId, saveLoaded }
           return (
             <div key={`${c.species}-${i}`} className="glass-card" style={{ display: 'flex', gap: '1rem', padding: '0.75rem 1.1rem', alignItems: 'center' }}>
               <div style={{ flex: '0 0 76px', textAlign: 'center', cursor: setSelectedPal ? 'pointer' : 'default' }} onClick={handlePalClick}>
-                <PalInstanceTooltip instance={candPal}>
+                <PalInstanceTooltip instance={candPal} masterPal={masterPal}>
                   <div>
                     {c.icon_path ? (
                       <img src={c.icon_path} alt={c.species} style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />

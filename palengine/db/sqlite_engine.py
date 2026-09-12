@@ -26,24 +26,7 @@ from palengine.parser.extract_settings import extract_world_settings
 from palengine.analytics.breeding_graph import BreedingGraphOptimizer
 
 
-def transform_icon_path(path: Optional[str]) -> Optional[str]:
-    """Converts absolute local asset file paths into web-accessible URL paths (/assets/...)."""
-    if not path:
-        return None
-    normalized = path.replace("\\", "/")
-    assets_dir = get_assets_dir().replace("\\", "/").rstrip("/")
-    if normalized.lower().startswith(assets_dir.lower()):
-        rel_path = normalized[len(assets_dir):]
-        if not rel_path.startswith("/"):
-            rel_path = "/" + rel_path
-        return f"/assets{rel_path}"
-    elif "palworld_assets" in normalized.lower():
-        idx = normalized.lower().find("palworld_assets")
-        rel_path = normalized[idx + len("palworld_assets"):]
-        if not rel_path.startswith("/"):
-            rel_path = "/" + rel_path
-        return f"/assets{rel_path}"
-    return normalized if (normalized.startswith("/") or normalized.startswith("http")) else None
+from palengine.db.utils import transform_icon_path
 
 
 def clean_skill_text(text: Optional[str], pal_name: str = "Pal") -> Optional[str]:
@@ -4329,6 +4312,10 @@ class SQLiteEngine:
                 'passives': [p.get('name') if isinstance(p, dict) else str(p) for p in best.get('passives', [])],
                 'partner_skill_categories': best.get('partner_skill_categories', []),
                 'icon_path': best.get('icon_path'),
+                'paldex_number': best.get('paldex_number'),
+                'work_suitabilities': best.get('work_suitabilities') or best.get('suitabilities', {}),
+                'suitabilities': best.get('suitabilities') or best.get('work_suitabilities', {}),
+                'work_suitability_details': best.get('work_suitability_details', []),
                 'element_1': best.get('element_1'),
                 'element_2': best.get('element_2'),
                 'partner_skill': ps,

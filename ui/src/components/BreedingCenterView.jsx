@@ -192,6 +192,23 @@ export function BreedingCenterView({
     return null;
   };
 
+  const getPalDisplayIcon = (palOrObj) => {
+    if (!palOrObj) return null;
+    if (typeof palOrObj === 'object' && palOrObj !== null) {
+      if (palOrObj.icon_path && !palOrObj.icon_path.endsWith('/png.png')) {
+        return palOrObj.icon_path;
+      }
+      const name = palOrObj.species || palOrObj.display_name || palOrObj.name;
+      const resolved = resolvePalForTooltip(name);
+      return resolved?.icon_path || null;
+    }
+    if (typeof palOrObj === 'string') {
+      const resolved = resolvePalForTooltip(palOrObj);
+      return resolved?.icon_path || null;
+    }
+    return null;
+  };
+
   React.useEffect(() => {
     if ((!availablePalOptions || availablePalOptions.length === 0) && palSourceMode === 'global') {
       fetch('/api/pals')
@@ -502,8 +519,8 @@ export function BreedingCenterView({
                 onClick={() => openPalDetails(breedResult)}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                  {breedResult.icon_path ? (
-                    <img src={breedResult.icon_path} alt={breedResult.display_name} style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  {getPalDisplayIcon(breedResult) ? (
+                    <img src={getPalDisplayIcon(breedResult)} alt={breedResult.display_name} style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
                   ) : (
                     <div style={{ width: '64px', height: '64px', borderRadius: '12px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.5rem' }}>
                       {breedResult.display_name ? breedResult.display_name[0] : 'P'}
@@ -771,8 +788,8 @@ export function BreedingCenterView({
                         <td style={{ fontWeight: 600 }}>
                           <PalInstanceTooltip instance={resolvePalForTooltip(pal)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                              {pal.icon_path ? (
-                                <img src={pal.icon_path} alt={pal.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                              {getPalDisplayIcon(pal) ? (
+                                <img src={getPalDisplayIcon(pal)} alt={pal.display_name} style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
                               ) : (
                                 <span style={{ fontSize: '1rem' }}>🐾</span>
                               )}
@@ -1289,8 +1306,8 @@ export function BreedingCenterView({
                                   openPalDetails(item.species);
                                 }}
                               >
-                                {item.icon_path ? (
-                                  <img src={item.icon_path} alt={item.species} style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                                {getPalDisplayIcon(item) ? (
+                                  <img src={getPalDisplayIcon(item)} alt={item.species} style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
                                 ) : (
                                   <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>
                                     {item.species[0]}
@@ -1841,8 +1858,17 @@ export function BreedingCenterView({
                                   </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  {p1.icon_path && (
-                                    <img src={p1.icon_path} alt="" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
+                                  {getPalDisplayIcon(p1) ? (
+                                    <img
+                                      src={getPalDisplayIcon(p1)}
+                                      alt={p1.species || ''}
+                                      style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }}
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem' }}>
+                                      {p1.species?.[0] || 'P'}
+                                    </div>
                                   )}
                                   <div>
                                     <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'white' }}>
@@ -1885,8 +1911,17 @@ export function BreedingCenterView({
                                   </span>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  {p2.icon_path && (
-                                    <img src={p2.icon_path} alt="" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
+                                  {getPalDisplayIcon(p2) ? (
+                                    <img
+                                      src={getPalDisplayIcon(p2)}
+                                      alt={p2.species || ''}
+                                      style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }}
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.85rem' }}>
+                                      {p2.species?.[0] || 'P'}
+                                    </div>
                                   )}
                                   <div>
                                     <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'white' }}>
@@ -1942,8 +1977,17 @@ export function BreedingCenterView({
                                 </div>
 
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  {child.icon_path && (
-                                    <img src={child.icon_path} alt="" style={{ width: '36px', height: '36px', borderRadius: '8px' }} />
+                                  {getPalDisplayIcon(child) ? (
+                                    <img
+                                      src={getPalDisplayIcon(child)}
+                                      alt={child.species || ''}
+                                      style={{ width: '36px', height: '36px', borderRadius: '8px', objectFit: 'cover' }}
+                                      onError={(e) => { e.target.style.display = 'none'; }}
+                                    />
+                                  ) : (
+                                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'var(--primary-gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.95rem' }}>
+                                      {child.species?.[0] || 'P'}
+                                    </div>
                                   )}
                                   <div>
                                     <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'white' }}>

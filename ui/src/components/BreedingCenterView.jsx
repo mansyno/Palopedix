@@ -209,6 +209,40 @@ export function BreedingCenterView({
     return null;
   };
 
+  const renderParentLocationBadge = (pal) => {
+    if (!pal) return null;
+    if (!pal.is_from_palbox) {
+      return (
+        <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: 'rgba(245, 158, 11, 0.2)', color: '#fbbf24' }}>
+          🐣 Hatched
+        </span>
+      );
+    }
+    if (pal.location === 'base') {
+      const baseName = pal.location_details?.base_camp_name || pal.location_details_base_camp_name || 'Base';
+      return (
+        <span
+          style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', border: '1px solid rgba(168, 85, 247, 0.35)' }}
+          title={`Stationed at Base: ${baseName}`}
+        >
+          🏰 Base: {baseName}
+        </span>
+      );
+    }
+    if (pal.location === 'party') {
+      return (
+        <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', border: '1px solid rgba(34, 197, 94, 0.35)' }}>
+          🎒 In Party
+        </span>
+      );
+    }
+    return (
+      <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: 'rgba(59, 130, 246, 0.2)', color: '#60a5fa' }}>
+        📦 In Palbox
+      </span>
+    );
+  };
+
   React.useEffect(() => {
     if ((!availablePalOptions || availablePalOptions.length === 0) && palSourceMode === 'global') {
       fetch('/api/pals')
@@ -1853,9 +1887,7 @@ export function BreedingCenterView({
                               <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PARENT 1</span>
-                                  <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: p1.is_from_palbox ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: p1.is_from_palbox ? '#60a5fa' : '#fbbf24' }}>
-                                    {p1.is_from_palbox ? '📦 In Palbox' : '🐣 Hatched'}
-                                  </span>
+                                  {renderParentLocationBadge(p1)}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                   {getPalDisplayIcon(p1) ? (
@@ -1906,9 +1938,7 @@ export function BreedingCenterView({
                               <div style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>PARENT 2</span>
-                                  <span style={{ fontSize: '0.68rem', padding: '0.1rem 0.35rem', borderRadius: '4px', background: p2.is_from_palbox ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)', color: p2.is_from_palbox ? '#60a5fa' : '#fbbf24' }}>
-                                    {p2.is_from_palbox ? '📦 In Palbox' : '🐣 Hatched'}
-                                  </span>
+                                  {renderParentLocationBadge(p2)}
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                   {getPalDisplayIcon(p2) ? (

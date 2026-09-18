@@ -44,6 +44,34 @@ def test_sqlite_engine_partner_skill_categories(engine):
     """Verifies Partner Skill Categories aggregation."""
     categories = engine.get_partner_skill_categories()
     assert isinstance(categories, list)
-    assert len(categories) > 0
+    assert len(categories) == 18
     cat_ids = {c["category_id"] for c in categories}
     assert "flying_mount" in cat_ids or "ground_mount" in cat_ids
+    assert "no_active_skill" in cat_ids
+
+    # Verify nested subcategories
+    ranch_cat = next((c for c in categories if c["category_id"] == "ranch_producer"), None)
+    assert ranch_cat is not None
+    assert "subcategories" in ranch_cat
+    assert len(ranch_cat["subcategories"]) >= 10
+    sub_ids = {s["id"] for s in ranch_cat["subcategories"]}
+    assert "milk" in sub_ids
+
+
+def test_sqlite_engine_partner_skill_subcategories_query(engine):
+    """Verifies querying pals by partner_subcategory."""
+    pals = engine.query_pals({
+        "partner_category": "ranch_producer",
+        "partner_subcategory": "milk",
+    })
+    assert len(pals) > 0
+    names = [p["display_name"] for p in pals]
+    assert "Mozzarina" in names
+
+    # Verify partner_skill_subcategories is attached
+    for p in pals:
+        assert "partner_skill_subcategories" in p
+        p_sub_ids = {s["id"] for s in p["partner_skill_subcategories"]}
+        assert "milk" in p_sub_ids
+
+

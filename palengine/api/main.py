@@ -134,6 +134,8 @@ def get_pals(
     suitability: Optional[str] = None,
     partner_category: Optional[str] = None,
     category: Optional[str] = None,
+    partner_subcategory: Optional[str] = None,
+    subcategory: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries the static Paldex database."""
     filters: dict[str, Any] = {}
@@ -145,6 +147,8 @@ def get_pals(
         filters["size"] = size
     if partner_category or category:
         filters["partner_category"] = partner_category or category
+    if partner_subcategory or subcategory:
+        filters["partner_subcategory"] = partner_subcategory or subcategory
 
     if suitability:
         if ":" in suitability:
@@ -171,6 +175,8 @@ def get_instances(
     passive: Optional[str] = None,
     partner_category: Optional[str] = None,
     category: Optional[str] = None,
+    partner_subcategory: Optional[str] = None,
+    subcategory: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries dynamic Pal instances (requires loading save game first)."""
     filters: dict[str, Any] = {}
@@ -186,6 +192,8 @@ def get_instances(
         filters["passive_id"] = passive
     if partner_category or category:
         filters["partner_category"] = partner_category or category
+    if partner_subcategory or subcategory:
+        filters["partner_subcategory"] = partner_subcategory or subcategory
 
     return db_engine.query_instances(filters)
 

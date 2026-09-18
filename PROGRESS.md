@@ -24,3 +24,10 @@
 - [X] Condenser CLI output alignment and non-redundant save load optimization
 - [X] Safe DDL schema initialization for multi-world database switching
 - [X] Base container migration planning and logistics execution
+
+## Phase 6: Partner Skill Categories & Secondary Subcategories
+- [X] Normalized SQLite tables `partner_skill_subcategories` and `pal_partner_skill_subcategories`
+- [X] Deterministic subcategory classification for 8 complex partner skill groups
+- [X] Backend `partner_subcategory` filtering across `SQLiteEngine`, REST API, and CLI
+- [X] Frontend UI integration in Master Paldex, Save Game Explorer, and Advanced Pal Filter modal
+

@@ -58,6 +58,7 @@ function App() {
   const [nocturnalFilter, setNocturnalFilter] = useState('');
   const [suitabilityFilter, setSuitabilityFilter] = useState('');
   const [partnerCategoryFilter, setPartnerCategoryFilter] = useState('');
+  const [partnerSubcategoryFilter, setPartnerSubcategoryFilter] = useState('');
 
   // Save Game State
   const [instances, setInstances] = useState([]);
@@ -75,6 +76,7 @@ function App() {
       if (nocturnalFilter) url += `nocturnal=${nocturnalFilter === 'true'}&`;
       if (suitabilityFilter) url += `suitability=${suitabilityFilter}&`;
       if (partnerCategoryFilter) url += `partner_category=${encodeURIComponent(partnerCategoryFilter)}&`;
+      if (partnerSubcategoryFilter) url += `partner_subcategory=${encodeURIComponent(partnerSubcategoryFilter)}&`;
       
       const res = await fetch(url);
       const data = await res.json();
@@ -259,7 +261,7 @@ function App() {
     if (isEngineReady) {
       fetchPals();
     }
-  }, [isEngineReady, elementFilter, sizeFilter, nocturnalFilter, suitabilityFilter, partnerCategoryFilter]);
+  }, [isEngineReady, elementFilter, sizeFilter, nocturnalFilter, suitabilityFilter, partnerCategoryFilter, partnerSubcategoryFilter]);
 
   useEffect(() => {
     if (isEngineReady) {
@@ -515,7 +517,12 @@ function App() {
             suitabilityFilter={suitabilityFilter}
             setSuitabilityFilter={setSuitabilityFilter}
             partnerCategoryFilter={partnerCategoryFilter}
-            setPartnerCategoryFilter={setPartnerCategoryFilter}
+            setPartnerCategoryFilter={(val) => {
+              setPartnerCategoryFilter(val);
+              setPartnerSubcategoryFilter('');
+            }}
+            partnerSubcategoryFilter={partnerSubcategoryFilter}
+            setPartnerSubcategoryFilter={setPartnerSubcategoryFilter}
           />
         </TabKeepAlive>
 

@@ -13,6 +13,7 @@ import {
 } from './common/PalFilterModal';
 import { getElementIconUrl } from '../constants/gameData';
 import { exportToJson } from '../utils/exportJson';
+import { findSubcategoryLabel } from '../constants/partnerCategories';
 
 const SHORT_CATEGORY_NAMES = {
   flying_mount: 'Fly',
@@ -39,6 +40,7 @@ const SHORT_CATEGORY_NAMES = {
 
 const DEFAULT_FILTERS = {
   partnerGroup: '',
+  partnerSubgroup: '',
   location: '',
   species: '',
   gender: '',
@@ -141,6 +143,7 @@ export function SaveGameExplorerView({
   const activeModalFiltersCount = useMemo(() => {
     return (
       (activeFilters.partnerGroup ? 1 : 0) +
+      (activeFilters.partnerSubgroup ? 1 : 0) +
       (activeFilters.location ? 1 : 0) +
       (activeFilters.species ? 1 : 0) +
       (activeFilters.gender ? 1 : 0) +
@@ -221,6 +224,16 @@ export function SaveGameExplorerView({
           ? pi.partner_skill_categories
           : (pals.find(p => p.display_name?.toLowerCase() === (pi.display_name || '').toLowerCase())?.partner_skill_categories || []);
         if (!cats.some(c => c.id === activeFilters.partnerGroup || c.name?.toLowerCase() === activeFilters.partnerGroup.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Partner Subgroup
+      if (activeFilters.partnerSubgroup) {
+        const subcats = (pi.partner_skill_subcategories && pi.partner_skill_subcategories.length > 0)
+          ? pi.partner_skill_subcategories
+          : (pals.find(p => p.display_name?.toLowerCase() === (pi.display_name || '').toLowerCase())?.partner_skill_subcategories || []);
+        if (!subcats.some(sc => sc.id === activeFilters.partnerSubgroup || sc.name?.toLowerCase() === activeFilters.partnerSubgroup.toLowerCase())) {
           return false;
         }
       }
@@ -344,6 +357,14 @@ export function SaveGameExplorerView({
       if (activeFilters.partnerGroup) {
         const cats = pal.partner_skill_categories || [];
         if (!cats.some(c => c.id === activeFilters.partnerGroup || c.name?.toLowerCase() === activeFilters.partnerGroup.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Partner Subgroup
+      if (activeFilters.partnerSubgroup) {
+        const subcats = pal.partner_skill_subcategories || [];
+        if (!subcats.some(sc => sc.id === activeFilters.partnerSubgroup || sc.name?.toLowerCase() === activeFilters.partnerSubgroup.toLowerCase())) {
           return false;
         }
       }
@@ -760,7 +781,15 @@ export function SaveGameExplorerView({
               {activeFilters.partnerGroup && (
                 <span className="badge" style={{ ...chipBadgeStyle, background: 'rgba(234, 179, 8, 0.2)', border: '1px solid rgba(234, 179, 8, 0.4)', color: '#fef08a' }}>
                   <span>{PARTNER_GROUP_OPTIONS.find(o => o.value === activeFilters.partnerGroup)?.label || `Group: ${activeFilters.partnerGroup}`}</span>
-                  <button onClick={() => pushFilterState({ ...activeFilters, partnerGroup: '' })} style={chipCloseBtnStyle} title="Remove filter">✕</button>
+                  <button onClick={() => pushFilterState({ ...activeFilters, partnerGroup: '', partnerSubgroup: '' })} style={chipCloseBtnStyle} title="Remove filter">✕</button>
+                </span>
+              )}
+
+              {/* Partner Subgroup Chip */}
+              {activeFilters.partnerSubgroup && (
+                <span className="badge" style={{ ...chipBadgeStyle, background: 'rgba(245, 158, 11, 0.22)', border: '1px solid rgba(245, 158, 11, 0.45)', color: '#fed7aa' }}>
+                  <span>🎯 {findSubcategoryLabel(activeFilters.partnerGroup, activeFilters.partnerSubgroup)}</span>
+                  <button onClick={() => pushFilterState({ ...activeFilters, partnerSubgroup: '' })} style={chipCloseBtnStyle} title="Remove filter">✕</button>
                 </span>
               )}
 

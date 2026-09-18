@@ -116,6 +116,7 @@ def cli(ctx: click.Context, format: str) -> None:
 )
 @click.option("--size", type=click.Choice(["XS", "S", "M", "L", "XL"]), help="Filter by size.")
 @click.option("--category", "-c", help="Filter by Partner Skill category (e.g. flying_mount, 'Flying Mounts').")
+@click.option("--subcategory", "-sub", help="Filter by Partner Skill subcategory (e.g. milk, fire, mounted_artillery).")
 @click.pass_context
 def pals(
     ctx: click.Context,
@@ -124,6 +125,7 @@ def pals(
     suitability: Optional[str],
     size: Optional[str],
     category: Optional[str],
+    subcategory: Optional[str] = None,
 ) -> None:
     """Queries the static Paldex database."""
     engine: SQLiteEngine = ctx.obj["engine"]
@@ -137,6 +139,8 @@ def pals(
         filters["size"] = size
     if category:
         filters["partner_category"] = category
+    if subcategory:
+        filters["partner_subcategory"] = subcategory
 
     if suitability:
         if ":" in suitability:
@@ -178,6 +182,7 @@ def pals(
 )
 @click.option("--passive", help="Filter by passive skill ID.")
 @click.option("--category", "-c", help="Filter by Partner Skill category (e.g. flying_mount, 'Flying Mounts').")
+@click.option("--subcategory", "-sub", help="Filter by Partner Skill subcategory (e.g. milk, fire, mounted_artillery).")
 @click.pass_context
 def instances(
     ctx: click.Context,
@@ -189,6 +194,7 @@ def instances(
     min_iv: Optional[str],
     passive: Optional[str],
     category: Optional[str],
+    subcategory: Optional[str] = None,
 ) -> None:
     """Queries dynamic Pal instances from the save game."""
     engine: SQLiteEngine = ctx.obj["engine"]
@@ -210,6 +216,8 @@ def instances(
         filters["passive_id"] = passive
     if category:
         filters["partner_category"] = category
+    if subcategory:
+        filters["partner_subcategory"] = subcategory
 
     if min_iv and ":" in min_iv:
         stat, val = min_iv.split(":", 1)

@@ -21,9 +21,11 @@ Queries the static Paldex database without requiring a save file.
   * `--nocturnal`, `-n`: Filter by nocturnal habits.
   * `--suitability`, `-s`: Filter by work suitability in `name:level` or `name` format (e.g. `handiwork:3`, `kindling:2`).
   * `--size`: Filter by Pal size (`XS`, `S`, `M`, `L`, `XL`).
+  * `--category`, `-c`: Filter by Partner Skill category (e.g. `flying_mount`, `ranch_producer`).
+  * `--subcategory`, `-sub`: Filter by Partner Skill subcategory (e.g. `milk`, `fire`, `mounted_artillery`).
 * **Example**:
   ```bash
-  python -m palengine.cli.main --format json pals -e Dragon -s mining:3
+  python -m palengine.cli.main --format json pals -c ranch_producer --subcategory milk
   ```
 
 ### 2. `instances` (Save Game Pal Instances)
@@ -36,6 +38,8 @@ Queries dynamic caught Pal instances from player save data.
   * `--min-level`: Filter by minimum Pal level.
   * `--min-iv`: Filter by minimum IV in `stat:val` format (e.g. `attack:80`, `defense:70`).
   * `--passive`: Filter by passive skill ID.
+  * `--category`, `-c`: Filter by Partner Skill category (e.g. `flying_mount`, `ranch_producer`).
+  * `--subcategory`, `-sub`: Filter by Partner Skill subcategory (e.g. `milk`, `fire`, `mounted_artillery`).
 * **Example**:
   ```bash
   python -m palengine.cli.main --format json instances -s Anubis --location palbox

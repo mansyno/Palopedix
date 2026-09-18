@@ -50,7 +50,7 @@ Palopedix provides three distinct interfaces to fit your workflow:
 - **Crafted Status Badges**: Displays `✅ Crafted & Ready` or `🔒 Not Crafted` across all Pal tooltips, modals, and filters for saddles, harnesses, gloves, and weapons.
 
 ### 7. 📖 Paldex, Skills & Tech Tree Catalog
-- **18 Partner Skill Categories**: Deterministically classifies all partner abilities (Flying Mounts, Ground Mounts, Ranch Producers, Player Infusions, Artillery, Combat Buffs, Healers, Item Droppers, etc.).
+- **18 Partner Skill Categories & Secondary Subcategories**: Deterministically classifies all partner abilities (Flying Mounts, Ground Mounts, Ranch Producers, Player Infusions, Artillery, Combat Buffs, Healers, Item Droppers, etc.) with secondary subfiltering across 8 major groups (e.g. produced item types, infused elements, enemy loot target elements, weapon classes, elemental auras, healing styles, and carrying weight targets).
 - **Authentic Scaling (Lv 1–5)**: Shows exact partner skill stat and damage increases for every condensation rank.
 - **Skills & Crafting Recipes**: Browse equipment, spheres, ammunition, structures, exact ingredient recipes, and ancient technology unlocks.
 

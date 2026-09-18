@@ -35,7 +35,7 @@ The CLI tool is located at `palengine/cli/main.py` and supports `--format json` 
 ### A. Paldex & Static Game Data
 * **Query Static Pals**:
   ```bash
-  python -m palengine.cli.main --format json pals [-e Element] [-n] [-s Suitability:Level] [--size XS|S|M|L|XL] [-c Category]
+  python -m palengine.cli.main --format json pals [-e Element] [-n] [-s Suitability:Level] [--size XS|S|M|L|XL] [-c Category] [-sub Subcategory]
   ```
 * **Breeding Outcome (2 Parents)**:
   ```bash
@@ -49,7 +49,7 @@ The CLI tool is located at `palengine/cli/main.py` and supports `--format json` 
 ### B. Save Game Dynamic Data (Auto-discovers `Level.sav` or uses `-p <path>`)
 * **Query Caught Pal Instances**:
   ```bash
-  python -m palengine.cli.main --format json instances [-l party|palbox|base] [-s Species] [-g Male|Female] [--min-level N] [--min-iv stat:val] [--passive PASSIVE_ID]
+  python -m palengine.cli.main --format json instances [-l party|palbox|base] [-s Species] [-g Male|Female] [--min-level N] [--min-iv stat:val] [--passive PASSIVE_ID] [-c Category] [-sub Subcategory]
   ```
 * **Query Condensing Candidates**:
   ```bash
@@ -97,9 +97,9 @@ if save_path:
     engine.load_save_data(save_path)
 
 # Built-in query methods:
-pals = engine.query_pals(filters)  # Supports element, size, nocturnal, work_suitability, partner_category, and enriches gear & scaling
-categories = engine.get_partner_skill_categories()  # Returns all 18 Partner Skill categories with counts
-instances = engine.query_instances(filters)  # Returns instances with IVs, rank-scaled partner skills, and gear crafted status
+pals = engine.query_pals(filters)  # Supports element, size, nocturnal, work_suitability, partner_category, partner_subcategory, and enriches gear & scaling
+categories = engine.get_partner_skill_categories()  # Returns all 18 Partner Skill categories with counts and nested subcategories
+instances = engine.query_instances(filters)  # Returns instances with IVs, partner_category/subcategory, rank-scaled partner skills, and gear crafted status
 pal_gear_map = engine.get_pal_gear_map()  # Maps pal_id/internal_name -> {item_id, name, icon_path}
 crafted_gear = engine.get_crafted_palgear_set()  # Returns set of lowercase item IDs in player's Key Items
 condense_candidates = engine.get_condense_candidates()
@@ -119,9 +119,9 @@ breeding_paths = engine.find_all_breeding_paths(owned_list, target_species, targ
 FastAPI runs at `http://localhost:8000`:
 * `GET /api/worlds`: Discovered save game worlds.
 * `POST /api/worlds/select`: Switch active world database.
-* `GET /api/pals`: Query static Paldex with query params (`element`, `size`, `nocturnal`, `suitability`, `partner_category`). Enriches each Pal with rank scaling and `gear` object.
-* `GET /api/pals/partner-skill-categories`: List all Partner Skill categories with metadata and Pal counts.
-* `GET /api/save/instances`: Query loaded save instances (includes `gear` with real-time `is_crafted` status).
+* `GET /api/pals`: Query static Paldex with query params (`element`, `size`, `nocturnal`, `suitability`, `partner_category`, `partner_subcategory`). Enriches each Pal with rank scaling, partner skill categories/subcategories, and `gear` object.
+* `GET /api/pals/partner-skill-categories`: List all 18 Partner Skill categories with metadata, Pal counts, and nested subcategories.
+* `GET /api/save/instances`: Query loaded save instances (supports `partner_category`, `partner_subcategory`, includes `gear` with real-time `is_crafted` status).
 * `GET /api/save/condense`: Get condensing candidates with keeper & fodder breakdown.
 * `GET /api/save/missions`: Active uncompleted NPC sub-missions with inventory & Palbox fulfillment status.
 * `GET /api/bases` & `GET /api/bases/{id}`: Base camps & structures.

@@ -110,3 +110,45 @@ def test_api_get_pals_with_partner_category():
         mock_fn.assert_called_once_with({"partner_category": "flying_mount"})
 
 
+def test_api_get_pals_with_partner_subcategory():
+    mock_pals = [
+        {
+            "display_name": "Mozzarina",
+            "partner_skill_categories": [{"id": "ranch_producer", "name": "Ranch Item Producers"}],
+            "partner_skill_subcategories": [{"id": "milk", "name": "Milk", "parent_category_id": "ranch_producer"}],
+        }
+    ]
+    with patch("palengine.api.main.db_engine.query_pals", return_value=mock_pals) as mock_fn:
+        response = client.get("/api/pals?partner_category=ranch_producer&partner_subcategory=milk")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        assert data[0]["display_name"] == "Mozzarina"
+        mock_fn.assert_called_once_with({
+            "partner_category": "ranch_producer",
+            "partner_subcategory": "milk",
+        })
+
+
+def test_api_get_instances_with_partner_subcategory():
+    mock_instances = [
+        {
+            "instance_id": "inst-1",
+            "species": "Mozzarina",
+            "partner_skill_categories": [{"id": "ranch_producer", "name": "Ranch Item Producers"}],
+            "partner_skill_subcategories": [{"id": "milk", "name": "Milk", "parent_category_id": "ranch_producer"}],
+        }
+    ]
+    with patch("palengine.api.main.db_engine.query_instances", return_value=mock_instances) as mock_fn:
+        response = client.get("/api/save/instances?partner_category=ranch_producer&partner_subcategory=milk")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data) == 1
+        mock_fn.assert_called_once_with({
+            "partner_category": "ranch_producer",
+            "partner_subcategory": "milk",
+        })
+
+
+
+

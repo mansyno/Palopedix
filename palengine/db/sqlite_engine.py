@@ -347,6 +347,88 @@ PARTNER_SKILL_CATEGORY_DEFS: list[dict[str, Any]] = [
     },
 ]
 
+PARTNER_SKILL_SUBCATEGORY_DEFS: list[dict[str, Any]] = [
+    # ── 1. Ranch Producers (ranch_producer) ──
+    {"category_id": "ranch_producer", "subcategory_id": "egg", "name": "Eggs", "icon": "🥚", "sort_order": 1},
+    {"category_id": "ranch_producer", "subcategory_id": "milk", "name": "Milk", "icon": "🥛", "sort_order": 2},
+    {"category_id": "ranch_producer", "subcategory_id": "honey", "name": "Honey", "icon": "🍯", "sort_order": 3},
+    {"category_id": "ranch_producer", "subcategory_id": "berries", "name": "Red Berries", "icon": "🍒", "sort_order": 4},
+    {"category_id": "ranch_producer", "subcategory_id": "mushrooms", "name": "Mushrooms", "icon": "🍄", "sort_order": 5},
+    {"category_id": "ranch_producer", "subcategory_id": "wool", "name": "Wool", "icon": "🧶", "sort_order": 6},
+    {"category_id": "ranch_producer", "subcategory_id": "high_quality_cloth", "name": "High Quality Cloth", "icon": "🧵", "sort_order": 7},
+    {"category_id": "ranch_producer", "subcategory_id": "flame_organ", "name": "Flame Organ", "icon": "🔥", "sort_order": 8},
+    {"category_id": "ranch_producer", "subcategory_id": "ice_organ", "name": "Ice Organ", "icon": "❄️", "sort_order": 9},
+    {"category_id": "ranch_producer", "subcategory_id": "electric_organ", "name": "Electric Organ", "icon": "⚡", "sort_order": 10},
+    {"category_id": "ranch_producer", "subcategory_id": "pal_fluids", "name": "Pal Fluids", "icon": "💧", "sort_order": 11},
+    {"category_id": "ranch_producer", "subcategory_id": "pal_oil", "name": "High Quality Pal Oil", "icon": "🛢️", "sort_order": 12},
+    {"category_id": "ranch_producer", "subcategory_id": "venom_gland", "name": "Venom Gland", "icon": "🧪", "sort_order": 13},
+    {"category_id": "ranch_producer", "subcategory_id": "bone", "name": "Bone", "icon": "🦴", "sort_order": 14},
+    {"category_id": "ranch_producer", "subcategory_id": "leather", "name": "Leather", "icon": "🛡️", "sort_order": 15},
+    {"category_id": "ranch_producer", "subcategory_id": "gold_coins", "name": "Gold Coins", "icon": "🪙", "sort_order": 16},
+    {"category_id": "ranch_producer", "subcategory_id": "cotton_candy", "name": "Cotton Candy", "icon": "🍭", "sort_order": 17},
+    {"category_id": "ranch_producer", "subcategory_id": "excavated_items", "name": "Spheres & Excavated Items", "icon": "🔮", "sort_order": 18},
+    {"category_id": "ranch_producer", "subcategory_id": "seeds", "name": "Seeds", "icon": "🌱", "sort_order": 19},
+
+    # ── 2. Player Element Infusion (player_element_infusion) ──
+    {"category_id": "player_element_infusion", "subcategory_id": "fire", "name": "Fire Infusion", "icon": "🔥", "sort_order": 1},
+    {"category_id": "player_element_infusion", "subcategory_id": "water", "name": "Water Infusion", "icon": "💧", "sort_order": 2},
+    {"category_id": "player_element_infusion", "subcategory_id": "electric", "name": "Electric Infusion", "icon": "⚡", "sort_order": 3},
+    {"category_id": "player_element_infusion", "subcategory_id": "ice", "name": "Ice Infusion", "icon": "❄️", "sort_order": 4},
+    {"category_id": "player_element_infusion", "subcategory_id": "dark", "name": "Dark Infusion", "icon": "🌑", "sort_order": 5},
+    {"category_id": "player_element_infusion", "subcategory_id": "grass", "name": "Grass Infusion", "icon": "🍃", "sort_order": 6},
+    {"category_id": "player_element_infusion", "subcategory_id": "ground", "name": "Ground Infusion", "icon": "⛰️", "sort_order": 7},
+    {"category_id": "player_element_infusion", "subcategory_id": "dragon", "name": "Dragon Infusion", "icon": "🐉", "sort_order": 8},
+
+    # ── 3. Drop Rate & Loot Boosters (drop_loot_booster) ──
+    {"category_id": "drop_loot_booster", "subcategory_id": "dark", "name": "Dark Pals Drops", "icon": "🌑", "sort_order": 1},
+    {"category_id": "drop_loot_booster", "subcategory_id": "dragon", "name": "Dragon Pals Drops", "icon": "🐉", "sort_order": 2},
+    {"category_id": "drop_loot_booster", "subcategory_id": "electric", "name": "Electric Pals Drops", "icon": "⚡", "sort_order": 3},
+    {"category_id": "drop_loot_booster", "subcategory_id": "fire", "name": "Fire Pals Drops", "icon": "🔥", "sort_order": 4},
+    {"category_id": "drop_loot_booster", "subcategory_id": "grass", "name": "Grass Pals Drops", "icon": "🍃", "sort_order": 5},
+    {"category_id": "drop_loot_booster", "subcategory_id": "ground", "name": "Ground Pals Drops", "icon": "⛰️", "sort_order": 6},
+    {"category_id": "drop_loot_booster", "subcategory_id": "ice", "name": "Ice Pals Drops", "icon": "❄️", "sort_order": 7},
+    {"category_id": "drop_loot_booster", "subcategory_id": "neutral", "name": "Neutral Pals Drops", "icon": "⚪", "sort_order": 8},
+    {"category_id": "drop_loot_booster", "subcategory_id": "water", "name": "Water Pals Drops", "icon": "💧", "sort_order": 9},
+    {"category_id": "drop_loot_booster", "subcategory_id": "pal_souls", "name": "Pal Souls Boost", "icon": "👻", "sort_order": 10},
+
+    # ── 4. Carrying Capacity Boosters (carrying_capacity) ──
+    {"category_id": "carrying_capacity", "subcategory_id": "flat_max_weight", "name": "Max Weight Increase", "icon": "🎒", "sort_order": 1},
+    {"category_id": "carrying_capacity", "subcategory_id": "ore_weight", "name": "Ore & Stone Weight", "icon": "⛏️", "sort_order": 2},
+    {"category_id": "carrying_capacity", "subcategory_id": "wood_weight", "name": "Wood & Timber Weight", "icon": "🌲", "sort_order": 3},
+    {"category_id": "carrying_capacity", "subcategory_id": "food_weight", "name": "Food & Ingredients Weight", "icon": "🍎", "sort_order": 4},
+    {"category_id": "carrying_capacity", "subcategory_id": "weapon_weight", "name": "Weapons Weight", "icon": "⚔️", "sort_order": 5},
+
+    # ── 5. Healers & Life-Steal (healer_lifesteal) ──
+    {"category_id": "healer_lifesteal", "subcategory_id": "active_burst_heal", "name": "Active Burst Heal", "icon": "💖", "sort_order": 1},
+    {"category_id": "healer_lifesteal", "subcategory_id": "life_steal", "name": "Life Steal (Vampiric)", "icon": "🩸", "sort_order": 2},
+    {"category_id": "healer_lifesteal", "subcategory_id": "continuous_regen", "name": "Continuous HP Regen", "icon": "✨", "sort_order": 3},
+    {"category_id": "healer_lifesteal", "subcategory_id": "emergency_revive", "name": "Emergency Heal / Revive", "icon": "🛡️", "sort_order": 4},
+
+    # ── 6. Heavy Artillery & Direct Weapons (heavy_artillery) ──
+    {"category_id": "heavy_artillery", "subcategory_id": "mounted_artillery", "name": "Mounted Artillery (Missile / Grenade / Minigun)", "icon": "🚀", "sort_order": 1},
+    {"category_id": "heavy_artillery", "subcategory_id": "handheld_weapons", "name": "Player Wielded (Launcher / Flamethrower / Blade)", "icon": "🗡️", "sort_order": 2},
+    {"category_id": "heavy_artillery", "subcategory_id": "support_gunfire", "name": "Autonomous Fire Support (Rifle / SMG / Shotgun)", "icon": "🔫", "sort_order": 3},
+
+    # ── 7. Pal / Party Combat Buffers (party_pal_buffer) ──
+    {"category_id": "party_pal_buffer", "subcategory_id": "fire_aura", "name": "Fire Pals Buff", "icon": "🔥", "sort_order": 1},
+    {"category_id": "party_pal_buffer", "subcategory_id": "water_aura", "name": "Water Pals Buff", "icon": "💧", "sort_order": 2},
+    {"category_id": "party_pal_buffer", "subcategory_id": "electric_aura", "name": "Electric Pals Buff", "icon": "⚡", "sort_order": 3},
+    {"category_id": "party_pal_buffer", "subcategory_id": "ground_aura", "name": "Ground Pals Buff", "icon": "⛰️", "sort_order": 4},
+    {"category_id": "party_pal_buffer", "subcategory_id": "ice_aura", "name": "Ice Pals Buff", "icon": "❄️", "sort_order": 5},
+    {"category_id": "party_pal_buffer", "subcategory_id": "grass_aura", "name": "Grass Pals Buff", "icon": "🍃", "sort_order": 6},
+    {"category_id": "party_pal_buffer", "subcategory_id": "dark_aura", "name": "Dark Pals Buff", "icon": "🌑", "sort_order": 7},
+    {"category_id": "party_pal_buffer", "subcategory_id": "dragon_aura", "name": "Dragon Pals Buff", "icon": "🐉", "sort_order": 8},
+    {"category_id": "party_pal_buffer", "subcategory_id": "neutral_aura", "name": "Neutral Pals Buff", "icon": "⚪", "sort_order": 9},
+    {"category_id": "party_pal_buffer", "subcategory_id": "misc", "name": "Team Synergy & Self-Buffers (Misc)", "icon": "🛡️", "sort_order": 10},
+
+    # ── 8. Player Combat Buffers (player_combat_buffer) ──
+    {"category_id": "player_combat_buffer", "subcategory_id": "element_buff_resist", "name": "Damage Resistance, Affliction & Status", "icon": "🔰", "sort_order": 1},
+    {"category_id": "player_combat_buffer", "subcategory_id": "attack_boost", "name": "Player Attack Boost", "icon": "⚔️", "sort_order": 2},
+    {"category_id": "player_combat_buffer", "subcategory_id": "defense_boost", "name": "Player Defense & Damage Reduction", "icon": "🛡️", "sort_order": 3},
+    {"category_id": "player_combat_buffer", "subcategory_id": "weak_point_crit", "name": "Weak Point & Critical Strike", "icon": "🎯", "sort_order": 4},
+    {"category_id": "player_combat_buffer", "subcategory_id": "weapon_mastery", "name": "Weapon Type Mastery (Shotgun / Melee / Bow)", "icon": "🏹", "sort_order": 5},
+]
+
 PASSIVE_SKILL_MODIFIER_DEFS: list[dict[str, Any]] = [
     # ── Work Speed Modifiers ──
     {"passive_id": "WorldTree_CraftSpeed", "name": "Demon's Hand", "work_speed_mod": 0.90, "san_decay_pts": -15.0},
@@ -584,6 +666,125 @@ def classify_pal_partner_categories(
         cats.append("exploration_survival")
 
     return cats if cats else ["no_active_skill"]
+
+
+def classify_pal_partner_subcategories(
+    pal_name: str,
+    partner_skill_name: Optional[str],
+    partner_skill_desc: Optional[str],
+    category_id: str,
+) -> list[str]:
+    """Deterministically classifies a Pal within a specific Partner Skill category into subcategories."""
+    ps_name = str(partner_skill_name or "").strip().lower()
+    desc = str(partner_skill_desc or "").strip().lower()
+    text = f"{pal_name.lower()} {ps_name} {desc}"
+
+    subs: list[str] = []
+
+    if category_id == "ranch_producer":
+        if "egg" in text and ("lays" in text or "lay" in text or "egg layer" in text):
+            subs.append("egg")
+        if "milk" in text:
+            subs.append("milk")
+        if "honey" in text:
+            subs.append("honey")
+        if ("red berries" in text or "berries" in text) and "ranch" in text:
+            subs.append("berries")
+        if "mushroom" in text:
+            subs.append("mushrooms")
+        if "wool" in text and "cloth" not in text:
+            subs.append("wool")
+        if "cloth" in text:
+            subs.append("high_quality_cloth")
+        if "flame organ" in text:
+            subs.append("flame_organ")
+        if "ice organ" in text:
+            subs.append("ice_organ")
+        if "electric organ" in text:
+            subs.append("electric_organ")
+        if "pal fluid" in text:
+            subs.append("pal_fluids")
+        if "pal oil" in text:
+            subs.append("pal_oil")
+        if "venom gland" in text:
+            subs.append("venom_gland")
+        if "bone" in text:
+            subs.append("bone")
+        if "leather" in text:
+            subs.append("leather")
+        if "gold coin" in text or "gold" in text:
+            subs.append("gold_coins")
+        if "cotton candy" in text:
+            subs.append("cotton_candy")
+        if "dig here" in text or ("ground" in text and "digs" in text) or "excavat" in text:
+            subs.append("excavated_items")
+        if "seeds" in text:
+            subs.append("seeds")
+
+    elif category_id == "player_element_infusion":
+        for el in ["fire", "water", "electric", "ice", "dark", "grass", "ground", "dragon"]:
+            if f"attack type to {el}" in desc or f"type to {el}" in desc:
+                subs.append(el)
+
+    elif category_id == "drop_loot_booster":
+        for el in ["dark", "dragon", "electric", "fire", "grass", "ground", "ice", "neutral", "water"]:
+            if f"{el} pals drop" in desc:
+                subs.append(el)
+        if "pal soul" in desc:
+            subs.append("pal_souls")
+
+    elif category_id == "carrying_capacity":
+        if "max carrying capacity" in desc or "carrying capacity increases" in desc:
+            subs.append("flat_max_weight")
+        if any(k in desc for k in ["ore", "stone", "sulfur", "coal"]):
+            subs.append("ore_weight")
+        if "wood" in desc or "logging" in desc:
+            subs.append("wood_weight")
+        if "food" in desc or "ingredient" in desc:
+            subs.append("food_weight")
+        if "weapon" in desc:
+            subs.append("weapon_weight")
+
+    elif category_id == "healer_lifesteal":
+        if "when activated" in desc and ("restore" in desc and "health" in desc):
+            subs.append("active_burst_heal")
+        if "life steal" in desc:
+            subs.append("life_steal")
+        if "per second" in desc and "health" in desc:
+            subs.append("continuous_regen")
+        if any(k in desc for k in ["falls below", "incapacitated", "revive"]):
+            subs.append("emergency_revive")
+
+    elif category_id == "heavy_artillery":
+        if any(k in desc for k in ["missile", "grenade", "minigun"]) and "mounted" in desc:
+            subs.append("mounted_artillery")
+        elif any(k in desc for k in ["flamethrower", "rocket launcher", "egg launcher", "katana", "thrown", "bomb"]):
+            subs.append("handheld_weapons")
+        elif any(k in desc for k in ["assault rifle", "submachine gun", "shotgun", "bombards", "weapon-wielding"]):
+            subs.append("support_gunfire")
+
+    elif category_id == "party_pal_buffer":
+        found_aura = False
+        for el in ["fire", "water", "electric", "ground", "ice", "grass", "dark", "dragon", "neutral"]:
+            if f"{el} pals" in desc and any(k in desc for k in ["increases attack", "increases defense"]):
+                subs.append(f"{el}_aura")
+                found_aura = True
+        if not found_aura:
+            subs.append("misc")
+
+    elif category_id == "player_combat_buffer":
+        if any(k in desc for k in ["less", "immune", "resistance", "elemental weakness", "enchant", "afflicted with", "lava"]):
+            subs.append("element_buff_resist")
+        if ("player's attack" in desc or "player attack" in desc) and "element_buff_resist" not in subs:
+            subs.append("attack_boost")
+        if any(k in desc for k in ["player's defense", "player defense", "reduced damage", "barrier", "dodge"]):
+            subs.append("defense_boost")
+        if "weak point" in desc or "critical" in desc:
+            subs.append("weak_point_crit")
+        if any(k in desc for k in ["shotgun", "melee", "bow", "weapon"]):
+            subs.append("weapon_mastery")
+
+    return subs
 
 
 class SQLiteEngine:
@@ -1568,6 +1769,12 @@ class SQLiteEngine:
                     "INSERT OR REPLACE INTO partner_skill_categories (category_id, name, description, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
                     (cat["category_id"], cat["name"], cat["description"], cat["icon"], cat["sort_order"]),
                 )
+        else:
+            for cat in PARTNER_SKILL_CATEGORY_DEFS:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO partner_skill_categories (category_id, name, description, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
+                    (cat["category_id"], cat["name"], cat["description"], cat["icon"], cat["sort_order"]),
+                )
 
         cursor.execute(
             """
@@ -1631,6 +1838,90 @@ class SQLiteEngine:
                         )
             except Exception as e:
                 print(f"Warning populating partner skill categories: {e}")
+
+        # ---------- Partner Skill Subcategories Table Setup & Population ----------
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS partner_skill_subcategories (
+                category_id TEXT,
+                subcategory_id TEXT,
+                name TEXT,
+                icon TEXT,
+                sort_order INTEGER,
+                PRIMARY KEY (category_id, subcategory_id)
+            )
+            """
+        )
+        for scat in PARTNER_SKILL_SUBCATEGORY_DEFS:
+            cursor.execute(
+                "INSERT OR REPLACE INTO partner_skill_subcategories (category_id, subcategory_id, name, icon, sort_order) VALUES (?, ?, ?, ?, ?)",
+                (scat["category_id"], scat["subcategory_id"], scat["name"], scat["icon"], scat["sort_order"]),
+            )
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pal_partner_skill_subcategories (
+                pal_internal_name TEXT,
+                category_id TEXT,
+                subcategory_id TEXT,
+                PRIMARY KEY (pal_internal_name, category_id, subcategory_id)
+            )
+            """
+        )
+
+        use_palworld_db = (
+            self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
+        )
+        try:
+            subcat_pal_rows = cursor.execute(
+                """
+                SELECT p.internal_name, p.display_name, p.id, p.code,
+                       ps.name as partner_name, ps.description as partner_desc,
+                       pc.category_id
+                FROM pals p
+                JOIN pal_partner_skill_categories pc ON LOWER(p.internal_name) = LOWER(pc.pal_internal_name)
+                                                    OR LOWER(p.id) = LOWER(pc.pal_internal_name)
+                                                    OR LOWER(p.code) = LOWER(pc.pal_internal_name)
+                LEFT JOIN partner_skills ps ON LOWER(p.internal_name) = LOWER(ps.pal_internal_name)
+                                            OR LOWER(p.id) = LOWER(ps.pal_internal_name)
+                                            OR LOWER(p.code) = LOWER(ps.pal_internal_name)
+                """
+            ).fetchall()
+
+            for spr in subcat_pal_rows:
+                pal_key = spr["internal_name"] or spr["id"] or spr["code"]
+                p_display = spr["display_name"]
+                ps_name = spr["partner_name"]
+                ps_desc = spr["partner_desc"]
+                c_id = spr["category_id"]
+
+                if use_palworld_db and (not ps_name or not ps_desc):
+                    try:
+                        s_row = cursor.execute(
+                            """
+                            SELECT s.name, s.description
+                            FROM palworld_master.pal_skills ps
+                            JOIN palworld_master.skills s ON ps.skill_id = s.id
+                            WHERE (LOWER(ps.pal_id) = LOWER(?) OR ps.pal_id = ?)
+                              AND (s.type = 'Partner' OR s.category = 'Partner' OR s.category LIKE 'Partner%')
+                            LIMIT 1
+                            """,
+                            (pal_key, pal_key),
+                        ).fetchone()
+                        if s_row:
+                            ps_name = s_row["name"]
+                            ps_desc = clean_skill_text(s_row["description"])
+                    except Exception:
+                        pass
+
+                subs = classify_pal_partner_subcategories(p_display, ps_name, ps_desc, c_id)
+                for s in subs:
+                    cursor.execute(
+                        "INSERT OR IGNORE INTO pal_partner_skill_subcategories (pal_internal_name, category_id, subcategory_id) VALUES (?, ?, ?)",
+                        (pal_key, c_id, s),
+                    )
+        except Exception as e:
+            print(f"Warning populating partner skill subcategories: {e}")
 
         # ---------- Passive Skill Modifiers Table Setup & Population ----------
         cursor.execute(
@@ -3099,6 +3390,22 @@ class SQLiteEngine:
             )"""
             params.extend([raw_cat, raw_cat, raw_cat, raw_cat, raw_cat, raw_cat])
 
+        if "partner_subcategory" in filters and filters["partner_subcategory"]:
+            raw_sub = str(filters["partner_subcategory"]).strip().lower()
+            query += """ AND (
+                LOWER(internal_name) IN (
+                    SELECT LOWER(pal_internal_name) FROM pal_partner_skill_subcategories
+                    WHERE LOWER(subcategory_id) = LOWER(?) OR LOWER(subcategory_id) = LOWER(REPLACE(?, ' ', '_'))
+                       OR subcategory_id IN (SELECT subcategory_id FROM partner_skill_subcategories WHERE LOWER(name) = LOWER(?))
+                )
+                OR LOWER(id) IN (
+                    SELECT LOWER(pal_internal_name) FROM pal_partner_skill_subcategories
+                    WHERE LOWER(subcategory_id) = LOWER(?) OR LOWER(subcategory_id) = LOWER(REPLACE(?, ' ', '_'))
+                       OR subcategory_id IN (SELECT subcategory_id FROM partner_skill_subcategories WHERE LOWER(name) = LOWER(?))
+                )
+            )"""
+            params.extend([raw_sub, raw_sub, raw_sub, raw_sub, raw_sub, raw_sub])
+
         query += " ORDER BY paldex_number ASC"
 
         rows = self.conn.execute(query, params).fetchall()
@@ -3305,7 +3612,7 @@ class SQLiteEngine:
                 except Exception:
                     pal_dict["drops"] = []
 
-            # Attach Partner Skill Categories
+            # Attach Partner Skill Categories & Subcategories
             try:
                 pal_key = pal_dict.get("internal_name") or pal_dict.get("id") or ""
                 cat_rows = self.conn.execute(
@@ -3319,15 +3626,28 @@ class SQLiteEngine:
                     (pal_key,),
                 ).fetchall()
                 pal_dict["partner_skill_categories"] = [dict(cr) for cr in cat_rows]
+
+                sub_rows = self.conn.execute(
+                    """
+                    SELECT DISTINCT ps.category_id, s.subcategory_id as id, s.name, s.icon
+                    FROM pal_partner_skill_subcategories ps
+                    JOIN partner_skill_subcategories s ON ps.category_id = s.category_id AND ps.subcategory_id = s.subcategory_id
+                    WHERE LOWER(ps.pal_internal_name) = LOWER(?)
+                    ORDER BY s.sort_order ASC
+                    """,
+                    (pal_key,),
+                ).fetchall()
+                pal_dict["partner_skill_subcategories"] = [dict(sr) for sr in sub_rows]
             except Exception:
                 pal_dict["partner_skill_categories"] = []
+                pal_dict["partner_skill_subcategories"] = []
 
             results.append(pal_dict)
 
         return results
 
     def get_partner_skill_categories(self) -> list[dict[str, Any]]:
-        """Returns all partner skill categories with icons, descriptions, and current pal counts."""
+        """Returns all partner skill categories with icons, descriptions, pal counts, and nested subcategories."""
         try:
             rows = self.conn.execute(
                 """
@@ -3339,7 +3659,34 @@ class SQLiteEngine:
                 ORDER BY c.sort_order ASC
                 """
             ).fetchall()
-            return [dict(r) for r in rows]
+
+            sub_rows = self.conn.execute(
+                """
+                SELECT s.category_id, s.subcategory_id as id, s.name, s.icon, s.sort_order,
+                       COUNT(DISTINCT ps.pal_internal_name) as pal_count
+                FROM partner_skill_subcategories s
+                LEFT JOIN pal_partner_skill_subcategories ps
+                  ON s.category_id = ps.category_id AND s.subcategory_id = ps.subcategory_id
+                GROUP BY s.category_id, s.subcategory_id
+                ORDER BY s.sort_order ASC
+                """
+            ).fetchall()
+            sub_map = defaultdict(list)
+            for sr in sub_rows:
+                sub_map[sr["category_id"]].append({
+                    "id": sr["id"],
+                    "name": sr["name"],
+                    "icon": sr["icon"],
+                    "sort_order": sr["sort_order"],
+                    "pal_count": sr["pal_count"]
+                })
+
+            res = []
+            for r in rows:
+                d = dict(r)
+                d["subcategories"] = sub_map.get(d["category_id"], [])
+                res.append(d)
+            return res
         except Exception as e:
             print(f"Error querying partner skill categories: {e}")
             return []
@@ -3788,6 +4135,37 @@ class SQLiteEngine:
             if not rows:
                 return []
 
+        # Filter by partner_subcategory in Python if requested
+        if "partner_subcategory" in filters and filters["partner_subcategory"]:
+            sub_val = str(filters["partner_subcategory"]).strip().lower()
+            matching_sub_rows = self.conn.execute(
+                """
+                SELECT LOWER(pal_internal_name) as p_name
+                FROM pal_partner_skill_subcategories ps
+                JOIN partner_skill_subcategories s ON ps.category_id = s.category_id AND ps.subcategory_id = s.subcategory_id
+                WHERE LOWER(s.subcategory_id) = ? OR LOWER(s.name) = ?
+                """,
+                (sub_val, sub_val),
+            ).fetchall()
+            matching_sub_names = {r["p_name"] for r in matching_sub_rows if r["p_name"]}
+            filtered_rows = []
+            for r in rows:
+                sp = (r["species"] or "").lower()
+                clean_sp = sp[5:] if sp.startswith("boss_") else sp
+                p_meta = pals_map.get(clean_sp) or pals_map.get(sp) or {}
+                p_keys = {
+                    sp, clean_sp,
+                    (p_meta.get("internal_name") or "").lower(),
+                    (p_meta.get("id") or "").lower(),
+                    (p_meta.get("code") or "").lower(),
+                    (p_meta.get("display_name") or "").lower(),
+                }
+                if p_keys & matching_sub_names:
+                    filtered_rows.append(r)
+            rows = filtered_rows
+            if not rows:
+                return []
+
         use_palworld_db = (
             self.source == "palworld_db" and os.path.exists(self.palworld_db_path)
         )
@@ -3811,6 +4189,27 @@ class SQLiteEngine:
                     "name": cr["name"],
                     "icon": cr["icon"],
                     "description": cr["description"]
+                })
+        except Exception:
+            pass
+
+        # 1a. Batch load Partner Skill Subcategories mapping
+        pal_subcats_map = defaultdict(list)
+        try:
+            pal_subcats_rows = self.conn.execute(
+                """
+                SELECT ps.pal_internal_name, ps.category_id, s.subcategory_id as id, s.name, s.icon
+                FROM pal_partner_skill_subcategories ps
+                JOIN partner_skill_subcategories s ON ps.category_id = s.category_id AND ps.subcategory_id = s.subcategory_id
+                ORDER BY s.sort_order ASC
+                """
+            ).fetchall()
+            for scr in pal_subcats_rows:
+                pal_subcats_map[scr["pal_internal_name"].lower()].append({
+                    "category_id": scr["category_id"],
+                    "id": scr["id"],
+                    "name": scr["name"],
+                    "icon": scr["icon"]
                 })
         except Exception:
             pass
@@ -3966,6 +4365,7 @@ class SQLiteEngine:
             d["icon_path"] = transform_icon_path(p_meta.get("icon_path"))
             pal_key = (p_meta.get("internal_name") or p_meta.get("id") or d.get("character_id") or d.get("species") or "").lower()
             d["partner_skill_categories"] = pal_cats_map.get(pal_key, [])
+            d["partner_skill_subcategories"] = pal_subcats_map.get(pal_key, [])
             inst_id = d.get("instance_id")
             inst_passives = passives_map.get(inst_id, [])
             d["passives"] = inst_passives

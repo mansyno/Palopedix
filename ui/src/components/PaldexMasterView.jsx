@@ -16,6 +16,8 @@ export function PaldexMasterView({
   setSuitabilityFilter,
   partnerCategoryFilter,
   setPartnerCategoryFilter,
+  partnerSubcategoryFilter = '',
+  setPartnerSubcategoryFilter = () => {},
 }) {
   const [categories, setCategories] = useState([]);
   const [speciesFilter, setSpeciesFilter] = useState('');
@@ -38,6 +40,7 @@ export function PaldexMasterView({
       if (nocturnalFilter) url += `nocturnal=${nocturnalFilter === 'true'}&`;
       if (suitabilityFilter) url += `suitability=${suitabilityFilter}&`;
       if (partnerCategoryFilter) url += `partner_category=${encodeURIComponent(partnerCategoryFilter)}&`;
+      if (partnerSubcategoryFilter) url += `partner_subcategory=${encodeURIComponent(partnerSubcategoryFilter)}&`;
 
       fetch(url)
         .then(res => res.json())
@@ -46,7 +49,7 @@ export function PaldexMasterView({
         })
         .catch(err => console.error('Error fetching fallback pals:', err));
     }
-  }, [pals, elementFilter, sizeFilter, nocturnalFilter, suitabilityFilter, partnerCategoryFilter]);
+  }, [pals, elementFilter, sizeFilter, nocturnalFilter, suitabilityFilter, partnerCategoryFilter, partnerSubcategoryFilter]);
 
   const activePals = (pals && pals.length > 0) ? pals : localPals;
 
@@ -90,7 +93,10 @@ export function PaldexMasterView({
             </label>
             <select
               value={partnerCategoryFilter}
-              onChange={e => setPartnerCategoryFilter(e.target.value)}
+              onChange={e => {
+                setPartnerCategoryFilter(e.target.value);
+                setPartnerSubcategoryFilter('');
+              }}
               style={{ borderColor: 'var(--accent-gold)' }}
             >
               <option value="">All Partner Groups</option>
@@ -101,6 +107,30 @@ export function PaldexMasterView({
               ))}
             </select>
           </div>
+          {(() => {
+            const currentCat = categories.find(c => c.category_id === partnerCategoryFilter);
+            const subcats = currentCat?.subcategories || [];
+            if (subcats.length === 0) return null;
+            return (
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                  🎯 Subcategory
+                </label>
+                <select
+                  value={partnerSubcategoryFilter}
+                  onChange={e => setPartnerSubcategoryFilter(e.target.value)}
+                  style={{ borderColor: 'var(--accent-gold)' }}
+                >
+                  <option value="">All Subcategories ({currentCat.pal_count})</option>
+                  {subcats.map(sc => (
+                    <option key={sc.id} value={sc.id}>
+                      {sc.icon ? `${sc.icon} ` : ''}{sc.name} ({sc.pal_count})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Element</label>
             <select value={elementFilter} onChange={e => setElementFilter(e.target.value)}>
@@ -158,24 +188,60 @@ export function PaldexMasterView({
 
         {/* Quick Category Filter Pills */}
         {categories.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.35rem', scrollbarWidth: 'thin' }}>
-            <button
-              className={`btn ${!partnerCategoryFilter ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setPartnerCategoryFilter('')}
-              style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
-            >
-              All Groups ({safePals.length})
-            </button>
-            {categories.map(c => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem', overflowX: 'auto', paddingBottom: '0.2rem', scrollbarWidth: 'thin' }}>
               <button
-                key={c.category_id}
-                className={`btn ${partnerCategoryFilter === c.category_id ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setPartnerCategoryFilter(partnerCategoryFilter === c.category_id ? '' : c.category_id)}
+                className={`btn ${!partnerCategoryFilter ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => {
+                  setPartnerCategoryFilter('');
+                  setPartnerSubcategoryFilter('');
+                }}
                 style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
               >
-                {c.icon} {c.name} ({c.pal_count})
+                All Groups ({safePals.length})
               </button>
-            ))}
+              {categories.map(c => (
+                <button
+                  key={c.category_id}
+                  className={`btn ${partnerCategoryFilter === c.category_id ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => {
+                    setPartnerCategoryFilter(partnerCategoryFilter === c.category_id ? '' : c.category_id);
+                    setPartnerSubcategoryFilter('');
+                  }}
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
+                >
+                  {c.icon} {c.name} ({c.pal_count})
+                </button>
+              ))}
+            </div>
+
+            {/* Expandable Subcategory Pills Row */}
+            {(() => {
+              const activeCat = categories.find(c => c.category_id === partnerCategoryFilter);
+              const subcats = activeCat?.subcategories || [];
+              if (subcats.length === 0) return null;
+              return (
+                <div style={{ display: 'flex', gap: '0.35rem', overflowX: 'auto', paddingLeft: '0.5rem', paddingBottom: '0.25rem', borderLeft: '3px solid var(--accent-gold)', scrollbarWidth: 'thin' }}>
+                  <button
+                    className={`btn ${!partnerSubcategoryFilter ? 'btn-primary' : 'btn-secondary'}`}
+                    onClick={() => setPartnerSubcategoryFilter('')}
+                    style={{ padding: '0.15rem 0.55rem', fontSize: '0.72rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
+                  >
+                    All {activeCat.name} ({activeCat.pal_count})
+                  </button>
+                  {subcats.map(sc => (
+                    <button
+                      key={sc.id}
+                      className={`btn ${partnerSubcategoryFilter === sc.id ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => setPartnerSubcategoryFilter(partnerSubcategoryFilter === sc.id ? '' : sc.id)}
+                      style={{ padding: '0.15rem 0.55rem', fontSize: '0.72rem', borderRadius: '6px', whiteSpace: 'nowrap' }}
+                    >
+                      {sc.icon ? `${sc.icon} ` : ''}{sc.name} ({sc.pal_count})
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
       </div>
@@ -277,6 +343,29 @@ export function PaldexMasterView({
                           >
                             <span>{cat.icon}</span>
                             <span>{cat.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {p.partner_skill_subcategories && p.partner_skill_subcategories.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.1rem' }}>
+                        {p.partner_skill_subcategories.map(sub => (
+                          <span
+                            key={sub.id}
+                            className="badge"
+                            style={{
+                              background: 'rgba(234, 179, 8, 0.12)',
+                              color: '#fde047',
+                              border: '1px solid rgba(234, 179, 8, 0.3)',
+                              fontSize: '0.64rem',
+                              padding: '0.03rem 0.28rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.15rem'
+                            }}
+                          >
+                            <span>{sub.icon || '🎯'}</span>
+                            <span>{sub.name}</span>
                           </span>
                         ))}
                       </div>

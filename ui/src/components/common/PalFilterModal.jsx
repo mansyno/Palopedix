@@ -41,26 +41,14 @@ export const OFFICIAL_WORK_SUITABILITIES = [
   { id: 'farming', label: 'Farming', icon: '/assets/work/MonsterFarm.png', emoji: '🍳', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.15)', border: 'rgba(245, 158, 11, 0.4)' },
 ];
 
-export const PARTNER_GROUP_OPTIONS = [
-  { value: '', label: 'All Partner Groups' },
-  { value: 'flying_mount', label: '🦅 Flying Mounts' },
-  { value: 'ground_mount', label: '🐎 Ground Mounts' },
-  { value: 'swimming_mount', label: '🌊 Swimming Mounts' },
-  { value: 'glider', label: '🪂 Gliders' },
-  { value: 'ranch_producer', label: '🚜 Ranch Producers' },
-  { value: 'player_element_infusion', label: '⚡ Player Element Infusion' },
-  { value: 'player_combat_buffer', label: '⚔️ Player Combat Buffers' },
-  { value: 'party_pal_buffer', label: '🛡️ Pal / Party Combat Buffers' },
-  { value: 'heavy_artillery', label: '💥 Heavy Artillery & Weapons' },
-  { value: 'coop_attacker', label: '👥 Autonomous Co-Op' },
-  { value: 'healer_lifesteal', label: '💖 Healers & Life-Steal' },
-  { value: 'carrying_capacity', label: '🎒 Carrying Capacity' },
-  { value: 'drop_loot_booster', label: '🎁 Drop & Loot Boosters' },
-  { value: 'resource_gathering', label: '⛏️ Resource Gathering' },
-  { value: 'breeding_egg_booster', label: '🥚 Breeding & Egg Boosters' },
-  { value: 'fishing_helper', label: '🎣 Fishing & Helpers' },
-  { value: 'exploration_survival', label: '🧭 Exploration & Survival' },
-];
+import {
+  PARTNER_GROUP_OPTIONS,
+  hasSubcategories,
+  getSubcategoryLabel,
+  getSubcategoryOptions,
+} from '../../constants/partnerCategories';
+
+export { PARTNER_GROUP_OPTIONS };
 
 export const LOCATION_OPTIONS = [
   { value: '', label: 'All Locations' },
@@ -127,6 +115,7 @@ export function PalFilterModal({
 }) {
   // General Attribute Filters
   const [partnerGroup, setPartnerGroup] = useState(initialFilters.partnerGroup || '');
+  const [partnerSubgroup, setPartnerSubgroup] = useState(initialFilters.partnerSubgroup || '');
   const [location, setLocation] = useState(initialFilters.location || '');
   const [species, setSpecies] = useState(initialFilters.species || '');
   const [gender, setGender] = useState(initialFilters.gender || '');
@@ -151,6 +140,7 @@ export function PalFilterModal({
   useEffect(() => {
     if (isOpen) {
       setPartnerGroup(initialFilters.partnerGroup || '');
+      setPartnerSubgroup(initialFilters.partnerSubgroup || '');
       setLocation(initialFilters.location || '');
       setSpecies(initialFilters.species || '');
       setGender(initialFilters.gender || '');
@@ -319,6 +309,7 @@ export function PalFilterModal({
 
   const handleReset = () => {
     setPartnerGroup('');
+    setPartnerSubgroup('');
     setLocation('');
     setSpecies('');
     setGender('');
@@ -336,6 +327,7 @@ export function PalFilterModal({
   const handleApply = () => {
     onApply({
       partnerGroup,
+      partnerSubgroup,
       location,
       species,
       gender,
@@ -447,12 +439,31 @@ export function PalFilterModal({
                 </label>
                 <CustomSelect
                   value={partnerGroup}
-                  onChange={setPartnerGroup}
+                  onChange={(val) => {
+                    setPartnerGroup(val);
+                    setPartnerSubgroup('');
+                  }}
                   options={PARTNER_GROUP_OPTIONS}
                   placeholder="All Groups"
                   accentColor="var(--accent-gold)"
                 />
               </div>
+
+              {/* Partner Subgroup (Contextual for 8 complex groups) */}
+              {hasSubcategories(partnerGroup) && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.3rem', color: partnerSubgroup ? 'var(--accent-gold)' : 'var(--text-secondary)', fontSize: '0.82rem', fontWeight: 700 }}>
+                    🎯 {getSubcategoryLabel(partnerGroup)}
+                  </label>
+                  <CustomSelect
+                    value={partnerSubgroup}
+                    onChange={setPartnerSubgroup}
+                    options={getSubcategoryOptions(partnerGroup)}
+                    placeholder="All Subcategories"
+                    accentColor="var(--accent-gold)"
+                  />
+                </div>
+              )}
 
               {/* Location */}
               <div>

@@ -41,6 +41,8 @@ def _read_player_container_ids(sav_path: str) -> dict[str, str]:
         return containers
 
     for player_sav_path in players_dir.glob("*.sav"):
+        if player_sav_path.name.endswith("_dps.sav"):
+            continue
         try:
             with open(player_sav_path, "rb") as f:
                 raw = f.read()

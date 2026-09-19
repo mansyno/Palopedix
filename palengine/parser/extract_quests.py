@@ -23,6 +23,8 @@ def extract_active_quests(level_sav_path: str) -> list[dict[str, Any]]:
     players_dir = Path(level_sav_path).parent / "Players"
     if players_dir.exists():
         for p_file in players_dir.glob("*.sav"):
+            if p_file.name.endswith("_dps.sav"):
+                continue
             try:
                 with open(p_file, "rb") as f:
                     raw = f.read()

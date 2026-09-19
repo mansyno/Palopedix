@@ -81,6 +81,8 @@ def extract_players(level_sav_path: str, gvas_file: Optional[GvasFile] = None) -
     players_dir = Path(level_sav_path).parent / "Players"
     if players_dir.exists():
         for p_file in players_dir.glob("*.sav"):
+            if p_file.name.endswith("_dps.sav"):
+                continue
             try:
                 with open(p_file, "rb") as f:
                     raw = f.read()

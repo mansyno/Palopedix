@@ -304,6 +304,8 @@ def load_player_containers(level_sav_path: str) -> dict[str, tuple[str, str]]:
         return containers
 
     for player_sav_path in players_dir.glob("*.sav"):
+        if player_sav_path.name.endswith("_dps.sav"):
+            continue
         try:
             with open(player_sav_path, "rb") as f:
                 raw = f.read()

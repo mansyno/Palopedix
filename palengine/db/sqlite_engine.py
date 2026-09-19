@@ -4024,7 +4024,7 @@ class SQLiteEngine:
 
         return results
 
-    def query_instances(self, filters: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
+    def query_instances(self, filters: Optional[dict[str, Any]] = None, sort_by: Optional[str] = None) -> list[dict[str, Any]]:
         """Queries dynamic Pal instances table with multiple filter conditions."""
         filters = filters or {}
         # 1. Preload master pals dictionary in memory for O(1) attribute lookup
@@ -4369,6 +4369,19 @@ class SQLiteEngine:
             inst_id = d.get("instance_id")
             inst_passives = passives_map.get(inst_id, [])
             d["passives"] = inst_passives
+
+            # 4-Aspect Passive Role Scores (Work, Attack, Defense, Movement)
+            from palengine.analytics.passive_role_scorer import calculate_passive_role_scores
+            role_eval = calculate_passive_role_scores(inst_passives)
+            d["score_work"] = role_eval["score_work"]
+            d["score_attack"] = role_eval["score_attack"]
+            d["score_defense"] = role_eval["score_defense"]
+            d["score_movement"] = role_eval["score_movement"]
+            d["score_best"] = role_eval["score_best"]
+            d["best_role"] = role_eval["best_role"]
+            d["role_scores"] = role_eval["role_scores"]
+            d["role_breakdown"] = role_eval["breakdown"]
+
             d["equip_waza"] = waza_map[inst_id]["equip"]
             d["mastered_waza"] = waza_map[inst_id]["mastered"]
             d["soul_points"] = soul_map.get(inst_id, {})
@@ -4466,6 +4479,18 @@ class SQLiteEngine:
                 d["partner_skill"] = None
             
             results.append(d)
+
+        sort_target = str(sort_by or filters.get("sort_by") or "").strip().lower()
+        if sort_target in ("work", "score_work"):
+            results.sort(key=lambda x: x.get("score_work", 0), reverse=True)
+        elif sort_target in ("attack", "score_attack"):
+            results.sort(key=lambda x: x.get("score_attack", 0), reverse=True)
+        elif sort_target in ("defense", "score_defense"):
+            results.sort(key=lambda x: x.get("score_defense", 0), reverse=True)
+        elif sort_target in ("movement", "speed", "score_movement"):
+            results.sort(key=lambda x: x.get("score_movement", 0), reverse=True)
+        elif sort_target in ("best", "best_role", "score_best"):
+            results.sort(key=lambda x: x.get("score_best", 0), reverse=True)
 
         return results
 

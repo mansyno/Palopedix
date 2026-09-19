@@ -177,6 +177,7 @@ def get_instances(
     category: Optional[str] = None,
     partner_subcategory: Optional[str] = None,
     subcategory: Optional[str] = None,
+    sort_by: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries dynamic Pal instances (requires loading save game first)."""
     filters: dict[str, Any] = {}
@@ -194,6 +195,8 @@ def get_instances(
         filters["partner_category"] = partner_category or category
     if partner_subcategory or subcategory:
         filters["partner_subcategory"] = partner_subcategory or subcategory
+    if sort_by:
+        filters["sort_by"] = sort_by
 
     return db_engine.query_instances(filters)
 

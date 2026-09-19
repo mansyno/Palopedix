@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTableSort } from '../hooks/useTableSort';
 import { PassiveBadge } from './common/PassiveBadge';
+import { PassiveRoleBadge } from './common/PassiveRoleBadge';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
 import {
   PalFilterModal,
@@ -77,6 +78,9 @@ export function SaveGameExplorerView({
   // 2-Tier Species Grouping State
   const [isGroupedBySpecies, setIsGroupedBySpecies] = useState(true);
   const [expandedSpecies, setExpandedSpecies] = useState(new Set());
+
+  // 4-Aspect Passive Role Sort State ('', 'score_work', 'score_attack', 'score_defense', 'score_movement', 'score_best')
+  const [roleSort, setRoleSort] = useState('');
 
   // Undo / Redo Filter History Stack
   const [filterHistory, setFilterHistory] = useState([DEFAULT_FILTERS]);
@@ -344,6 +348,16 @@ export function SaveGameExplorerView({
     handleSort,
   } = useTableSort(filteredInstances, 'level', true);
 
+  const displayInstances = useMemo(() => {
+    if (!roleSort) return sortedInstances;
+    return [...filteredInstances].sort((a, b) => {
+      const scoreA = a[roleSort] ?? -999;
+      const scoreB = b[roleSort] ?? -999;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      return (b.level || 0) - (a.level || 0);
+    });
+  }, [sortedInstances, filteredInstances, roleSort]);
+
   // Global In-Game Pals Filtered by active modal filters
   const filteredGlobalPals = useMemo(() => {
     if (palSourceMode !== 'global') return [];
@@ -490,6 +504,11 @@ export function SaveGameExplorerView({
 
     // Sort grouped species
     const sorted = Array.from(groups.values()).sort((a, b) => {
+      if (roleSort) {
+        const maxA = Math.max(...a.instances.map(i => i[roleSort] ?? -999));
+        const maxB = Math.max(...b.instances.map(i => i[roleSort] ?? -999));
+        if (maxB !== maxA) return maxB - maxA;
+      }
       if (sortCol === 'display_name') {
         return sortDesc ? b.speciesName.localeCompare(a.speciesName) : a.speciesName.localeCompare(b.speciesName);
       }
@@ -507,7 +526,7 @@ export function SaveGameExplorerView({
     });
 
     return sorted;
-  }, [filteredInstances, pals, sortCol, sortDesc]);
+  }, [filteredInstances, pals, sortCol, sortDesc, roleSort]);
 
   const chipBadgeStyle = {
     fontSize: '0.7rem',
@@ -733,6 +752,33 @@ export function SaveGameExplorerView({
                     >
                       📄 Flat ({filteredInstances.length})
                     </button>
+                  </div>
+
+                  {/* 4-Aspect Role Sort Selector */}
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginLeft: '0.2rem' }}>
+                    <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600 }}>Role:</label>
+                    <select
+                      value={roleSort}
+                      onChange={(e) => setRoleSort(e.target.value)}
+                      style={{
+                        background: roleSort ? 'rgba(99, 102, 241, 0.25)' : 'rgba(0, 0, 0, 0.4)',
+                        border: roleSort ? '1px solid #818cf8' : '1px solid var(--border-color)',
+                        color: roleSort ? '#fff' : 'var(--text-secondary)',
+                        fontSize: '0.74rem',
+                        fontWeight: roleSort ? 700 : 500,
+                        borderRadius: '6px',
+                        padding: '0.22rem 0.5rem',
+                        cursor: 'pointer',
+                      }}
+                      title="Sort Pals by 4-Aspect Passive Role points"
+                    >
+                      <option value="">Sort: Default</option>
+                      <option value="score_work">🔨 Work</option>
+                      <option value="score_attack">⚔️ Attack</option>
+                      <option value="score_defense">🛡️ Defense</option>
+                      <option value="score_movement">⚡ Movement</option>
+                      <option value="score_best">🌟 Best Role</option>
+                    </select>
                   </div>
                 </>
               ) : (
@@ -1125,8 +1171,13 @@ export function SaveGameExplorerView({
                   const masterPal = group.masterPal;
                   const palIcon = group.palIcon;
 
-                  // Instance children sorted by table sort
+                  // Instance children sorted by table sort or role sort
                   const sortedChildren = [...group.instances].sort((a, b) => {
+                    if (roleSort) {
+                      const scoreA = a[roleSort] ?? -999;
+                      const scoreB = b[roleSort] ?? -999;
+                      if (scoreB !== scoreA) return scoreB - scoreA;
+                    }
                     if (sortCol === 'level') return sortDesc ? (b.level || 0) - (a.level || 0) : (a.level || 0) - (b.level || 0);
                     if (sortCol === 'gender') return sortDesc ? (b.gender || '').localeCompare(a.gender || '') : (a.gender || '').localeCompare(b.gender || '');
                     if (sortCol === 'rank') return sortDesc ? (b.rank || 0) - (a.rank || 0) : (a.rank || 0) - (b.rank || 0);
@@ -1268,19 +1319,43 @@ export function SaveGameExplorerView({
 
                         {/* Pal Gear Status (under Passives column) */}
                         <td style={{ padding: '0.45rem 0.4rem' }}>
-                          {group.gear?.requires_gear ? (
-                            group.gear.is_crafted ? (
-                              <span style={{ fontSize: '0.68rem', color: '#86efac', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
-                                <span>🪖</span> <span>{group.gear.name}: <strong>Crafted</strong></span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            {roleSort && (
+                              <span style={{
+                                fontSize: '0.68rem',
+                                background: 'rgba(99, 102, 241, 0.25)',
+                                border: '1px solid #818cf8',
+                                color: '#c7d2fe',
+                                padding: '0.08rem 0.4rem',
+                                borderRadius: '5px',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem'
+                              }}>
+                                <span>🏆 Top:</span>
+                                <span style={{ color: '#fff', fontWeight: 800 }}>
+                                  {(() => {
+                                    const maxVal = Math.max(...group.instances.map(i => i[roleSort] ?? -999));
+                                    return maxVal > -999 ? (maxVal > 0 ? `+${maxVal}` : maxVal) : 0;
+                                  })()} pts
+                                </span>
                               </span>
+                            )}
+                            {group.gear?.requires_gear ? (
+                              group.gear.is_crafted ? (
+                                <span style={{ fontSize: '0.68rem', color: '#86efac', background: 'rgba(34, 197, 94, 0.15)', border: '1px solid rgba(34, 197, 94, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
+                                  <span>🪖</span> <span>{group.gear.name}: <strong>Crafted</strong></span>
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: '0.68rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
+                                  <span>🔒</span> <span>{group.gear.name}: <strong>Not Crafted</strong></span>
+                                </span>
+                              )
                             ) : (
-                              <span style={{ fontSize: '0.68rem', color: '#fca5a5', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.35)', padding: '0.05rem 0.35rem', borderRadius: '4px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.2rem', whiteSpace: 'nowrap' }}>
-                                <span>🔒</span> <span>{group.gear.name}: <strong>Not Crafted</strong></span>
-                              </span>
-                            )
-                          ) : (
-                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>✨ Inherent Skill</span>
-                          )}
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>✨ Inherent Skill</span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Dedicated Element Column */}
@@ -1414,7 +1489,8 @@ export function SaveGameExplorerView({
 
                             {/* Passives */}
                             <td style={{ padding: '0.3rem 0.4rem' }}>
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                                <PassiveRoleBadge instance={pi} activeRole={roleSort} />
                                 {(pi.passives || []).length > 0 ? (
                                   (pi.passives || []).map((pass, pIdx) => {
                                     const pName = typeof pass === 'string' ? pass : (pass.name || pass.id);
@@ -1459,7 +1535,7 @@ export function SaveGameExplorerView({
                 /* ========================================================================= */
                 /* FLAT LIST VIEW */
                 /* ========================================================================= */
-                sortedInstances.map((pi, idx) => {
+                displayInstances.map((pi, idx) => {
                   const masterPal = pals.find(p => 
                     (p.internal_name && (p.internal_name === pi.character_id || p.internal_name === pi.character_id_raw || p.internal_name === pi.species)) ||
                     (p.id && (p.id === pi.character_id || p.id === pi.character_id_raw || p.id === pi.species)) ||
@@ -1586,7 +1662,8 @@ export function SaveGameExplorerView({
 
                       {/* Passives */}
                       <td style={{ padding: '0.3rem 0.4rem' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', alignItems: 'center' }}>
+                          <PassiveRoleBadge instance={pi} activeRole={roleSort} />
                           {(pi.passives || []).length > 0 ? (
                             (pi.passives || []).map((pass, pIdx) => {
                               const pName = typeof pass === 'string' ? pass : (pass.name || pass.id);

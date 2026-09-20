@@ -219,6 +219,12 @@ def get_inventory(container_type: Optional[str] = None) -> list[dict[str, Any]]:
     return db_engine.query_inventory(container_type)
 
 
+@app.get("/api/save/soul-optimizer")
+def get_soul_optimizer() -> dict[str, Any]:
+    """Returns current Pal Soul inventory and optimal Crusher conversion plan."""
+    return db_engine.get_soul_optimizer_summary()
+
+
 @app.get("/api/save/owned-species")
 def get_owned_species() -> list[str]:
     """Returns list of distinct Pal species owned in the loaded save data."""

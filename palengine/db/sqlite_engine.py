@@ -4630,6 +4630,29 @@ class SQLiteEngine:
             
         return results
 
+    def get_soul_optimizer_summary(self) -> dict[str, Any]:
+        """Calculates current Pal Soul inventory and computes optimal Crusher conversion plan."""
+        from palengine.analytics.soul_optimizer import optimize_pal_souls, SOUL_ITEM_MAP
+
+        cursor = self.conn.cursor()
+        try:
+            rows = cursor.execute("""
+                SELECT LOWER(item_id) as item_id, SUM(count) as total
+                FROM item_container_slots
+                WHERE LOWER(item_id) IN ('palupgradestone', 'palupgradestone2', 'palupgradestone3', 'palupgradestone4')
+                GROUP BY LOWER(item_id)
+            """).fetchall()
+        except Exception:
+            rows = []
+
+        inv = {"small": 0, "medium": 0, "large": 0, "giant": 0}
+        for r in rows:
+            tier = SOUL_ITEM_MAP.get(str(r["item_id"]).lower())
+            if tier:
+                inv[tier] = r["total"] or 0
+
+        return optimize_pal_souls(inv)
+
     def get_condense_candidates(self) -> list[dict]:
         from collections import defaultdict
         

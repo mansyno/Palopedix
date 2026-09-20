@@ -646,6 +646,47 @@ def missions(
         click.echo("")
 
 
+@cli.command()
+@click.pass_context
+def souls(ctx: click.Context) -> None:
+    """Analyzes Pal Soul inventory and suggests optimal Crusher transformations (2:1 ratio)."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    summary = engine.get_soul_optimizer_summary()
+
+    if ctx.obj["format"] == "json":
+        click.echo(json.dumps(summary, indent=2))
+        return
+
+    inv = summary["current_inventory"]
+    click.echo("\n[CURRENT PAL SOUL INVENTORY]")
+    click.echo("===============================")
+    inv_table = [
+        {"Tier": "Small Pal Soul", "Count": inv.get("small", 0), "Rank Tiers": "Ranks 1-4 (Cost: 10)"},
+        {"Tier": "Medium Pal Soul", "Count": inv.get("medium", 0), "Rank Tiers": "Ranks 5-7 (Cost: 6)"},
+        {"Tier": "Large Pal Soul", "Count": inv.get("large", 0), "Rank Tiers": "Ranks 8-10 (Cost: 6)"},
+        {"Tier": "Giant Pal Soul", "Count": inv.get("giant", 0), "Rank Tiers": "Ranks 11-20 (Cost: 30)"},
+    ]
+    click.echo(tabulate(inv_table, headers="keys", tablefmt="github"))
+
+    click.echo(f"\nDirect Maxable Stats (Without Crusher): {summary['direct_maxable_stats']} stats ({summary['direct_pals_maxed']} Pals fully maxed)")
+    click.echo(f"Optimal Maxable Stats (With Crusher):   {summary['optimal_maxable_stats']} stats ({summary['optimal_pals_maxed']} Pals fully maxed) [+{summary['stats_gained_via_crusher']} gained]")
+
+    steps = summary.get("crusher_steps", [])
+    if steps:
+        click.echo("\n[RECOMMENDED CRUSHER TRANSFORMATIONS]")
+        click.echo("========================================")
+        step_rows = [
+            {"Step": idx + 1, "Action": s["description"]}
+            for idx, s in enumerate(steps)
+        ]
+        click.echo(tabulate(step_rows, headers="keys", tablefmt="github"))
+    else:
+        click.echo("\nNo Crusher transformations needed (inventory is already optimal).")
+
+    rem = summary.get("remainder_after_optimal", {})
+    click.echo(f"\nRemaining Leftovers: {rem.get('small', 0)} Small, {rem.get('medium', 0)} Medium, {rem.get('large', 0)} Large, {rem.get('giant', 0)} Giant souls.\n")
+
+
 if __name__ == "__main__":
     cli(obj={})
 

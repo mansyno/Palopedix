@@ -15,6 +15,14 @@ const SOUL_TIER_NAMES = {
   giant: 'Giant Pal Soul',
 };
 
+const RARITY_COLORS = {
+  0: { label: 'Common', border: 'rgba(255,255,255,0.15)', text: '#94a3b8', bg: 'rgba(255,255,255,0.05)' },
+  1: { label: 'Uncommon', border: 'rgba(52, 211, 153, 0.4)', text: '#34d399', bg: 'rgba(16, 185, 129, 0.12)' },
+  2: { label: 'Rare', border: 'rgba(96, 165, 250, 0.4)', text: '#60a5fa', bg: 'rgba(59, 130, 246, 0.12)' },
+  3: { label: 'Epic', border: 'rgba(192, 132, 252, 0.4)', text: '#c084fc', bg: 'rgba(139, 92, 246, 0.15)' },
+  4: { label: 'Legendary', border: 'rgba(251, 191, 36, 0.5)', text: '#fbbf24', bg: 'rgba(245, 158, 11, 0.2)' },
+};
+
 export function InventoryView() {
   const [subView, setSubView] = useState('inventory');
   const [inventory, setInventory] = useState([]);
@@ -55,12 +63,22 @@ export function InventoryView() {
   }, [containerFilter]);
 
   const filteredInventory = inventory.filter(item => {
-    if (categoryFilter && (item.category || '').toLowerCase() !== categoryFilter.toLowerCase()) return false;
+    if (categoryFilter) {
+      const itemCat = (item.category || '').toLowerCase();
+      const filterCat = categoryFilter.toLowerCase();
+      if (filterCat === 'sphere' || filterCat === 'specialweapon') {
+        if (itemCat !== 'sphere' && itemCat !== 'specialweapon') return false;
+      } else if (itemCat !== filterCat) {
+        return false;
+      }
+    }
     if (search) {
       const q = search.toLowerCase();
-      const matchName = (item.item_name || item.name || '').toLowerCase().includes(q);
+      const matchName = (item.item_name || item.name || item.display_name || '').toLowerCase().includes(q);
       const matchLoc = (item.container_type || '').toLowerCase().includes(q);
-      if (!matchName && !matchLoc) return false;
+      const matchBase = (item.base_camp_name || '').toLowerCase().includes(q);
+      const matchDesc = (item.description || '').toLowerCase().includes(q);
+      if (!matchName && !matchLoc && !matchBase && !matchDesc) return false;
     }
     return true;
   });
@@ -368,26 +386,29 @@ export function InventoryView() {
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Storage Location</label>
                 <select value={containerFilter} onChange={e => setContainerFilter(e.target.value)}>
                   <option value="">All Storage Locations</option>
-                  <option value="PlayerInventory">🎒 Player Inventory</option>
-                  <option value="PlayerWeapon">⚔️ Equipped Weapons</option>
-                  <option value="PlayerArmor">🛡️ Equipped Armor</option>
-                  <option value="PlayerAccessory">💍 Equipped Accessories</option>
-                  <option value="BaseCampChest">📦 Base Camp Chests</option>
-                  <option value="BaseCampFeedBox">🍳 Feed Boxes</option>
+                  <option value="Inventory">🎒 Player Inventory</option>
+                  <option value="Base Chest">📦 Base Camp Chests</option>
+                  <option value="Weapon Loadout">⚔️ Weapon Loadout</option>
+                  <option value="Equipped Armor">🛡️ Equipped Armor</option>
+                  <option value="Food Equip">🍱 Food Bag</option>
+                  <option value="Key Items">🔑 Key Items</option>
                 </select>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Item Category</label>
                 <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}>
                   <option value="">All Categories</option>
-                  <option value="Material">Crafting Materials</option>
-                  <option value="Food">Food & Consumables</option>
-                  <option value="Sphere">Pal Spheres</option>
-                  <option value="Weapon">Weapons & Ammo</option>
-                  <option value="Armor">Armor & Clothing</option>
-                  <option value="Accessory">Accessories</option>
-                  <option value="Medicine">Medicine & Supplies</option>
-                  <option value="Essential">Key Items</option>
+                  <option value="Material">🧱 Crafting Materials</option>
+                  <option value="Food">🍖 Food & Nutrition</option>
+                  <option value="Consume">🧪 Medicine & Consumables</option>
+                  <option value="SpecialWeapon">🔮 Pal Spheres</option>
+                  <option value="Weapon">⚔️ Weapons</option>
+                  <option value="Ammo">🎯 Ammunition</option>
+                  <option value="Armor">🛡️ Armor & Clothing</option>
+                  <option value="Accessory">💍 Accessories</option>
+                  <option value="Blueprint">📜 Schematics & Blueprints</option>
+                  <option value="Essential">🔑 Key Items</option>
+                  <option value="Glider">🪂 Gliders</option>
                 </select>
               </div>
               <div style={{ flexGrow: 1 }}>
@@ -415,50 +436,123 @@ export function InventoryView() {
                     <th onClick={() => handleSort('count')} style={{ cursor: 'pointer', textAlign: 'center', width: '100px' }}>
                       Quantity{sortCol === 'count' ? (sortDesc ? ' ▼' : ' ▲') : ''}
                     </th>
-                    <th onClick={() => handleSort('container_type')} style={{ cursor: 'pointer' }}>
+                    <th onClick={() => handleSort('container_type')} style={{ cursor: 'pointer', width: '150px' }}>
                       Storage Container{sortCol === 'container_type' ? (sortDesc ? ' ▼' : ' ▲') : ''}
                     </th>
-                    <th>Base / Location</th>
+                    <th onClick={() => handleSort('base_camp_name')} style={{ cursor: 'pointer' }}>
+                      Base / Location{sortCol === 'base_camp_name' ? (sortDesc ? ' ▼' : ' ▲') : ''}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedInventory.map((item, idx) => (
-                    <tr key={`${item.item_id || item.item_name}-${idx}`}>
-                      <td style={{ fontWeight: 600 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                          {item.icon_path ? (
-                            <img src={item.icon_path} alt={item.item_name} style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: '4px', background: 'rgba(0,0,0,0.2)' }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  {sortedInventory.map((item, idx) => {
+                    const rarityInfo = item.rarity !== undefined && item.rarity !== null ? RARITY_COLORS[item.rarity] : null;
+                    return (
+                      <tr key={`${item.item_id || item.item_name}-${idx}`}>
+                        <td style={{ fontWeight: 600 }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.2rem 0' }}>
+                            {item.icon_path ? (
+                              <img
+                                src={item.icon_path}
+                                alt={item.item_name}
+                                style={{
+                                  width: '36px',
+                                  height: '36px',
+                                  objectFit: 'contain',
+                                  borderRadius: '6px',
+                                  background: 'rgba(0,0,0,0.25)',
+                                  border: rarityInfo && item.rarity > 0 ? `1px solid ${rarityInfo.border}` : '1px solid rgba(255,255,255,0.08)',
+                                  flexShrink: 0,
+                                }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <span style={{ fontSize: '1.3rem', flexShrink: 0 }}>📦</span>
+                            )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <span style={{ color: rarityInfo && item.rarity >= 3 ? rarityInfo.text : 'var(--text-primary)', fontSize: '0.9rem' }}>
+                                  {item.item_name || item.name || item.display_name}
+                                </span>
+                                {rarityInfo && item.rarity > 0 && (
+                                  <span style={{
+                                    fontSize: '0.66rem',
+                                    fontWeight: 700,
+                                    padding: '0.05rem 0.35rem',
+                                    borderRadius: '4px',
+                                    border: `1px solid ${rarityInfo.border}`,
+                                    color: rarityInfo.text,
+                                    background: rarityInfo.bg,
+                                  }}>
+                                    {rarityInfo.label}
+                                  </span>
+                                )}
+                              </div>
+                              {item.description && (
+                                <div
+                                  style={{
+                                    fontSize: '0.74rem',
+                                    color: 'var(--text-secondary)',
+                                    marginTop: '0.2rem',
+                                    whiteSpace: 'normal',
+                                    maxWidth: '420px',
+                                    lineHeight: '1.25',
+                                  }}
+                                  title={item.description}
+                                >
+                                  {item.description}
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginTop: '0.25rem', fontSize: '0.7rem' }}>
+                                {item.weight !== undefined && item.weight !== null && (
+                                  <span style={{ color: 'rgba(255,255,255,0.45)' }} title="Weight (Encumbrance)">
+                                    ⚖️ {item.weight}
+                                  </span>
+                                )}
+                                {item.price !== undefined && item.price !== null && item.price > 0 && (
+                                  <span style={{ color: 'rgba(251, 191, 36, 0.75)' }} title="Sell Price (Gold)">
+                                    💰 {item.price.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', fontSize: '0.74rem' }}>
+                            {item.category || 'Material'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--accent-gold)', fontSize: '0.95rem' }}>
+                          x{item.count ? item.count.toLocaleString() : 1}
+                        </td>
+                        <td>
+                          <span className="badge" style={{
+                            background: item.container_type === 'Base Chest' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                            color: item.container_type === 'Base Chest' ? '#fbbf24' : '#60a5fa',
+                            border: item.container_type === 'Base Chest' ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(59, 130, 246, 0.3)',
+                            fontSize: '0.74rem',
+                          }}>
+                            {item.container_type || 'Inventory'}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.82rem' }}>
+                          {item.base_camp_name?.startsWith('Base') || item.base_camp_name?.includes('Guild') ? (
+                            <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+                              🏰 {item.base_camp_name}
+                            </span>
                           ) : (
-                            <span style={{ fontSize: '1.1rem' }}>📦</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>
+                              {item.base_camp_name ? `🎒 ${item.base_camp_name}` : 'Player Character'}
+                            </span>
                           )}
-                          <span style={{ color: 'var(--text-primary)' }}>{item.item_name || item.name}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="badge" style={{ background: 'rgba(255,255,255,0.08)', fontSize: '0.72rem' }}>
-                          {item.category || 'Material'}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--accent-gold)' }}>
-                        x{item.count ? item.count.toLocaleString() : 1}
-                      </td>
-                      <td>
-                        <span className="badge" style={{
-                          background: item.container_type?.includes('Player') ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
-                          color: item.container_type?.includes('Player') ? '#60a5fa' : '#fbbf24',
-                          fontSize: '0.75rem'
-                        }}>
-                          {item.container_type || 'Inventory'}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-                        {item.base_camp_name ? `🏰 ${item.base_camp_name}` : 'Player Character'}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {sortedInventory.length === 0 && (
                     <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-secondary)' }}>
                         No items found matching the selected storage criteria.
                       </td>
                     </tr>

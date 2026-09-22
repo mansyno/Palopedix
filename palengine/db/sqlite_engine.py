@@ -109,9 +109,15 @@ def is_playable_pal(pal_dict: dict[str, Any]) -> bool:
 def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Optional[set[str]] = None) -> bool:
     if pal_dict.get("is_variant", 0) != 0:
         return False
+    if pal_dict.get("breeding_power") is None:
+        return False
+    if pal_dict.get("index_order", 0) < 0 or pal_dict.get("paldex_number", 0) < 0:
+        return False
     d_name = str(pal_dict.get("display_name", "")).strip().lower()
     i_name = str(pal_dict.get("internal_name", "")).strip().lower()
     if "&" in d_name or "boss" in i_name or i_name.startswith("yakushima") or i_name.startswith("raid_"):
+        return False
+    if d_name.startswith("unidentified") or d_name == "en_text":
         return False
     active_restricted = restricted_set if restricted_set is not None else RESTRICTED_BREEDING_SPECIES
     if d_name in active_restricted or i_name in active_restricted:
@@ -4578,8 +4584,106 @@ class SQLiteEngine:
         return summary
 
 
+    def clean_item_description(self, desc: str) -> str:
+        """Cleans and interpolates XML markup tags from Palworld item descriptions."""
+        if not desc or "<" not in desc:
+            return desc.replace("\r\n", " ").replace("\n", " ").strip() if desc else ""
+        import re
+
+        # Lazily populate name resolution caches
+        if not hasattr(self, "_desc_pal_names"):
+            cursor = self.conn.cursor()
+            db_names = [r[1] for r in cursor.execute("PRAGMA database_list").fetchall()]
+            pfx = "palworld_master." if "palworld_master" in db_names else ""
+            try:
+                self._desc_pal_names = {r[0].lower(): r[1] for r in cursor.execute(f"SELECT id, name FROM {pfx}pals").fetchall()}
+            except Exception:
+                self._desc_pal_names = {}
+            try:
+                self._desc_item_names = {r[0].lower(): r[1] for r in cursor.execute(f"SELECT id, name FROM {pfx}items WHERE name IS NOT NULL AND name != 'en Text'").fetchall()}
+            except Exception:
+                self._desc_item_names = {}
+            try:
+                self._desc_skill_names = {r[0].replace("EPalWazaID::", "").lower(): r[1] for r in cursor.execute(f"SELECT id, name FROM {pfx}skills").fetchall()}
+            except Exception:
+                self._desc_skill_names = {}
+            try:
+                self._desc_map_objs = {r[0].lower(): r[1] for r in cursor.execute(f"SELECT id, name FROM {pfx}buildings WHERE name IS NOT NULL AND name != 'en Text'").fetchall()}
+            except Exception:
+                self._desc_map_objs = {}
+
+        UI_COMMON_MAP = {
+            "RARITY_COMMON": "Common",
+            "RARITY_UNCOMMON": "Uncommon",
+            "RARITY_RARE": "Rare",
+            "RARITY_EPIC": "Epic",
+            "RARITY_LEGENDARY": "Legendary",
+            "COMMON_ELEMENT_NAME_DARK": "Dark",
+            "COMMON_ELEMENT_NAME_DRAGON": "Dragon",
+            "COMMON_ELEMENT_NAME_EARTH": "Ground",
+            "COMMON_ELEMENT_NAME_ELECTRICITY": "Electric",
+            "COMMON_ELEMENT_NAME_FIRE": "Fire",
+            "COMMON_ELEMENT_NAME_ICE": "Ice",
+            "COMMON_ELEMENT_NAME_LEAF": "Grass",
+            "COMMON_ELEMENT_NAME_NORMAL": "Neutral",
+            "COMMON_ELEMENT_NAME_WATER": "Water",
+            "COMMON_WORK_SUITABILITY_COLLECTION": "Gathering",
+            "COMMON_WORK_SUITABILITY_COOL": "Cooling",
+            "COMMON_WORK_SUITABILITY_DEFOREST": "Lumbering",
+            "COMMON_WORK_SUITABILITY_EMITFLAME": "Kindling",
+            "COMMON_WORK_SUITABILITY_GENERATEELECTRICITY": "Generating Electricity",
+            "COMMON_WORK_SUITABILITY_HANDCRAFT": "Handiwork",
+            "COMMON_WORK_SUITABILITY_MINING": "Mining",
+            "COMMON_WORK_SUITABILITY_MONSTERFARM": "Farming",
+            "COMMON_WORK_SUITABILITY_PRODUCTMEDICINE": "Medicine Production",
+            "COMMON_WORK_SUITABILITY_SEEDING": "Planting",
+            "COMMON_WORK_SUITABILITY_TRANSPORT": "Transporting",
+            "COMMON_WORK_SUITABILITY_WATERING": "Watering",
+            "COMMON_CONDITION_NAME_DEPRESSIONSPRAIN": "Sprain/Depression",
+            "COMMON_CONDITION_NAME_FRACTURE": "Fracture",
+            "COMMON_CONDITION_NAME_GASTRICULCER": "Ulcer",
+            "COMMON_CONDITION_NAME_WEAKNESS": "Weakened",
+            "ADDITIONAL_EFFECT_POISON": "Poison",
+            "COMMON_STATUS_DEFENCE": "Defense",
+            "COMMON_STATUS_RANGE_ATTACK": "Ranged Attack",
+        }
+
+        def _resolve_item(m):
+            iid = m.group(1).strip()
+            low = iid.lower()
+            if low == "machingun": return "Machine Gun"
+            if low == "magnum": return "Revolver"
+            if low in self._desc_item_names:
+                return self._desc_item_names[low]
+            if low.endswith("_1") and low[:-2] in self._desc_item_names:
+                return self._desc_item_names[low[:-2]]
+            if (low + "_1") in self._desc_item_names:
+                return self._desc_item_names[low + "_1"]
+            tier_m = re.search(r"_(\d+)$", iid)
+            if tier_m:
+                base_id = iid[:tier_m.start()]
+                tier_num = int(tier_m.group(1))
+                base_name = self._desc_item_names.get(base_id.lower())
+                if base_name:
+                    suffix = f" +{tier_num - 1}" if tier_num > 1 else ""
+                    return f"{base_name}{suffix}"
+            return iid
+
+        text = re.sub(r"<itemName\s+id=\|([^|]+)\|/>", _resolve_item, desc)
+        text = re.sub(r"<characterName\s+id=\|([^|]+)\|/>", lambda m: self._desc_pal_names.get(m.group(1).lower(), m.group(1)), text)
+        text = re.sub(r"<activeSkillName\s+id=\|([^|]+)\|/>", lambda m: self._desc_skill_names.get(m.group(1).lower(), m.group(1)), text)
+        text = re.sub(r"<[mM]apObjectName\s+id=\|([^|]+)\|/>", lambda m: self._desc_map_objs.get(m.group(1).lower(), m.group(1)), text)
+        text = re.sub(r"<uiCommon\s+id=\|([^|]+)\|(?:[^>]*)/>", lambda m: UI_COMMON_MAP.get(m.group(1).upper(), ""), text)
+        text = re.sub(r"<img\s+id=\|([^|]+)\|/>", "", text)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = text.replace("\r\n", " ").replace("\n", " ")
+        text = re.sub(r"\s*\(\s*\)", "", text)
+        text = re.sub(r"\s{2,}", " ", text)
+        return text.strip()
+
     def query_inventory(self, container_type: Optional[str] = None) -> list[dict[str, Any]]:
         """Queries item inventory from dynamic save data joined with static master items table."""
+        import re
         cursor = self.conn.cursor()
         try:
             cursor.execute("SELECT COUNT(*) as c FROM item_containers")
@@ -4588,7 +4692,10 @@ class SQLiteEngine:
         except Exception:
             return []
 
-        query = """
+        db_names = [r[1] for r in cursor.execute("PRAGMA database_list").fetchall()]
+        pfx = "palworld_master." if "palworld_master" in db_names else ""
+
+        query = f"""
             SELECT 
                 c.container_id,
                 c.container_type,
@@ -4606,28 +4713,126 @@ class SQLiteEngine:
                 m.description
             FROM item_containers c
             JOIN item_container_slots s ON c.container_id = s.container_id
-            LEFT JOIN palworld_master.items m ON LOWER(s.item_id) = LOWER(m.id)
+            LEFT JOIN {pfx}items m ON LOWER(s.item_id) = LOWER(m.id)
         """
         params = []
         if container_type:
             query += " WHERE c.container_type = ?"
             params.append(container_type)
-            
+
         query += " ORDER BY c.container_type, s.slot_index"
-        
+
         cursor.execute(query, params)
         rows = cursor.fetchall()
-        
+
+        # Cache of base items for fallback (tier variants like SFArmor_2, Blueprint_Accessory_ColdIce_1)
+        base_item_cache: dict[str, dict[str, Any]] = {}
+        missing_m_ids = {r["item_id"] for r in rows if not r["category"] or r["display_name"] == "en Text"}
+        if missing_m_ids and pfx:
+            stripped_candidates = {re.sub(r'_\d+$', '', iid): iid for iid in missing_m_ids}
+            if stripped_candidates:
+                placeholders = ",".join("?" for _ in stripped_candidates)
+                try:
+                    m_rows = cursor.execute(
+                        f"SELECT id, name, category, subcategory, rarity, weight, price, icon_path, description FROM {pfx}items WHERE LOWER(id) IN ({placeholders})",
+                        [x.lower() for x in stripped_candidates.keys()]
+                    ).fetchall()
+                    for mr in m_rows:
+                        base_item_cache[mr["id"].lower()] = dict(mr)
+                except Exception:
+                    pass
+
+        # Base camp container mapping
+        base_names = self.get_resolved_base_names()
+        base_container_map = getattr(self, "_base_container_map", None)
+        if base_container_map is None:
+            base_container_map = {}
+            eff_path = getattr(self, "current_save_path", None)
+            if eff_path and os.path.exists(eff_path):
+                try:
+                    from palengine.logistics.base_migration import inspect_base_containers, CONTAINER_TYPE_INFO
+                    inspected = inspect_base_containers(eff_path)
+                    for bid, c_list in inspected.items():
+                        b_name = base_names.get(bid, "Base Camp")
+                        for c_obj in c_list:
+                            cid = c_obj.get("container_id")
+                            if cid:
+                                c_custom = c_obj.get("custom_name")
+                                m_id = c_obj.get("map_object_id", "")
+                                t_info = CONTAINER_TYPE_INFO.get(m_id, {})
+                                t_name = t_info.get("name") or (m_id if m_id else "Chest")
+                                if c_custom:
+                                    base_container_map[cid] = f"{b_name} ({c_custom})"
+                                else:
+                                    base_container_map[cid] = f"{b_name} ({t_name})"
+                except Exception:
+                    pass
+            self._base_container_map = base_container_map
+
         results = []
         for r in rows:
             d = dict(r)
-            if not d["display_name"]:
-                d["display_name"] = d["item_id"]
-            if d["icon_path"]:
-                parts = d["icon_path"].split("/")
-                d["icon_path"] = "/assets/" + parts[-2] + "/" + parts[-1]
+            raw_id = d["item_id"]
+
+            # Fallback to base item for tier variants if category is not populated or name is 'en Text'
+            if not d.get("category") or d.get("display_name") == "en Text":
+                base_id = re.sub(r'_\d+$', '', raw_id)
+                base_meta = base_item_cache.get(base_id.lower())
+                if base_meta:
+                    for k in ("category", "subcategory", "weight", "price", "icon_path", "description"):
+                        if not d.get(k) or d.get(k) == "en Text":
+                            d[k] = base_meta.get(k)
+                    
+                    tier_match = re.search(r'_(\d+)$', raw_id)
+                    if tier_match:
+                        tier_num = int(tier_match.group(1))
+                        d["rarity"] = max(0, min(4, tier_num - 1))
+                        suffix_label = f" +{tier_num - 1}" if tier_num > 1 else ""
+                        d["display_name"] = f"{base_meta.get('name', base_id)}{suffix_label}"
+                    else:
+                        d["display_name"] = base_meta.get("name", base_id)
+                        if d.get("rarity") is None:
+                            d["rarity"] = base_meta.get("rarity", 0)
+
+            if not d.get("display_name") or d.get("display_name") == "en Text":
+                d["display_name"] = raw_id
+
+            # Standardize naming contract across frontend and backend
+            d["item_name"] = d["display_name"]
+            d["name"] = d["display_name"]
+
+            # Clean description string
+            if d.get("description"):
+                d["description"] = self.clean_item_description(d["description"])
+
+            # Fix icon path to /assets/items/...
+            if d.get("icon_path"):
+                norm_p = d["icon_path"].replace("\\", "/")
+                parts = norm_p.split("/")
+                d["icon_path"] = f"/assets/items/{parts[-1]}"
+
+            # Resolve Base / Location name
+            ctype = d.get("container_type", "Inventory")
+            cid = d.get("container_id")
+            if cid == "dddcad69-443b-c028-1566-04b205b4533a":
+                d["base_camp_name"] = "Guild Storage"
+            elif ctype == "Base Chest":
+                d["base_camp_name"] = base_container_map.get(cid, "Guild Storage")
+            elif ctype == "Inventory":
+                d["base_camp_name"] = "Player Inventory"
+            elif ctype == "Equipped Armor":
+                d["base_camp_name"] = "Player (Armor)"
+            elif ctype == "Weapon Loadout":
+                d["base_camp_name"] = "Player (Weapons)"
+            elif ctype == "Food Equip":
+                d["base_camp_name"] = "Player (Food Bag)"
+            elif ctype == "Key Items":
+                d["base_camp_name"] = "Player (Key Items)"
+            else:
+                d["base_camp_name"] = "Player Character"
+
             results.append(d)
-            
+
         return results
 
     def get_soul_optimizer_summary(self) -> dict[str, Any]:

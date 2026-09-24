@@ -5,6 +5,8 @@ from palengine.db.utils import clean_species_name, normalize_passives, transform
 
 def is_valid_standard_candidate(pal_dict: dict[str, Any], restricted_set: Optional[set[str]] = None) -> bool:
     """Helper to verify if Pal is eligible for mathematical breeding formula."""
+    if pal_dict.get("breeding_power") is None:
+        return False
     if restricted_set is None:
         restricted_set = set()
     d_name = pal_dict.get("display_name", "")

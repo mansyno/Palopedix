@@ -215,71 +215,242 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
+BOSS_PAL_MAP: dict[str, str] = {
+    "zoe & grizzbolt": "Grizzbolt",
+    "lily & lyleen": "Lyleen",
+    "axel & orserk": "Orserk",
+    "marcus & faleris": "Faleris",
+    "victor & shadowbeak": "Shadowbeak",
+    "saya & selyne": "Selyne",
+    "jetragon": "Jetragon",
+    "frostallion": "Frostallion",
+    "necromus": "Necromus",
+    "paladius": "Paladius",
+    "blazamut": "Blazamut",
+    "astegon": "Astegon",
+}
+
+BOSS_STATIC_ICONS: dict[str, str] = {
+    "Grizzbolt": "/assets/pals/ElecPanda.png",
+    "Lyleen": "/assets/pals/LilyQueen.png",
+    "Orserk": "/assets/pals/ThunderDragonMan.png",
+    "Faleris": "/assets/pals/Horus.png",
+    "Shadowbeak": "/assets/pals/BlackGriffon.png",
+    "Selyne": "/assets/pals/MoonQueen.png",
+    "Jetragon": "/assets/pals/JetDragon.png",
+    "Frostallion": "/assets/pals/IceHorse.png",
+    "Necromus": "/assets/pals/BlackCentaur.png",
+    "Paladius": "/assets/pals/SaintCentaur.png",
+    "Blazamut": "/assets/pals/KingBahamut.png",
+    "Astegon": "/assets/pals/BlackMetalDragon.png",
+}
+
+
 class BossPartyRecommender:
     """Generates optimal 5-Pal counter-parties for any boss encounter from local save data."""
 
     def __init__(self, engine: SQLiteEngine):
         self.engine = engine
 
+    @classmethod
+    def list_bosses(cls, engine: Optional[SQLiteEngine] = None) -> list[dict[str, Any]]:
+        """Returns all boss encounters from the database, enriched with categories, drops, and assets."""
+        import sqlite3
+        from palengine.db.utils import transform_icon_path
+
+        con = None
+        should_close = False
+        if engine and hasattr(engine, "conn") and isinstance(engine.conn, sqlite3.Connection):
+            con = engine.conn
+        else:
+            try:
+                from palengine.config import get_default_palworld_db_path
+                db_path = get_default_palworld_db_path()
+                con = sqlite3.connect(db_path)
+                con.row_factory = sqlite3.Row
+                should_close = True
+            except Exception:
+                pass
+
+        NORMALIZE_ELEMENT = {
+            "Earth": "Ground", "Leaf": "Grass", "Electricity": "Electric",
+            "Normal": "Neutral", "Dark": "Dark", "Dragon": "Dragon",
+            "Fire": "Fire", "Water": "Water", "Ice": "Ice",
+        }
+
+        results: list[dict[str, Any]] = []
+
+        if con:
+            try:
+                cur = con.cursor()
+                prefix = ""
+                try:
+                    cur.execute("SELECT 1 FROM palworld_master.bosses LIMIT 1")
+                    prefix = "palworld_master."
+                except Exception:
+                    pass
+
+                query = f"""
+                    SELECT b.id, b.pal_id, b.name, b.title, b.boss_type, b.element1, b.element2,
+                           b.hp, b.attack, b.defense, b.icon_path, b.badge_icon_path,
+                           b.location_x, b.location_y,
+                           p.name as pal_name, p.icon_path as pal_icon_path
+                    FROM {prefix}bosses b
+                    LEFT JOIN {prefix}pals p ON b.pal_id = p.id
+                    WHERE b.boss_type IN ('Tower', 'Alpha', 'Raid')
+                      AND b.id NOT LIKE '%Avatar%' 
+                      AND b.id NOT LIKE '%Servant%' 
+                      AND b.id NOT LIKE '%Otomo%'
+                      AND b.id NOT LIKE '%BossRush%'
+                      AND b.name NOT IN ('Unidentified Pal', 'en_text')
+                      AND (b.icon_path IS NOT NULL OR p.icon_path IS NOT NULL)
+                    ORDER BY 
+                        CASE b.boss_type
+                            WHEN 'Tower' THEN 1
+                            WHEN 'Raid' THEN 2
+                            WHEN 'Alpha' THEN 3
+                            ELSE 4
+                        END,
+                        b.name ASC
+                """
+                rows = cur.execute(query).fetchall()
+
+                # Load drops map
+                drops_map: dict[str, list[dict[str, Any]]] = {}
+                try:
+                    d_rows = cur.execute(f"SELECT boss_id, item_name, drop_rate, min_quantity, max_quantity FROM {prefix}boss_drops").fetchall()
+                    for dr in d_rows:
+                        drops_map.setdefault(dr["boss_id"], []).append({
+                            "item_name": dr["item_name"],
+                            "drop_rate": dr["drop_rate"],
+                            "min_qty": dr["min_quantity"],
+                            "max_qty": dr["max_quantity"],
+                        })
+                except Exception:
+                    pass
+
+                legendary_species = {"jetragon", "frostallion", "necromus", "paladius"}
+
+                for r in rows:
+                    b_id = r["id"]
+                    b_name = r["name"]
+                    b_type = r["boss_type"]
+
+                    # Category
+                    if b_type == "Tower":
+                        category = "Tower Boss"
+                    elif b_type == "Raid":
+                        category = "Raid Boss"
+                    elif b_name.lower() in legendary_species or (r["pal_name"] and r["pal_name"].lower() in legendary_species):
+                        category = "Alpha Legendary"
+                    else:
+                        category = "Alpha Boss"
+
+                    # Normalize elements
+                    elems = []
+                    for el in [r["element1"], r["element2"]]:
+                        if el:
+                            norm_el = NORMALIZE_ELEMENT.get(el, el)
+                            if norm_el not in elems:
+                                elems.append(norm_el)
+                    if not elems:
+                        elems = ["Neutral"]
+
+                    # Compute weaknesses
+                    weaknesses = []
+                    for el in elems:
+                        for w in ELEMENT_WEAKNESSES.get(el, []):
+                            if w not in weaknesses:
+                                weaknesses.append(w)
+
+                    # Icon & Badge
+                    icon = transform_icon_path(r["icon_path"]) or transform_icon_path(r["pal_icon_path"])
+                    badge = transform_icon_path(r["badge_icon_path"])
+
+                    # Encounter details
+                    reg_key = b_name.lower()
+                    reg_profile = BOSS_REGISTRY.get(reg_key) or {}
+
+                    hp = reg_profile.get("hp") or (r["hp"] * 100 if r["hp"] else 10000)
+                    level = reg_profile.get("level") or (50 if category in ("Alpha Legendary", "Raid Boss") else 40 if category == "Alpha Boss" else 30)
+                    time_limit = reg_profile.get("time_limit_sec") or (600 if b_type in ("Tower", "Raid") else None)
+                    dps = round(hp / time_limit, 1) if time_limit else None
+
+                    loc = reg_profile.get("location")
+                    if not loc:
+                        if r["location_x"] is not None and r["location_y"] is not None:
+                            loc = f"Palpagos Islands ({int(r['location_x'])}, {int(r['location_y'])})"
+                        elif b_type == "Tower":
+                            loc = "Syndicate Tower Arena"
+                        elif b_type == "Raid":
+                            loc = "Summoning Altar"
+                        else:
+                            loc = "Palpagos Islands (Wild / Dungeon Encounter)"
+
+                    dangerous = reg_profile.get("dangerous_moves", ["Signature Move", "Heavy Charge"])
+                    tactics = reg_profile.get("tactics", f"Target weakness ({', '.join(weaknesses)}) to gain 2.0x super-effective STAB multiplier.")
+
+                    results.append({
+                        "id": b_id,
+                        "canonical_name": b_name,
+                        "category": category,
+                        "title": r["title"],
+                        "pal_species": r["pal_name"] or b_name,
+                        "level": level,
+                        "hp": hp,
+                        "attack": r["attack"],
+                        "defense": r["defense"],
+                        "elements": elems,
+                        "weaknesses": weaknesses,
+                        "location": loc,
+                        "time_limit_sec": time_limit,
+                        "required_dps": dps,
+                        "icon_path": icon,
+                        "badge_icon_path": badge,
+                        "dangerous_moves": dangerous,
+                        "tactics": tactics,
+                        "drops": drops_map.get(b_id, []),
+                    })
+            except Exception:
+                pass
+            finally:
+                if should_close and con:
+                    con.close()
+
+        # Fallback to BOSS_REGISTRY if database unavailable
+        if not results:
+            for key, profile in BOSS_REGISTRY.items():
+                item = dict(profile)
+                item["id"] = key
+                item["category"] = "Tower Boss" if "zoe" in key or "lily" in key or "axel" in key or "marcus" in key or "victor" in key or "saya" in key else "Alpha Boss"
+                if item.get("time_limit_sec") and item.get("hp"):
+                    item["required_dps"] = round(item["hp"] / item["time_limit_sec"], 1)
+                else:
+                    item["required_dps"] = None
+                results.append(item)
+
+        return results
+
     def resolve_boss(self, query: str) -> Optional[dict[str, Any]]:
         """Resolves user query string into a structured Boss Profile."""
         cleaned = query.strip().lower()
-        
-        # Direct match from registry
-        for key, profile in BOSS_REGISTRY.items():
-            if key in cleaned or cleaned in key:
-                profile_copy = dict(profile)
-                if profile_copy.get("time_limit_sec"):
-                    profile_copy["required_dps"] = round(profile_copy["hp"] / profile_copy["time_limit_sec"], 1)
-                else:
-                    profile_copy["required_dps"] = None
-                return profile_copy
-                
-        # Keyword checks (e.g. "victor", "faleris", "grizzbolt")
-        for key, profile in BOSS_REGISTRY.items():
-            words = re.findall(r"\w+", key)
+
+        all_bosses = self.list_bosses(self.engine)
+        # 1. Exact match on id or canonical_name
+        for b in all_bosses:
+            if b["id"].lower() == cleaned or b["canonical_name"].lower() == cleaned:
+                return b
+
+        # 2. Substring match
+        for b in all_bosses:
+            if cleaned in b["id"].lower() or cleaned in b["canonical_name"].lower() or cleaned in b.get("pal_species", "").lower():
+                return b
+
+        # 3. Keyword match
+        for b in all_bosses:
+            words = re.findall(r"\w+", b["canonical_name"].lower())
             if any(w in cleaned for w in words if len(w) > 3):
-                profile_copy = dict(profile)
-                if profile_copy.get("time_limit_sec"):
-                    profile_copy["required_dps"] = round(profile_copy["hp"] / profile_copy["time_limit_sec"], 1)
-                else:
-                    profile_copy["required_dps"] = None
-                return profile_copy
-
-        # Fallback: Query static SQLite Paldex for any Alpha/Pal species
-        cursor = self.engine.conn.cursor()
-        cursor.execute(
-            """
-            SELECT name, display_name, element_1, element_2, hp, attack_melee, defense
-            FROM pals
-            WHERE lower(name) LIKE ? OR lower(display_name) LIKE ?
-            LIMIT 1
-            """,
-            (f"%{cleaned}%", f"%{cleaned}%"),
-        )
-        row = cursor.fetchone()
-        if row:
-            e1 = row["element_1"] or "Neutral"
-            e2 = row["element_2"]
-            elems = [e1] if not e2 else [e1, e2]
-            weaknesses = []
-            for el in elems:
-                weaknesses.extend(ELEMENT_WEAKNESSES.get(el, []))
-            weaknesses = list(dict.fromkeys(weaknesses))
-            est_hp = row["hp"] * 100 if row["hp"] else 10000
-
-            return {
-                "canonical_name": f"Alpha {row['display_name'] or row['name']}",
-                "location": "Palpagos Islands (Wild / Dungeon Encounter)",
-                "level": 50,
-                "hp": est_hp,
-                "time_limit_sec": None,
-                "required_dps": None,
-                "elements": elems,
-                "weaknesses": weaknesses,
-                "dangerous_moves": ["Elemental Signature Skill", "Charge Attack"],
-                "tactics": f"Target weakness ({', '.join(weaknesses)}) to gain 2.0x super-effective STAB multiplier.",
-            }
+                return b
 
         return None
 
@@ -339,6 +510,12 @@ class BossPartyRecommender:
         if level_gap >= 0 and counter_count >= 1:
             status = "FAVORED"
             verdict = f"Encounter is favored. Lead Pal (Lv.{highest_lvl}) matches or exceeds Boss level (Lv.{boss_level}) with {counter_count} super-effective counter(s)."
+        elif level_gap >= 5:
+            status = "FAVORED"
+            verdict = f"Encounter is favored due to substantial level advantage (Lv.{highest_lvl} vs Lv.{boss_level}, Level gap: +{level_gap}), though direct elemental counters are limited."
+        elif level_gap >= 0:
+            status = "NEUTRAL"
+            verdict = f"Neutral encounter. Lead Pal (Lv.{highest_lvl}) matches Boss level (Lv.{boss_level}), but party lacks super-effective elemental counters."
         elif level_gap >= -5 and counter_count >= 1:
             status = "CHALLENGING"
             verdict = f"Viable but challenging (Level gap: {level_gap}). Stagger rotation and careful dodging required."
@@ -352,10 +529,12 @@ class BossPartyRecommender:
         # Time constraint notes
         if time_limit_sec:
             time_mins = time_limit_sec // 60
+            dps_text = f"{req_dps:,.1f}" if isinstance(req_dps, (int, float)) else "N/A"
+            hp_text = f"{boss.get('hp', 0):,}" if isinstance(boss.get("hp"), (int, float)) else str(boss.get("hp", "N/A"))
             if status in ("HIGH DIFFICULTY", "UNLIKELY / NOT RECOMMENDED"):
-                timer_note = f"[HIGH TIMEOUT RISK] Must output {req_dps:,} DPS to burn {boss['hp']:,} HP within the strict {time_mins}-minute arena limit. Underleveled damage penalties make this timeout very likely."
+                timer_note = f"[HIGH TIMEOUT RISK] Must output {dps_text} DPS to burn {hp_text} HP within the strict {time_mins}-minute arena limit. Underleveled damage penalties make this timeout very likely."
             else:
-                timer_note = f"Arena Time Limit: {time_mins} minutes ({time_limit_sec}s). Minimum sustained DPS threshold: {req_dps:,} DPS."
+                timer_note = f"Arena Time Limit: {time_mins} minutes ({time_limit_sec}s). Minimum sustained DPS threshold: {dps_text} DPS."
         else:
             timer_note = "Open Field / Dungeon Encounter: No hard arena timer. Prioritize kiting and Pal recall dodging."
 
@@ -417,6 +596,8 @@ class BossPartyRecommender:
             inst_copy["base_hp"] = st.get("hp", 100)
             inst_copy["base_atk"] = st.get("attack_melee", 100)
             inst_copy["base_def"] = st.get("defense", 100)
+            if not inst_copy.get("icon_path") and st.get("icon_path"):
+                inst_copy["icon_path"] = st.get("icon_path")
             enriched.append(inst_copy)
 
         weaknesses = boss["weaknesses"]
@@ -533,10 +714,13 @@ class BossPartyRecommender:
             if len(best_party_instances) == 5:
                 break
 
-        # Format party with tailored movesets and role-specific passive priorities
+        # Query player inventory for owned Skill Fruits (SkillCard_*)
+        inventory_fruits = self._get_inventory_skill_fruits()
+
+        # Format party with tailored movesets, skill fruit availability, and role priorities
         formatted_team = []
         for p, role in zip(best_party_instances, party_roles):
-            formatted_team.append(self._format_team_member_with_waza(p, role, weaknesses))
+            formatted_team.append(self._format_team_member_with_waza(p, role, weaknesses, inventory_fruits))
 
         # Evaluate encounter readiness
         readiness = self.evaluate_encounter_readiness(boss, best_party_instances)
@@ -548,11 +732,54 @@ class BossPartyRecommender:
             "tactics": boss.get("tactics", ""),
         }
 
+    def _get_inventory_skill_fruits(self) -> dict[str, dict[str, Any]]:
+        """Loads all Skill Fruits (SkillCard_*) in player storage and inventory."""
+        fruits: dict[str, dict[str, Any]] = {}
+        if not self.engine or not hasattr(self.engine, "conn") or not self.engine.conn:
+            return fruits
+        try:
+            cursor = self.engine.conn.cursor()
+            query = """
+                SELECT s.item_id, SUM(s.count) as total_count, i.name as fruit_name, i.icon_path
+                FROM item_container_slots s
+                LEFT JOIN palworld_master.items i ON s.item_id = i.id
+                WHERE s.item_id LIKE 'SkillCard_%'
+                GROUP BY s.item_id
+            """
+            try:
+                rows = cursor.execute(query).fetchall()
+            except Exception:
+                query_fallback = """
+                    SELECT s.item_id, SUM(s.count) as total_count, i.name as fruit_name, i.icon_path
+                    FROM item_container_slots s
+                    LEFT JOIN items i ON s.item_id = i.id
+                    WHERE s.item_id LIKE 'SkillCard_%'
+                    GROUP BY s.item_id
+                """
+                rows = cursor.execute(query_fallback).fetchall()
+
+            from palengine.db.utils import transform_icon_path
+            for r in rows:
+                fn = r["fruit_name"] or r["item_id"]
+                # e.g. "Water Skill Fruit: Hydro Jet" -> "Hydro Jet"
+                skill_name = fn.split(":")[-1].strip() if ":" in fn else fn.replace("SkillCard_", "").strip()
+                fruits[skill_name.lower()] = {
+                    "item_id": r["item_id"],
+                    "fruit_name": fn,
+                    "count": r["total_count"],
+                    "skill_name": skill_name,
+                    "icon_path": transform_icon_path(r["icon_path"]),
+                }
+        except Exception:
+            pass
+        return fruits
+
     def _format_team_member_with_waza(
         self,
         pal: dict[str, Any],
         role_hint: str,
         weaknesses: list[str],
+        inventory_fruits: Optional[dict[str, dict[str, Any]]] = None,
     ) -> dict[str, Any]:
         passives = [p["name"] if isinstance(p, dict) else str(p) for p in pal.get("passives", [])]
         elem = f"{pal.get('element_1') or '?'}/{pal.get('element_2') or ''}".rstrip('/')
@@ -568,6 +795,34 @@ class BossPartyRecommender:
             target_elements = weaknesses + pal_elements
         
         assigned_waza = self._get_tailored_waza_for_pal(target_elements)
+
+        # Cross-reference assigned waza against currently equipped, mastered reserve, and inventory fruits
+        equipped_waza = pal.get("equip_waza", [])
+        mastered_waza = pal.get("mastered_waza", [])
+
+        equipped_names = {w.get("name", "").lower() for w in equipped_waza if isinstance(w, dict) and w.get("name")}
+        mastered_names = {w.get("name", "").lower() for w in mastered_waza if isinstance(w, dict) and w.get("name")}
+
+        for waza in assigned_waza:
+            w_name = waza.get("name", "")
+            w_lower = w_name.lower()
+
+            if w_lower in equipped_names:
+                waza["status"] = "equipped"
+                waza["status_badge"] = "🟢 Equipped"
+            elif w_lower in mastered_names:
+                waza["status"] = "learned"
+                waza["status_badge"] = "🔵 Learned (Can Equip)"
+            elif inventory_fruits and w_lower in inventory_fruits:
+                fruit = inventory_fruits[w_lower]
+                waza["status"] = "fruit"
+                waza["status_badge"] = f"🟣 Skill Fruit (x{fruit['count']})"
+                waza["fruit_count"] = fruit["count"]
+                waza["fruit_name"] = fruit["fruit_name"]
+                waza["fruit_icon"] = fruit["icon_path"]
+            else:
+                waza["status"] = "unlearned"
+                waza["status_badge"] = "⚪ Not Learned (Need Fruit)"
 
         # Determine optimal target passives based on role
         if "Buffer" in role_hint or "Gobfin" in role_hint:
@@ -589,7 +844,10 @@ class BossPartyRecommender:
             "human_label": self.get_human_pal_representation(pal),
             "role": role_hint,
             "recommended_waza": assigned_waza,
+            "equip_waza": equipped_waza,
+            "mastered_waza": mastered_waza,
             "optimal_passives": optimal_passives,
+            "icon_path": pal.get("icon_path"),
         }
 
     def _get_tailored_waza_for_pal(self, elements: list[str]) -> list[dict[str, Any]]:

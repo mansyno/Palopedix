@@ -22,3 +22,9 @@ All AI coding agents (Antigravity) operating within this repository MUST follow 
    The total number of unique unordered parent pairs is: $$\frac{291 \times (291 + 1)}{2} = \mathbf{42{,}486\text{ 
 combinations}}$$
    use the numbers
+
+10. **Strict Project Boundary & `palDBxtrct` Protocol**:
+    - Work solely within the `palopedix` project folder. All access to or inspection of the `c:\AI\palDBxtrct` project directory is strictly forbidden, with the sole exception of copying or referencing `palworld.db` itself.
+    - Do NOT view, search, or speculate on files, code, or tasks in `palDBxtrct`.
+    - Only concern yourself with the integrity of this repository's local codebase and world save database (`data/world_*.db`, `data/palworld.db`).
+    - If any data discrepancies, schema bugs, or missing information in `palworld.db` are identified during tasks for this app, they MUST be immediately reported to the user with exact tables and records affected. Do NOT attempt in-repo workarounds, ad-hoc patches, or synthetic fixes. The user will take the issue to the `palDBxtrct` agent for fixing at the source.

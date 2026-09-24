@@ -120,7 +120,7 @@ def test_recommend_party_for_boss(mock_engine, mock_instances):
     assert "recommended_party" in result
     
     readiness = result["encounter_readiness"]
-    assert readiness["status"] in ("FAVORED", "CHALLENGING", "HIGH DIFFICULTY", "UNLIKELY / NOT RECOMMENDED")
+    assert readiness["status"] in ("FAVORED", "NEUTRAL", "CHALLENGING", "HIGH DIFFICULTY", "UNLIKELY / NOT RECOMMENDED")
     assert readiness["highest_pal_level"] >= 40
     assert "verdict" in readiness
     
@@ -187,5 +187,43 @@ def test_cli_boss_party_command():
         assert "Jormuntide Ignis" in result.output
         assert "Dragon Cannon" in result.output
         assert "FAVORED" in result.output
+
+
+def test_list_bosses():
+    bosses = BossPartyRecommender.list_bosses()
+    assert len(bosses) >= 12
+    for b in bosses:
+        assert "id" in b
+        assert "canonical_name" in b
+        assert "category" in b
+        assert b["category"] in ("Tower Boss", "Alpha Legendary", "Alpha Boss", "Raid Boss")
+        assert "elements" in b
+        assert "weaknesses" in b
+        assert "icon_path" in b
+        assert b["icon_path"] is not None
+
+
+def test_evaluate_readiness_overleveled_no_counter():
+    recommender = BossPartyRecommender(MagicMock())
+    boss = {
+        "canonical_name": "Zoe & Grizzbolt",
+        "level": 10,
+        "hp": 30550,
+        "weaknesses": ["Ground"],
+        "elements": ["Electric"],
+        "time_limit_sec": 600,
+        "required_dps": 50.9,
+    }
+    # Party with Lv 55 Pals, but NO Ground counter
+    party = [
+        {"species": "Lamball", "level": 55, "element_1": "Neutral", "element_2": None},
+        {"species": "Cattiva", "level": 50, "element_1": "Neutral", "element_2": None},
+    ]
+    readiness = recommender.evaluate_encounter_readiness(boss, party)
+    # Must NOT be HIGH DIFFICULTY or UNLIKELY
+    assert readiness["status"] == "FAVORED"
+    assert readiness["level_gap"] == 45
+    assert "favored" in readiness["verdict"].lower()
+
 
 

@@ -15,6 +15,7 @@ import HomepageView from './components/HomepageView';
 import { WorldOverviewView, WelcomeView } from './components/WorldOverviewView';
 import BaseMigrationView from './components/BaseMigrationView';
 import PalDetailModal from './components/common/PalDetailModal';
+import BossCounterView from './components/BossCounterView';
 
 function TabKeepAlive({ id, activeTab, mode, visitedTabs, children }) {
   if (!visitedTabs.has(id)) return null;
@@ -420,6 +421,9 @@ function App() {
                 <div className={`nav-item ${activeTab === 'breeding' ? 'active' : ''}`} onClick={() => setActiveTab('breeding')}>
                   🐣 Breeding Center
                 </div>
+                <div className={`nav-item ${activeTab === 'boss_counter' ? 'active' : ''}`} onClick={() => setActiveTab('boss_counter')}>
+                  ⚔️ Boss Counter
+                </div>
               </>
             )}
 
@@ -451,6 +455,7 @@ function App() {
               activeTab === 'base_optimizer' ? 'Base Camp Pal Recommendation & Optimizer Engine' :
               activeTab === 'condenser' ? 'Condenser Recommendations' :
               activeTab === 'missions' ? 'Active NPC Sub-Missions' :
+              activeTab === 'boss_counter' ? 'Boss Counter Recommender' :
               activeTab === 'settings' ? 'System Settings' : 'Breeding Center'
             }</h1>
             <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{
@@ -465,6 +470,7 @@ function App() {
               activeTab === 'base_optimizer' ? 'Automated work suitability demand matching, nocturnal 24/7 duty cycle bonuses, and food satiety balance.' :
               activeTab === 'condenser' ? 'View the absolute best Pals to condense based on your duplicates, IVs, and passives.' :
               activeTab === 'missions' ? 'Track and fulfill NPC quest requirements using your personal inventory, base chests, and caught Pals.' :
+              activeTab === 'boss_counter' ? 'Evaluate boss encounters, elemental weaknesses, and optimal 5-Pal counter parties from your save roster.' :
               activeTab === 'settings' ? 'Manage save file loading and database source settings.' :
               'Calculate offspring results or find parent breeding pairs for any Pal.'
             }</p>
@@ -633,6 +639,15 @@ function App() {
             ownedPals={ownedPals}
             setOwnedPals={setOwnedPals}
             instances={instances}
+          />
+        </TabKeepAlive>
+
+        {/* ⚔️ Boss Counter Tab */}
+        <TabKeepAlive id="boss_counter" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <BossCounterView
+            saveLoaded={saveLoaded}
+            worldId={selectedWorldId}
+            setSelectedPal={setSelectedPal}
           />
         </TabKeepAlive>
       </main>

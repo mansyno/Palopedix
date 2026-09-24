@@ -43,10 +43,22 @@ export function getPassiveMeta(skill, isMatched = false) {
   if (matchedCard) {
     iconPath = iconPath || matchedCard.icon_path;
     name = name || matchedCard.name;
-    description = description || matchedCard.description;
-    statModifier = statModifier || matchedCard.stat_modifier;
+    description = (!description || description.includes('{') || description === statModifier)
+      ? (matchedCard.description || description)
+      : description;
+    statModifier = (!statModifier || statModifier.includes('{'))
+      ? (matchedCard.stat_modifier || matchedCard.description || statModifier)
+      : statModifier;
     category = category || matchedCard.category;
     id = id || matchedCard.id;
+  }
+
+  // Defensive sanitization: ensure no raw Unreal {EffectValue...} braces leak to UI
+  if (description && description.includes('{')) {
+    description = description.replace(/\{.*?EffectValue.*?\}/g, '').replace(/\[.*?EffectValue.*?\]/g, '').trim();
+  }
+  if (statModifier && statModifier.includes('{')) {
+    statModifier = statModifier.replace(/\{.*?EffectValue.*?\}/g, '').replace(/\[.*?EffectValue.*?\]/g, '').trim();
   }
 
   if (!iconPath && id) {

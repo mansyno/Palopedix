@@ -672,6 +672,31 @@ def execute_migration(req: MigrationExecuteRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.get("/api/bosses")
+def get_bosses() -> list[dict[str, Any]]:
+    """Returns all registered boss profiles enriched with categories and icon paths."""
+    from palengine.analytics.boss_recommender import BossPartyRecommender
+    return BossPartyRecommender.list_bosses(engine=db_engine)
+
+
+@app.get("/api/bosses/{boss_name}/party")
+def get_boss_party_recommendation(boss_name: str) -> dict[str, Any]:
+    """Calculates optimal 5-Pal counter party for the specified boss against loaded save data."""
+    from palengine.analytics.boss_recommender import BossPartyRecommender
+
+    recommender = BossPartyRecommender(db_engine)
+    try:
+        recommendation = recommender.recommend_party_for_boss(boss_name)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate boss party recommendation: {e}"
+        )
+    return recommendation
+
+
+
 
 
 

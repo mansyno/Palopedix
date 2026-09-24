@@ -25,6 +25,10 @@
    - Central filter dropdowns (`CustomSelect`) must render via `createPortal(..., document.body)` with `fixed` coordinates to prevent modal container clipping.
    - World Pals and Filter Modal must respect `palSourceMode` (`'all'` vs `'caught'`), dynamically scoping available passive skills and species when caught mode is active.
 8. **Surgical Precision**: Touch only the exact files required for the task. Keep diffs minimal and clean.
+9. **Strict Project Boundary & External Database Protocol**:
+   - Work solely within the `palopedix` workspace. Never inspect or navigate external project folders (such as `c:\AI\palDBxtrct`), with the sole exception of copying or referencing `palworld.db` itself.
+   - Do NOT speculate on other projects or write in-code workarounds for external database defects.
+   - If a data corruption, alignment flaw, or schema issue is discovered in `palworld.db` during development or testing, immediately report the exact tables, columns, and records to the user so it can be routed to the extractor agent for resolution at the source.
 
 ---
 

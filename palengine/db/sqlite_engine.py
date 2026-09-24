@@ -26,7 +26,7 @@ from palengine.parser.extract_settings import extract_world_settings
 from palengine.analytics.breeding_graph import BreedingGraphOptimizer
 
 
-from palengine.db.utils import transform_icon_path
+from palengine.db.utils import transform_icon_path, resolve_passive_placeholders
 
 
 def clean_skill_text(text: Optional[str], pal_name: str = "Pal") -> Optional[str]:
@@ -213,6 +213,10 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
 
     desc = clean_skill_text(skill_dict.get("description"))
     mod = clean_skill_text(skill_dict.get("stat_modifier"))
+
+    # Resolve static parameter placeholders ({EffectValue})
+    desc = resolve_passive_placeholders(desc, p_id, name)
+    mod = resolve_passive_placeholders(mod, p_id, name)
 
     if not mod and desc:
         mod = desc

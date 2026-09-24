@@ -157,8 +157,139 @@ def categorize_passive_source(name: str, p_id: str, category: Optional[str] = No
         return "Legendary"
     return "Pals"
 
+PASSIVE_SKILL_RESOLVED_TEXT: dict[str, str] = {
+    "traineratk_up_1": "10.0% increase in Player Attack.",
+    "vanguard": "10.0% increase in Player Attack.",
+    "trainerdef_up_1": "10.0% increase in Player Defense.",
+    "stronghold strategist": "10.0% increase in Player Defense.",
+    "trainerworkspeed_up_1": "25.0% increase in Player Work Speed.",
+    "motivational leader": "25.0% increase in Player Work Speed.",
+    "trainermining_up1": "25.0% increase in Player Mining Efficiency.",
+    "mine foreman": "25.0% increase in Player Mining Efficiency.",
+    "trainerlogging_up1": "25.0% increase in Player Logging Efficiency.",
+    "logging foreman": "25.0% increase in Player Logging Efficiency.",
+    "elementresist_normal_1_pal": "10.0% decrease in incoming Neutral damage.",
+    "abnormal": "10.0% decrease in incoming Neutral damage.",
+    "elementresist_fire_1_pal": "10.0% decrease in incoming Fire damage.",
+    "suntan lover": "10.0% decrease in incoming Fire damage.",
+    "elementresist_aqua_1_pal": "10.0% decrease in incoming Water damage.",
+    "waterproof": "10.0% decrease in incoming Water damage.",
+    "elementresist_thunder_1_pal": "10.0% decrease in incoming Lightning damage.",
+    "insulated body": "10.0% decrease in incoming Lightning damage.",
+    "elementresist_leaf_1_pal": "10.0% decrease in incoming Grass damage.",
+    "botanical barrier": "10.0% decrease in incoming Grass damage.",
+    "elementresist_ice_1_pal": "10.0% decrease in incoming Ice damage.",
+    "heated body": "10.0% decrease in incoming Ice damage.",
+    "elementresist_earth_1_pal": "10.0% decrease in incoming Earth damage.",
+    "earthquake resistant": "10.0% decrease in incoming Earth damage.",
+    "elementresist_dark_1_pal": "10.0% decrease in incoming Dark damage.",
+    "cheery": "10.0% decrease in incoming Dark damage.",
+    "elementresist_dragon_1_pal": "10.0% decrease in incoming Dragon damage.",
+    "dragonkiller": "10.0% decrease in incoming Dragon damage.",
+    "elementboost_normal_1_pal": "10.0% increase in Neutral attack damage.",
+    "spirit of zen": "10.0% increase in Neutral attack damage.",
+    "elementboost_fire_1_pal": "10.0% increase in Fire attack damage.",
+    "pyromaniac": "10.0% increase in Fire attack damage.",
+    "elementboost_aqua_1_pal": "10.0% increase in Water attack damage.",
+    "hydromaniac": "10.0% increase in Water attack damage.",
+    "elementboost_thunder_1_pal": "10.0% increase in Lightning attack damage.",
+    "capacitor": "10.0% increase in Lightning attack damage.",
+    "elementboost_leaf_1_pal": "10.0% increase in Grass attack damage.",
+    "fragrant foliage": "10.0% increase in Grass attack damage.",
+    "elementboost_ice_1_pal": "10.0% increase in Ice attack damage.",
+    "coldblooded": "10.0% increase in Ice attack damage.",
+    "elementboost_earth_1_pal": "10.0% increase in Earth attack damage.",
+    "power of gaia": "10.0% increase in Earth attack damage.",
+    "elementboost_dark_1_pal": "10.0% increase in Dark attack damage.",
+    "veil of darkness": "10.0% increase in Dark attack damage.",
+    "elementboost_dragon_1_pal": "10.0% increase in Dragon attack damage.",
+    "blood of the dragon": "10.0% increase in Dragon attack damage.",
+    "cooltimereduction_up_1": "Active skill cooldown reduction 30.0% Attack +10.0%",
+    "serenity": "Active skill cooldown reduction 30.0% Attack +10.0%",
+    "cooltimereduction_up_2": "Active skill cooldown reduction 15.0%",
+    "impatient": "Active skill cooldown reduction 15.0%",
+    "cooltimereduction_up_3": "Active skill cooldown reduction 30.0% Attack +10.0%",
+    "tempest fury": "Active skill cooldown reduction 30.0% Attack +10.0%",
+    "cooltimereduction_down_1": "Active skill cooldown extension -15.0%",
+    "easygoing": "Active skill cooldown extension -15.0%",
+    "stamina_up_1": "Max Stamina +50.0% *This effect is only valid for rideable pals.",
+    "infinite stamina": "Max Stamina +50.0% *This effect is only valid for rideable pals.",
+    "stamina_up_2": "Max Stamina +25.0% *This effect is only valid for rideable pals.",
+    "fit as a fiddle": "Max Stamina +25.0% *This effect is only valid for rideable pals.",
+    "stamina_up_3": "Max Stamina +75.0% *This effect is only valid for rideable pals.",
+    "eternal engine": "Max Stamina +75.0% *This effect is only valid for rideable pals.",
+    "stamina_down_1": "Max Stamina -25.0% *This effect is only valid for rideable pals.",
+    "sickly": "Max Stamina -25.0% *This effect is only valid for rideable pals.",
+    "saleprice_up_1": "Increases the value of items when sold by +5.0%",
+    "noble": "Increases the value of items when sold by +5.0%",
+    "saleprice_up_2": "Increases the value of items when sold by +3.0%",
+    "fine furs": "Increases the value of items when sold by +3.0%",
+    "saleprice_down_1": "Decreases the value of items when sold by -10.0%",
+    "shabby": "Decreases the value of items when sold by -10.0%",
+    "alien": "Attack +10.0% Fire damage reduction 15.0% Lightning damage reduction 15.0%",
+    "otherworldly cells": "Attack +10.0% Fire damage reduction 15.0% Lightning damage reduction 15.0%",
+    "test_palegg_hatchingspeed_up": "When assigned to a Breeding Farm, breeding speed is increased by 100.0%.",
+    "philanthropist": "When assigned to a Breeding Farm, breeding speed is increased by 100.0%.",
+    "vampire": "Absorbs a portion of the damage dealt to restore Health. Does not sleep at night and continues to work.",
+    "vampiric": "Absorbs a portion of the damage dealt to restore Health. Does not sleep at night and continues to work.",
+    "nushi": "20.0% increase to Water attack damage 20.0% increase to Ice attack damage 20.0% increase to Defense.",
+    "lunker": "20.0% increase to Water attack damage 20.0% increase to Ice attack damage 20.0% increase to Defense.",
+    "gym_name_meadow": "Attack +20.0% Movement Speed increases 10.0%",
+    "rayne syndicate boss": "Attack +20.0% Movement Speed increases 10.0%",
+    "worldtree_atk": "Attack +50.0% Defense -30.0% World Tree resources will not vanish when approached.",
+    "twin-edged holy blade": "Attack +50.0% Defense -30.0% World Tree resources will not vanish when approached.",
+    "worldtree_def": "Defense +50.0% Attack -30.0% World Tree resources will not vanish when approached.",
+    "sanctified meat shield": "Defense +50.0% Attack -30.0% World Tree resources will not vanish when approached.",
+    "worldtree_craftspeed": "Work Speed +90.0% SAN decreases +15.0% faster. World Tree resources will not vanish when approached.",
+    "demon's hand": "Work Speed +90.0% SAN decreases +15.0% faster. World Tree resources will not vanish when approached.",
+    "demons hand": "Work Speed +90.0% SAN decreases +15.0% faster. World Tree resources will not vanish when approached.",
+    "worldtree_fullstomach": "Decrease Hunger depletion rate by +50.0% Max Health -20.0% World Tree resources will not vanish when approached.",
+    "world tree's bounty": "Decrease Hunger depletion rate by +50.0% Max Health -20.0% World Tree resources will not vanish when approached.",
+    "world tree seedbed": "Decrease Hunger depletion rate by +50.0% Max Health -20.0% World Tree resources will not vanish when approached.",
+    "worldtree_sanity": "SAN drops +50.0% slower. Work Speed -20.0% World Tree resources will not vanish when approached.",
+    "hermit sage": "SAN drops +50.0% slower. Work Speed -20.0% World Tree resources will not vanish when approached.",
+    "worldtree_movespeed": "Movement Speed +50.0% Increases Hunger depletion rate by +15.0% World Tree resources will not vanish when approached.",
+    "dimensional leap": "Movement Speed +50.0% Increases Hunger depletion rate by +15.0% World Tree resources will not vanish when approached.",
+    "worldtree_atk_def": "Attack +40.0% Defense +20.0% Max Health -50.0% World Tree resources will not vanish when approached.",
+    "god of destruction": "Attack +40.0% Defense +20.0% Max Health -50.0% World Tree resources will not vanish when approached.",
+    "mutationpal_babysitter": "While at a base, increases egg production speed by +30.0% and incubation speed by +30.0% for Pals assigned to a Breeding Farm.",
+    "babysitter": "While at a base, increases egg production speed by +30.0% and incubation speed by +30.0% for Pals assigned to a Breeding Farm.",
+    "mutationpal_mutant": "Pal and Player Auto Health Regeneration Rate +50.0% Defense +25.0% Immune to Poison Damage Immune to Burn Damage",
+    "idiosyncratic": "Pal and Player Auto Health Regeneration Rate +50.0% Defense +25.0% Immune to Poison Damage Immune to Burn Damage",
+    "mutationpal_immortal": "Absorbs 5.0% of damage dealt and restores Health. Pal Auto Health Regeneration Rate +100.0% Attack +15.0%",
+    "immortality": "Absorbs 5.0% of damage dealt and restores Health. Pal Auto Health Regeneration Rate +100.0% Attack +15.0%",
+    "deffence_up2": "Defense +20.0% Immune to Flinch",
+    "burly body": "Defense +20.0% Immune to Flinch",
+    "deffence_up2_2": "Defense +20.0% Immune to Knockback",
+    "heavyweight": "Defense +20.0% Immune to Knockback",
+    "deffence_up3": "Defense +30.0% Immune to Flinch Immune to Knockback",
+    "diamond body": "Defense +30.0% Immune to Flinch Immune to Knockback",
+    "legend": "Attack +20.0% Defense +20.0% Movement Speed increases 20.0%",
+}
+
+def resolve_passive_placeholders(text: Optional[str], p_id: str = "", name: str = "") -> Optional[str]:
+    """Resolves {EffectValue} placeholders in passive skill texts using canonical game parameter values."""
+    if not text and not p_id and not name:
+        return text
+    has_placeholder = bool(text and ("{" in text or "EffectValue" in text))
+    pid_key = str(p_id or "").strip().lower()
+    name_key = str(name or "").strip().lower()
+
+    resolved = PASSIVE_SKILL_RESOLVED_TEXT.get(pid_key) or PASSIVE_SKILL_RESOLVED_TEXT.get(name_key)
+    if resolved:
+        if not text or has_placeholder:
+            return resolved
+
+    if text and has_placeholder:
+        cleaned = re.sub(r"\{.*?EffectValue.*?\}%?", "", text)
+        cleaned = re.sub(r"\[.*?EffectValue.*?\]%?", "", cleaned)
+        cleaned = " ".join(cleaned.split())
+        return cleaned
+
+    return text
+
 def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
-    """Enrich a skill record with aptitude and source metadata."""
+    """Enrich a skill record with aptitude, source metadata, and resolved parameter values."""
     if not skill_dict:
         return skill_dict
     s_name = skill_dict.get('name', '')
@@ -168,6 +299,19 @@ def enrich_passive_skill(skill_dict: dict[str, Any]) -> dict[str, Any]:
     skill_dict['aptitude'] = calculate_aptitude(s_name, s_id, s_cat)
     if skill_dict.get('type') == 'Passive':
         skill_dict['source'] = categorize_passive_source(s_name, s_id, s_cat)
+
+    desc = skill_dict.get('description')
+    mod = skill_dict.get('stat_modifier')
+    if desc or mod or s_id or s_name:
+        desc = resolve_passive_placeholders(desc, s_id, s_name)
+        mod = resolve_passive_placeholders(mod, s_id, s_name)
+        if not mod and desc:
+            mod = desc
+        if not desc and mod:
+            desc = mod
+        skill_dict['description'] = desc
+        skill_dict['stat_modifier'] = mod
+
     return skill_dict
 
 def normalize_passives(passives_raw: list) -> list[dict[str, Any]]:

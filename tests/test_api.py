@@ -150,5 +150,37 @@ def test_api_get_instances_with_partner_subcategory():
         })
 
 
+def test_api_get_bosses():
+    response = client.get("/api/bosses")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) >= 12
+    first = data[0]
+    assert "canonical_name" in first
+    assert "category" in first
+    assert "elements" in first
+    assert "icon_path" in first
+
+
+def test_api_get_boss_party():
+    mock_result = {
+        "boss_profile": {"canonical_name": "Victor & Shadowbeak", "level": 50},
+        "encounter_readiness": {"status": "FAVORED", "verdict": "Encounter is favored."},
+        "recommended_party": [],
+        "tactics": "Use arena pillars.",
+    }
+    with patch(
+        "palengine.analytics.boss_recommender.BossPartyRecommender.recommend_party_for_boss",
+        return_value=mock_result,
+    ):
+        response = client.get("/api/bosses/victor/party")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["boss_profile"]["canonical_name"] == "Victor & Shadowbeak"
+        assert data["encounter_readiness"]["status"] == "FAVORED"
+
+
+
 
 

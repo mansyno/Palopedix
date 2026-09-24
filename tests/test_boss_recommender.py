@@ -195,12 +195,43 @@ def test_list_bosses():
     for b in bosses:
         assert "id" in b
         assert "canonical_name" in b
-        assert "category" in b
-        assert b["category"] in ("Tower Boss", "Alpha Legendary", "Alpha Boss", "Raid Boss")
+        assert "level" in b and b["level"] is not None
+        assert "is_capturable" in b
+        assert b["category"] in (
+            "Tower Boss",
+            "Alpha Legendary",
+            "Alpha Boss",
+            "Field Alpha",
+            "Dungeon Alpha",
+            "Story Boss",
+            "Raid Boss",
+            "Bounty Target",
+            "Faction Leader",
+            "Crossover Event",
+            "Boss Rush",
+        )
         assert "elements" in b
         assert "weaknesses" in b
         assert "icon_path" in b
         assert b["icon_path"] is not None
+
+    # Verify Blueprint Spawner levels and metadata
+    jet = next((b for b in bosses if b["id"] == "BOSS_JetDragon"), None)
+    assert jet is not None
+    assert jet["level"] == 70
+    assert jet["is_capturable"] is True
+
+    necro = next((b for b in bosses if b["id"] == "BOSS_BlackCentaur"), None)
+    assert necro is not None
+    assert necro["level"] == 60
+    assert len(necro["minions"]) >= 1
+    assert necro["minions"][0]["name"] == "Paladius"
+
+    pan = next((b for b in bosses if b["id"] == "BOSS_KingWhale"), None)
+    assert pan is not None
+    assert pan["level"] == 70
+    assert pan["is_capturable"] is True
+    assert pan["category"] == "Story Boss"
 
 
 def test_evaluate_readiness_overleveled_no_counter():

@@ -42,6 +42,27 @@ ELEMENT_WEAKNESSES: dict[str, list[str]] = {
     "Neutral": ["Dark"],
 }
 
+# Signature 20% Elemental Damage Passives
+ELEMENT_EMPEROR_PASSIVES: dict[str, str] = {
+    "Fire": "Flame Emperor",
+    "Water": "Lord of the Sea",
+    "Electric": "Lord of Lightning",
+    "Grass": "Spirit Emperor",
+    "Ground": "Earth Emperor",
+    "Ice": "Ice Emperor",
+    "Dragon": "Divine Dragon",
+    "Dark": "Lord of the Underworld",
+    "Neutral": "Celestial Emperor",
+}
+
+
+def raw_coords_to_map(x: float, y: float) -> tuple[int, int]:
+    """Converts raw Unreal Engine world units (cm) to in-game 2D map coordinates."""
+    map_x = round((y - 158000) / 459)
+    map_y = round((x + 123888) / 459)
+    return map_x, map_y
+
+
 # Mounts that change player attack to an element and/or boost that element
 MOUNT_CONVERTERS: dict[str, dict[str, Any]] = {
     # Dragon
@@ -149,7 +170,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
     "jetragon": {
         "canonical_name": "Jetragon (Alpha Legendary)",
         "location": "Mount Obsidian (-845, -450)",
-        "level": 50,
+        "level": 70,
         "hp": 11500,
         "time_limit_sec": None,
         "elements": ["Dragon"],
@@ -160,7 +181,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
     "frostallion": {
         "canonical_name": "Frostallion (Alpha Legendary)",
         "location": "Astral Mountains (-357, 508)",
-        "level": 50,
+        "level": 60,
         "hp": 14500,
         "time_limit_sec": None,
         "elements": ["Ice"],
@@ -171,7 +192,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
     "necromus": {
         "canonical_name": "Necromus (Alpha Legendary)",
         "location": "Dessicated Dunes (285, 655)",
-        "level": 50,
+        "level": 60,
         "hp": 13000,
         "time_limit_sec": None,
         "elements": ["Dark"],
@@ -182,7 +203,7 @@ BOSS_REGISTRY: dict[str, dict[str, Any]] = {
     "paladius": {
         "canonical_name": "Paladius (Alpha Legendary)",
         "location": "Dessicated Dunes (285, 655)",
-        "level": 50,
+        "level": 60,
         "hp": 13000,
         "time_limit_sec": None,
         "elements": ["Neutral"],
@@ -291,13 +312,14 @@ class BossPartyRecommender:
                     pass
 
                 query = f"""
-                    SELECT b.id, b.pal_id, b.name, b.title, b.boss_type, b.element1, b.element2,
+                    SELECT b.id, b.pal_id, b.name, b.title, b.boss_type, b.level, b.element1, b.element2,
                            b.hp, b.attack, b.defense, b.icon_path, b.badge_icon_path,
+                           b.is_capturable, b.dungeon_name, b.respawn_time, b.minions, b.bounty_token, b.summon_item,
                            b.location_x, b.location_y,
                            p.name as pal_name, p.icon_path as pal_icon_path
                     FROM {prefix}bosses b
                     LEFT JOIN {prefix}pals p ON b.pal_id = p.id
-                    WHERE b.boss_type IN ('Tower', 'Alpha', 'Raid')
+                    WHERE b.boss_type IN ('FieldAlpha', 'DungeonAlpha', 'Story', 'Tower', 'Raid', 'Bounty', 'FactionLeader', 'Crossover', 'BossRush', 'Alpha')
                       AND b.id NOT LIKE '%Avatar%' 
                       AND b.id NOT LIKE '%Servant%' 
                       AND b.id NOT LIKE '%Otomo%'
@@ -307,9 +329,14 @@ class BossPartyRecommender:
                     ORDER BY 
                         CASE b.boss_type
                             WHEN 'Tower' THEN 1
-                            WHEN 'Raid' THEN 2
-                            WHEN 'Alpha' THEN 3
-                            ELSE 4
+                            WHEN 'Story' THEN 2
+                            WHEN 'Raid' THEN 3
+                            WHEN 'FieldAlpha' THEN 4
+                            WHEN 'DungeonAlpha' THEN 5
+                            WHEN 'Bounty' THEN 6
+                            WHEN 'FactionLeader' THEN 7
+                            WHEN 'Crossover' THEN 8
+                            ELSE 9
                         END,
                         b.name ASC
                 """
@@ -339,8 +366,25 @@ class BossPartyRecommender:
                     # Category
                     if b_type == "Tower":
                         category = "Tower Boss"
+                    elif b_type == "Story":
+                        category = "Story Boss"
                     elif b_type == "Raid":
                         category = "Raid Boss"
+                    elif b_type == "FieldAlpha":
+                        if b_name.lower() in legendary_species or (r["pal_name"] and r["pal_name"].lower() in legendary_species):
+                            category = "Alpha Legendary"
+                        else:
+                            category = "Field Alpha"
+                    elif b_type == "DungeonAlpha":
+                        category = "Dungeon Alpha"
+                    elif b_type == "Bounty":
+                        category = "Bounty Target"
+                    elif b_type == "FactionLeader":
+                        category = "Faction Leader"
+                    elif b_type == "Crossover":
+                        category = "Crossover Event"
+                    elif b_type == "BossRush":
+                        category = "Boss Rush"
                     elif b_name.lower() in legendary_species or (r["pal_name"] and r["pal_name"].lower() in legendary_species):
                         category = "Alpha Legendary"
                     else:
@@ -372,23 +416,66 @@ class BossPartyRecommender:
                     reg_profile = BOSS_REGISTRY.get(reg_key) or {}
 
                     hp = reg_profile.get("hp") or (r["hp"] * 100 if r["hp"] else 10000)
-                    level = reg_profile.get("level") or (50 if category in ("Alpha Legendary", "Raid Boss") else 40 if category == "Alpha Boss" else 30)
+                    level = r["level"] if r["level"] is not None else (reg_profile.get("level") or 50)
+                    is_capturable = bool(r["is_capturable"]) if r["is_capturable"] is not None else (
+                        category not in ("Tower Boss", "Raid Boss", "Crossover Event", "Boss Rush")
+                    )
+
+                    minions_list = []
+                    if r["minions"]:
+                        try:
+                            parsed_minions = json.loads(r["minions"])
+                            if isinstance(parsed_minions, list):
+                                minions_list = parsed_minions
+                        except Exception:
+                            minions_list = []
+
                     time_limit = reg_profile.get("time_limit_sec") or (600 if b_type in ("Tower", "Raid") else None)
                     dps = round(hp / time_limit, 1) if time_limit else None
 
+                    map_coords = None
+                    if r["location_x"] is not None and r["location_y"] is not None:
+                        map_coords = raw_coords_to_map(r["location_x"], r["location_y"])
+
                     loc = reg_profile.get("location")
                     if not loc:
-                        if r["location_x"] is not None and r["location_y"] is not None:
-                            loc = f"Palpagos Islands ({int(r['location_x'])}, {int(r['location_y'])})"
+                        if r["dungeon_name"]:
+                            loc = r["dungeon_name"]
+                        elif map_coords:
+                            loc = f"Palpagos Islands ({map_coords[0]}, {map_coords[1]})"
                         elif b_type == "Tower":
                             loc = "Syndicate Tower Arena"
+                        elif b_type == "Story":
+                            loc = "Eternal Sea (World Tree Trial)"
                         elif b_type == "Raid":
-                            loc = "Summoning Altar"
+                            slab_suffix = f" (Requires {r['summon_item']})" if r["summon_item"] else ""
+                            loc = f"Summoning Altar{slab_suffix}"
+                        elif b_type == "DungeonAlpha":
+                            loc = "Dungeon / Sealed Realm"
+                        elif b_type == "Bounty":
+                            loc = "Wanted Board / Outpost"
+                        elif b_type == "FactionLeader":
+                            loc = "Faction Camp / Base"
+                        elif b_type == "Crossover":
+                            loc = "Crossover Summoning Altar"
                         else:
                             loc = "Palpagos Islands (Wild / Dungeon Encounter)"
 
-                    dangerous = reg_profile.get("dangerous_moves", ["Signature Move", "Heavy Charge"])
-                    tactics = reg_profile.get("tactics", f"Target weakness ({', '.join(weaknesses)}) to gain 2.0x super-effective STAB multiplier.")
+                    dangerous = reg_profile.get("dangerous_moves")
+                    if not dangerous:
+                        if b_type == "Story":
+                            dangerous = ["Water Laser", "Tidal Surge", "Ocean Whirlpool"]
+                        else:
+                            dangerous = ["Signature Move", "Heavy Charge"]
+
+                    tactics = reg_profile.get("tactics")
+                    if not tactics:
+                        if b_type == "Story":
+                            tactics = "Instanced ocean trial. Arena is deep water with minimal land; deploy flying mounts and long-range Electric Pals (e.g. Orserk, Grizzbolt). Target weakness to reduce HP to 1, enabling guaranteed 100% Pal Sphere capture."
+                        elif b_type == "Raid" and r["summon_item"]:
+                            tactics = f"Requires {r['summon_item']} to activate altar. Target weakness ({', '.join(weaknesses)}) to gain 2.0x super-effective STAB multiplier."
+                        else:
+                            tactics = f"Target weakness ({', '.join(weaknesses)}) to gain 2.0x super-effective STAB multiplier."
 
                     results.append({
                         "id": b_id,
@@ -400,9 +487,16 @@ class BossPartyRecommender:
                         "hp": hp,
                         "attack": r["attack"],
                         "defense": r["defense"],
+                        "is_capturable": is_capturable,
+                        "dungeon_name": r["dungeon_name"],
+                        "respawn_time": r["respawn_time"],
+                        "minions": minions_list,
+                        "bounty_token": r["bounty_token"],
+                        "summon_item": r["summon_item"],
                         "elements": elems,
                         "weaknesses": weaknesses,
                         "location": loc,
+                        "map_coordinates": map_coords,
                         "time_limit_sec": time_limit,
                         "required_dps": dps,
                         "icon_path": icon,
@@ -824,13 +918,28 @@ class BossPartyRecommender:
                 waza["status"] = "unlearned"
                 waza["status_badge"] = "⚪ Not Learned (Need Fruit)"
 
-        # Determine optimal target passives based on role
+        # Determine optimal target passives based on role and element
         if "Buffer" in role_hint or "Gobfin" in role_hint:
-            optimal_passives = ["Vanguard", "Stronghold Strategist", "Noble", "Fine Coat"]
+            optimal_passives = ["Vanguard", "Stronghold Strategist", "Burly Body", "Legend"]
+        elif "Mount" in role_hint or "Infusion" in role_hint:
+            optimal_passives = ["Vanguard", "Swift", "Legend", "Stronghold Strategist"]
         elif "Tank" in role_hint:
-            optimal_passives = ["Burly Body", "Hard Skin", "Legend", "Masochist"]
+            optimal_passives = ["Burly Body", "Legend", "Serenity", "Hard Skin"]
         else:
-            optimal_passives = ["Ferocious", "Musclehead", "Legend", "Serenity"]
+            # Elemental attacker: select matching Elemental Emperor/Lord trait if available
+            primary_elem = None
+            for e in pal_elements:
+                if e in weaknesses:
+                    primary_elem = e
+                    break
+            if not primary_elem and pal_elements:
+                primary_elem = pal_elements[0]
+
+            emperor_trait = ELEMENT_EMPEROR_PASSIVES.get(primary_elem) if primary_elem else None
+            if emperor_trait:
+                optimal_passives = [emperor_trait, "Legend", "Musclehead", "Serenity"]
+            else:
+                optimal_passives = ["Ferocious", "Musclehead", "Legend", "Serenity"]
 
         return {
             "species": pal.get("display_name") or pal.get("species"),

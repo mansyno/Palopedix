@@ -761,6 +761,11 @@ tr.instance-sub-row.last-child > td {
   box-shadow: 0 0 10px rgba(56, 189, 248, 0.25) !important;
 }
 
+.filter-bar .search-input-wrapper input[type="text"] {
+  padding-left: 2.2rem !important;
+  padding-right: 2.2rem !important;
+}
+
 /* 🎯 Global Pal Instance Tooltip Styling */
 .pal-tooltip-wrapper {
   display: inline-flex;

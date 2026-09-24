@@ -43,10 +43,16 @@ const STATUS_COLORS = {
 
 const CATEGORY_OPTIONS = [
   { value: 'All', label: 'All Boss Encounters' },
-  { value: 'Tower Boss', label: 'Tower Bosses' },
+  { value: 'Tower Boss', label: 'Tower Leaders (Gyms)' },
+  { value: 'Story Boss', label: 'Story Encounters (World Tree)' },
+  { value: 'Field Alpha', label: 'Field Alphas (Overworld)' },
   { value: 'Alpha Legendary', label: 'Alpha Legendaries' },
-  { value: 'Alpha Boss', label: 'Field Alpha Bosses' },
-  { value: 'Raid Boss', label: 'Raid Bosses' },
+  { value: 'Dungeon Alpha', label: 'Dungeon Alphas (Caverns)' },
+  { value: 'Raid Boss', label: 'Raid Bosses (Altars)' },
+  { value: 'Crossover Event', label: 'Crossover Summons' },
+  { value: 'Bounty Target', label: 'Bounty Targets (Wanted)' },
+  { value: 'Faction Leader', label: 'Faction Leaders' },
+  { value: 'Boss Rush', label: 'Boss Rush Challenge' },
 ];
 
 export default function BossCounterView({ saveLoaded = true, worldId, setSelectedPal }) {
@@ -119,11 +125,18 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
   const categoryCounts = useMemo(() => {
     const counts = { All: bosses.length };
     bosses.forEach((b) => {
-      const cat = b.category || 'Alpha Boss';
+      const cat = b.category || 'Field Alpha';
       counts[cat] = (counts[cat] || 0) + 1;
     });
     return counts;
   }, [bosses]);
+
+  // Dynamically available category options
+  const categoryOptions = useMemo(() => {
+    return CATEGORY_OPTIONS.filter(
+      (opt) => opt.value === 'All' || (categoryCounts[opt.value] || 0) > 0
+    );
+  }, [categoryCounts]);
 
   // Filtered bosses list
   const filteredBosses = useMemo(() => {
@@ -233,10 +246,10 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                   fontWeight: '600',
                   outline: 'none',
                   cursor: 'pointer',
-                  minWidth: '200px',
+                  minWidth: '220px',
                 }}
               >
-                {CATEGORY_OPTIONS.map((opt) => (
+                {categoryOptions.map((opt) => (
                   <option key={opt.value} value={opt.value}>
                     {opt.label} ({categoryCounts[opt.value] ?? 0})
                   </option>
@@ -245,7 +258,7 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
             </div>
 
             {/* Search Box */}
-            <div style={{ position: 'relative', minWidth: '260px' }}>
+            <div className="search-input-wrapper" style={{ position: 'relative', minWidth: '260px' }}>
               <input
                 type="text"
                 placeholder="Search boss, title, or element..."
@@ -256,7 +269,6 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                   background: 'rgba(0, 0, 0, 0.35)',
                   border: '1px solid var(--border-color)',
                   borderRadius: '6px',
-                  padding: '0.45rem 0.75rem 0.45rem 2rem',
                   color: 'var(--text-primary)',
                   fontSize: '0.85rem',
                   outline: 'none',
@@ -275,6 +287,31 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
               >
                 🔍
               </span>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                  style={{
+                    position: 'absolute',
+                    right: '0.65rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.9rem',
+                    cursor: 'pointer',
+                    padding: '2px 6px',
+                    lineHeight: 1,
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#fff'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
             <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
@@ -345,7 +382,6 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                     >
                       Arena / Location{sortCol === 'location' ? (sortDesc ? ' ▼' : ' ▲') : ''}
                     </th>
-                    <th style={{ padding: '0.65rem 0.85rem', width: '160px', textAlign: 'center', position: 'sticky', top: 0, zIndex: 10, background: '#0f172a' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -406,8 +442,17 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                             )}
                           </div>
                           <div>
-                            <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>
-                              {boss.canonical_name}
+                            <div style={{ fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <span>{boss.canonical_name}</span>
+                              {boss.is_capturable ? (
+                                <span title="Capturable with Pal Sphere" style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                                  Capturable
+                                </span>
+                              ) : (
+                                <span title="Uncapturable Encounter" style={{ fontSize: '0.65rem', padding: '0.1rem 0.35rem', borderRadius: '3px', background: 'rgba(239, 68, 68, 0.12)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+                                  Uncapturable
+                                </span>
+                              )}
                             </div>
                             {boss.title && (
                               <div style={{ fontSize: '0.74rem', color: 'var(--accent-gold)' }}>
@@ -532,26 +577,12 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                               ⏱️ {boss.time_limit_sec / 60}m Arena Timer
                             </span>
                           )}
+                          {boss.minions && boss.minions.length > 0 && (
+                            <span style={{ color: '#93c5fd', fontSize: '0.72rem' }}>
+                              👥 Escort: {boss.minions.map((m) => m.name || m.pal_id).join(', ')}
+                            </span>
+                          )}
                         </div>
-                      </td>
-
-                      {/* Action Button */}
-                      <td style={{ padding: '0.65rem 0.85rem', textAlign: 'center' }}>
-                        <button
-                          className="btn btn-primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleSelectBoss(boss.id);
-                          }}
-                          style={{
-                            fontSize: '0.75rem',
-                            padding: '0.3rem 0.7rem',
-                            borderRadius: '6px',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          ⚔️ Counter Party →
-                        </button>
                       </td>
                     </tr>
                   ))}
@@ -716,6 +747,35 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                     >
                       {selectedBossProfile.category}
                     </span>
+                    {selectedBossProfile.is_capturable ? (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '4px',
+                          background: 'rgba(16, 185, 129, 0.2)',
+                          color: '#34d399',
+                          border: '1px solid rgba(16, 185, 129, 0.3)',
+                        }}
+                      >
+                        ✓ Capturable
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          fontWeight: '700',
+                          padding: '0.15rem 0.5rem',
+                          borderRadius: '4px',
+                          background: 'rgba(239, 68, 68, 0.2)',
+                          color: '#fca5a5',
+                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                        }}
+                      >
+                        ✕ Uncapturable
+                      </span>
+                    )}
                   </div>
                   {selectedBossProfile.title && (
                     <div style={{ fontSize: '0.82rem', color: 'var(--accent-gold)', marginTop: '0.15rem', fontStyle: 'italic' }}>
@@ -758,6 +818,14 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                     {selectedBossProfile.time_limit_sec ? `${selectedBossProfile.time_limit_sec / 60}m` : 'Open World'}
                   </div>
                 </div>
+                {selectedBossProfile.respawn_time ? (
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Respawn Timer</div>
+                    <div style={{ fontSize: '1.05rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                      {Math.round(selectedBossProfile.respawn_time / 60)}m
+                    </div>
+                  </div>
+                ) : null}
                 {selectedBossProfile.required_dps && (
                   <div>
                     <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Min Required DPS</div>
@@ -829,6 +897,49 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                   ))}
                 </div>
               </div>
+
+              {/* Encounter Specifics (Dungeon, Summon Slab, Bounty Token, Minions) */}
+              {(selectedBossProfile.dungeon_name || selectedBossProfile.summon_item || selectedBossProfile.bounty_token || (selectedBossProfile.minions && selectedBossProfile.minions.length > 0)) && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', background: 'rgba(0, 0, 0, 0.25)', padding: '0.65rem 0.85rem', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)', fontSize: '0.8rem' }}>
+                  {selectedBossProfile.dungeon_name && (
+                    <div style={{ color: 'var(--text-primary)' }}>
+                      🏛️ <strong>Sealed Realm / Dungeon:</strong> <span style={{ color: '#93c5fd' }}>{selectedBossProfile.dungeon_name}</span>
+                    </div>
+                  )}
+                  {selectedBossProfile.summon_item && (
+                    <div style={{ color: 'var(--text-primary)' }}>
+                      🔮 <strong>Required Summoning Item:</strong> <span style={{ color: '#fca5a5', fontWeight: '600' }}>{selectedBossProfile.summon_item}</span>
+                    </div>
+                  )}
+                  {selectedBossProfile.bounty_token && (
+                    <div style={{ color: 'var(--text-primary)' }}>
+                      📜 <strong>Bounty Drop Token:</strong> <span style={{ color: '#fef08a' }}>{selectedBossProfile.bounty_token}</span>
+                    </div>
+                  )}
+                  {selectedBossProfile.minions && selectedBossProfile.minions.length > 0 && (
+                    <div>
+                      <span style={{ color: 'var(--accent-gold)', fontWeight: '600' }}>👥 Co-Spawned Companions (Minions): </span>
+                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+                        {selectedBossProfile.minions.map((m, mIdx) => (
+                          <span
+                            key={mIdx}
+                            style={{
+                              background: 'rgba(255, 255, 255, 0.06)',
+                              padding: '0.15rem 0.45rem',
+                              borderRadius: '4px',
+                              fontSize: '0.76rem',
+                              color: 'var(--text-primary)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                            }}
+                          >
+                            {m.name || m.pal_id} {m.level ? `(Lv.${m.level})` : ''} {m.count ? `x${m.count}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Guaranteed Boss Drops */}
               {selectedBossProfile.drops?.length > 0 && (
@@ -1364,21 +1475,27 @@ export default function BossCounterView({ saveLoaded = true, worldId, setSelecte
                           {pal.optimal_passives?.length > 0 && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
                               <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)' }}>Target:</span>
-                              {pal.optimal_passives.map((optPass) => (
-                                <span
-                                  key={optPass}
-                                  style={{
-                                    fontSize: '0.64rem',
-                                    background: 'rgba(255, 255, 255, 0.04)',
-                                    border: '1px solid rgba(255, 255, 255, 0.08)',
-                                    borderRadius: '3px',
-                                    padding: '0.05rem 0.3rem',
-                                    color: 'var(--text-secondary)',
-                                  }}
-                                >
-                                  {optPass}
-                                </span>
-                              ))}
+                              {pal.optimal_passives.map((optPass) => {
+                                const isMatched = (pal.passives || []).some(
+                                  (p) => (typeof p === 'string' ? p : p?.name)?.toLowerCase() === optPass.toLowerCase()
+                                );
+                                return (
+                                  <span
+                                    key={optPass}
+                                    style={{
+                                      fontSize: '0.64rem',
+                                      background: isMatched ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                                      border: `1px solid ${isMatched ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.08)'}`,
+                                      borderRadius: '3px',
+                                      padding: '0.05rem 0.3rem',
+                                      color: isMatched ? '#34d399' : 'var(--text-secondary)',
+                                      fontWeight: isMatched ? '700' : 'normal',
+                                    }}
+                                  >
+                                    {isMatched ? `✓ ${optPass}` : optPass}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                         </div>

@@ -3780,10 +3780,82 @@ class SQLiteEngine:
         recipe_dict["ingredients"] = ingredients
         return recipe_dict
 
+    def _get_built_structure_counts(self) -> dict[str, int]:
+        """Returns map of lowercase structure name/alias to total built count in active world save."""
+        built_counts: dict[str, int] = defaultdict(int)
+        try:
+            bsi_check = self.conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='base_structures_instances'"
+            ).fetchone()
+            if bsi_check:
+                alias_map = {}
+                try:
+                    sa_check = self.conn.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name='structure_aliases'"
+                    ).fetchone()
+                    if sa_check:
+                        for a_row in self.conn.execute(
+                            "SELECT LOWER(alias), LOWER(canonical_name) FROM structure_aliases"
+                        ).fetchall():
+                            if a_row[0] and a_row[1]:
+                                alias_map[a_row[0]] = a_row[1]
+                except Exception:
+                    pass
+
+                for row in self.conn.execute(
+                    "SELECT LOWER(structure_name), SUM(count) FROM base_structures_instances GROUP BY LOWER(structure_name)"
+                ).fetchall():
+                    s_name, cnt = row[0], int(row[1] or 0)
+                    built_counts[s_name] += cnt
+                    if s_name in alias_map:
+                        built_counts[alias_map[s_name]] += cnt
+        except Exception:
+            pass
+        return built_counts
+
     def query_buildings(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
-        """Queries base camp buildings & infrastructure."""
+        """Queries base camp buildings & infrastructure with live world build counts and tech unlock correlation."""
         if not (self.source == "palworld_db" and os.path.exists(self.palworld_db_path)):
             return []
+
+        # 1. Fetch built counts from active save
+        built_counts = self._get_built_structure_counts()
+
+        # 2. Fetch player unlocked technology names if available in world database
+        unlocked_set: set[str] = set()
+        try:
+            tbl_check = self.conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='player_unlocked_techs'"
+            ).fetchone()
+            if tbl_check:
+                u_rows = self.conn.execute("SELECT LOWER(tech_name) FROM player_unlocked_techs").fetchall()
+                unlocked_set = {r[0] for r in u_rows if r[0]}
+        except Exception:
+            pass
+
+        # 3. Map building_id -> unlocking tech node
+        building_tech_map: dict[str, dict[str, Any]] = {}
+        try:
+            bt_query = """
+                SELECT 
+                    LOWER(tu.target_id) as b_target_id,
+                    tu.tech_id,
+                    t.name as tech_name,
+                    t.is_ancient
+                FROM palworld_master.technology_unlocks tu
+                JOIN palworld_master.technology_tree t ON tu.tech_id = t.id
+                WHERE tu.unlock_type = 'building'
+            """
+            for row in self.conn.execute(bt_query).fetchall():
+                b_tgt = row["b_target_id"]
+                if b_tgt not in building_tech_map:
+                    building_tech_map[b_tgt] = {
+                        "tech_id": row["tech_id"],
+                        "tech_name": row["tech_name"] or row["tech_id"],
+                        "is_ancient": bool(row["is_ancient"]),
+                    }
+        except Exception:
+            pass
 
         query = "SELECT * FROM palworld_master.buildings WHERE 1=1"
         params: list[Any] = []
@@ -3794,48 +3866,173 @@ class SQLiteEngine:
 
         if "search" in filters and filters["search"]:
             query += " AND (LOWER(name) LIKE LOWER(?) OR LOWER(id) LIKE LOWER(?))"
-            s = f"%{filters['search']}%"
+            s = f"%{str(filters['search']).strip()}%"
             params.extend([s, s])
 
         query += " ORDER BY tech_level ASC, name ASC"
 
         rows = self.conn.execute(query, params).fetchall()
         results = []
-        assets_dir = get_assets_dir()
         for r in rows:
             d = dict(r)
-            raw_path = d.get("icon_path")
-            if raw_path and assets_dir:
-                filename = os.path.basename(raw_path.replace("\\", "/"))
-                local_file = os.path.join(assets_dir, "buildings", filename)
-                if not os.path.exists(local_file):
+            b_id = d.get("id") or ""
+            b_id_lower = b_id.lower()
+
+            # Built count in world
+            built_cnt = built_counts.get(b_id_lower, 0)
+            d["built_count"] = built_cnt
+            d["is_built"] = built_cnt > 0
+
+            tech_info = building_tech_map.get(b_id_lower)
+
+            # Exclude unreleased, internal, deprecated, and duplicate dummy assets
+            if not tech_info and built_cnt == 0:
+                continue
+            if d.get("name") == "en Text":
+                continue
+
+            # Unlock source & status
+            if tech_info:
+                d["unlock_method"] = "Ancient Tech" if tech_info["is_ancient"] else "Standard Tech"
+                d["required_tech_id"] = tech_info["tech_id"]
+                d["required_tech_name"] = tech_info["tech_name"]
+                d["is_unlocked"] = (tech_info["tech_id"].lower() in unlocked_set) or (built_cnt > 0)
+            else:
+                d["unlock_method"] = "Built in World"
+                d["required_tech_id"] = None
+                d["required_tech_name"] = None
+                d["is_unlocked"] = True
+
+            d["icon_path"] = transform_icon_path(d.get("icon_path"))
+
+            # Filtering
+            if "is_unlocked" in filters and filters["is_unlocked"] is not None:
+                if bool(filters["is_unlocked"]) != d["is_unlocked"]:
                     continue
-            d["icon_path"] = transform_icon_path(raw_path)
+            if "is_built" in filters and filters["is_built"] is not None:
+                if bool(filters["is_built"]) != d["is_built"]:
+                    continue
+            if "unlock_method" in filters and filters["unlock_method"]:
+                if d["unlock_method"].lower() != str(filters["unlock_method"]).lower():
+                    continue
+
             results.append(d)
         return results
 
     def query_tech_tree(self, filters: dict[str, Any]) -> list[dict[str, Any]]:
-        """Queries technology tree unlock nodes."""
+        """Queries technology tree unlock nodes with live player unlock status, world build counts, and full unlock mappings."""
         if not (self.source == "palworld_db" and os.path.exists(self.palworld_db_path)):
             return []
 
-        query = "SELECT * FROM palworld_master.technology_tree WHERE 1=1"
+        # 1. Fetch built counts from active save
+        built_counts = self._get_built_structure_counts()
+
+        # 2. Fetch player unlocked technology names if available in world database
+        unlocked_set: set[str] = set()
+        try:
+            tbl_check = self.conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='player_unlocked_techs'"
+            ).fetchone()
+            if tbl_check:
+                u_rows = self.conn.execute("SELECT LOWER(tech_name) FROM player_unlocked_techs").fetchall()
+                unlocked_set = {r[0] for r in u_rows if r[0]}
+        except Exception:
+            pass
+
+        # 3. Build map of tech_id -> list of unlock targets (buildings/recipes)
+        unlocks_map: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        try:
+            u_query = """
+                SELECT 
+                    tu.tech_id,
+                    tu.unlock_type,
+                    tu.target_id,
+                    b.name as building_name,
+                    b.icon_path as building_icon,
+                    i.name as item_name,
+                    i.icon_path as item_icon
+                FROM palworld_master.technology_unlocks tu
+                LEFT JOIN palworld_master.buildings b ON tu.unlock_type = 'building' AND tu.target_id = b.id
+                LEFT JOIN palworld_master.items i ON tu.unlock_type = 'recipe' AND tu.target_id = i.id
+            """
+            for row in self.conn.execute(u_query).fetchall():
+                t_id = row["tech_id"]
+                u_type = row["unlock_type"]
+                target_id = row["target_id"]
+                target_name = row["building_name"] if u_type == "building" else row["item_name"]
+                target_icon = row["building_icon"] if u_type == "building" else row["item_icon"]
+                unlocks_map[t_id].append({
+                    "type": u_type,
+                    "target_id": target_id,
+                    "name": target_name or target_id,
+                    "icon_path": transform_icon_path(target_icon),
+                })
+        except Exception:
+            pass
+
+        # 4. Query base technology tree nodes
+        query = """
+            SELECT 
+                t.*,
+                coalesce(b.icon_path, i.icon_path) as default_icon
+            FROM palworld_master.technology_tree t
+            LEFT JOIN palworld_master.buildings b ON t.unlocked_building_id = b.id
+            LEFT JOIN palworld_master.items i ON t.unlocked_item_id = i.id
+            WHERE 1=1
+        """
         params: list[Any] = []
 
         if "level" in filters and filters["level"] is not None:
-            query += " AND level = ?"
+            query += " AND t.level = ?"
             params.append(filters["level"])
 
         if "is_ancient" in filters and filters["is_ancient"] is not None:
-            query += " AND is_ancient = ?"
+            query += " AND t.is_ancient = ?"
             params.append(1 if filters["is_ancient"] else 0)
 
-        query += " ORDER BY level ASC, name ASC"
+        if "search" in filters and filters["search"]:
+            s = f"%{str(filters['search']).strip()}%"
+            query += " AND (LOWER(t.name) LIKE LOWER(?) OR LOWER(t.id) LIKE LOWER(?))"
+            params.extend([s, s])
+
+        query += " ORDER BY t.level ASC, t.name ASC"
 
         rows = self.conn.execute(query, params).fetchall()
         results = []
         for r in rows:
             d = dict(r)
+            tech_id = d.get("id") or ""
+            is_unlocked = tech_id.lower() in unlocked_set if unlocked_set else False
+            d["is_unlocked"] = is_unlocked
+            d["tier"] = "Ancient" if d.get("is_ancient") else "Standard"
+            d["cost"] = d.get("tech_point_cost", 0)
+            
+            # Resolve icon path
+            raw_icon = d.pop("default_icon", None)
+            d["icon_path"] = transform_icon_path(raw_icon)
+            
+            d["unlocks"] = unlocks_map.get(tech_id, [])
+
+            # Calculate built instances from unlocked buildings
+            node_built_count = 0
+            has_buildings = False
+            for u in d["unlocks"]:
+                if u.get("type") == "building":
+                    has_buildings = True
+                    target_b_id = str(u.get("target_id") or "").lower()
+                    node_built_count += built_counts.get(target_b_id, 0)
+            d["built_count"] = node_built_count
+            d["is_built"] = node_built_count > 0
+            d["has_buildings"] = has_buildings
+
+            if "is_unlocked" in filters and filters["is_unlocked"] is not None:
+                if bool(filters["is_unlocked"]) != is_unlocked:
+                    continue
+
+            if "is_built" in filters and filters["is_built"] is not None:
+                if bool(filters["is_built"]) != d["is_built"]:
+                    continue
+
             results.append(d)
         return results
 
@@ -4982,6 +5179,12 @@ class SQLiteEngine:
             })
             
         return results
+
+    def get_palbox_cleanup_recommendations(self) -> dict[str, Any]:
+        """Runs the PalboxCleaner engine to triage and rank Palbox instances."""
+        from palengine.analytics.palbox_cleaner import PalboxCleaner
+        cleaner = PalboxCleaner(self)
+        return cleaner.analyze_palbox()
 
     def get_building_work_types(self, building_id: Optional[str] = None) -> list[dict[str, Any]]:
         """Returns work suitability requirements for buildings."""

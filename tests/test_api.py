@@ -181,6 +181,95 @@ def test_api_get_boss_party():
         assert data["encounter_readiness"]["status"] == "FAVORED"
 
 
+def test_api_get_palbox_cleanup():
+    mock_result = {
+        "total_evaluated": 10,
+        "keep_core_count": 3,
+        "keep_breeding_count": 2,
+        "condense_fodder_count": 4,
+        "butcher_sell_count": 1,
+        "freeable_slots": 5,
+        "species_count": 3,
+        "condense_targets": [],
+        "roster": [],
+    }
+    with patch(
+        "palengine.api.main.db_engine.get_palbox_cleanup_recommendations",
+        return_value=mock_result,
+    ):
+        response = client.get("/api/save/palbox-cleanup")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_evaluated"] == 10
+        assert data["freeable_slots"] == 5
+        assert data["keep_core_count"] == 3
+
+
+def test_api_tech_tree():
+    response = client.get("/api/tech_tree")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) >= 500
+
+    first = data[0]
+    for key in ("id", "name", "level", "tech_point_cost", "is_ancient", "is_unlocked", "tier", "unlocks", "built_count", "is_built", "has_buildings"):
+        assert key in first
+
+    # Test filtering by is_ancient
+    res_ancient = client.get("/api/tech_tree?is_ancient=true")
+    assert res_ancient.status_code == 200
+    ancient_data = res_ancient.json()
+    assert len(ancient_data) > 0
+    assert all(item["is_ancient"] == 1 for item in ancient_data)
+
+    # Test filtering by is_unlocked
+    res_unlocked = client.get("/api/tech_tree?is_unlocked=true")
+    assert res_unlocked.status_code == 200
+    unlocked_data = res_unlocked.json()
+    assert len(unlocked_data) > 0
+    assert all(item["is_unlocked"] is True for item in unlocked_data)
+
+    # Test filtering by is_built
+    res_built = client.get("/api/tech_tree?is_built=true")
+    assert res_built.status_code == 200
+    built_data = res_built.json()
+    assert all(item["is_built"] is True for item in built_data)
+
+    # Test alias /api/technology
+    res_alias = client.get("/api/technology")
+    assert res_alias.status_code == 200
+    assert len(res_alias.json()) == len(data)
+
+
+def test_api_buildings():
+    response = client.get("/api/buildings")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    assert len(data) >= 450
+
+    first = data[0]
+    for key in ("id", "name", "category", "built_count", "is_built", "unlock_method", "is_unlocked"):
+        assert key in first
+
+    # Test filtering by is_built
+    res_built = client.get("/api/buildings?is_built=true")
+    assert res_built.status_code == 200
+    built_data = res_built.json()
+    assert all(item["is_built"] is True for item in built_data)
+
+    # Test filtering by unlock_method
+    res_tech = client.get("/api/buildings?unlock_method=Standard Tech")
+    assert res_tech.status_code == 200
+    tech_data = res_tech.json()
+    assert len(tech_data) > 0
+    assert all(item["unlock_method"] == "Standard Tech" for item in tech_data)
+
+
+
+
+
 
 
 

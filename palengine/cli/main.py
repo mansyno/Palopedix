@@ -505,6 +505,62 @@ def condense(ctx: click.Context, save_path: Optional[str]) -> None:
     click.echo(tabulate(display_rows, headers="keys", tablefmt="github"))
 
 
+@cli.command("cleanup-palbox")
+@click.option("--save-path", "-p", help="Path to Level.sav file.")
+@click.option("--action", "-a", type=click.Choice(["all", "keep_core", "keep_breeding", "condense", "butcher_sell"], case_sensitive=False), default="all", help="Filter by recommended action.")
+@click.option("--limit", "-n", type=int, default=50, help="Max rows to display in table view.")
+@click.pass_context
+def cleanup_palbox(ctx: click.Context, save_path: Optional[str], action: str, limit: int) -> None:
+    """Evaluates and ranks Palbox instances for triaging, condensing, and cleanup."""
+    engine: SQLiteEngine = ctx.obj["engine"]
+    if save_path:
+        resolved_path = get_resolved_save_path(save_path)
+        engine.load_save_data(resolved_path)
+    elif not engine.query_instances({}):
+        resolved_path = get_resolved_save_path(None)
+        if resolved_path:
+            engine.load_save_data(resolved_path)
+
+    result = engine.get_palbox_cleanup_recommendations()
+
+    if ctx.obj["format"] == "json":
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    if not result or result.get("total_evaluated", 0) == 0:
+        click.echo("No Palbox instances found to evaluate.")
+        return
+
+    click.echo(f"=== PALBOX CLEANUP AUDIT SUMMARY ===")
+    click.echo(f"Total Palbox Pals: {result['total_evaluated']}")
+    click.echo(f"Keep (Core/Investment): {result['keep_core_count']}")
+    click.echo(f"Keep (Breeding Stock): {result['keep_breeding_count']}")
+    click.echo(f"Condense Fodder: {result['condense_fodder_count']}")
+    click.echo(f"Butcher / Sell Surplus: {result['butcher_sell_count']}")
+    click.echo(f"Total Freeable Slots: {result['freeable_slots']}")
+    click.echo(f"Species Preserved: {result['species_count']}")
+    click.echo("-" * 40)
+
+    roster = result.get("roster", [])
+    if action.lower() != "all":
+        roster = [p for p in roster if p.get("audit_action") == action.lower()]
+
+    display_rows = []
+    for p in roster[:limit]:
+        p_list = [t.get("name") if isinstance(t, dict) else str(t) for t in (p.get("passives") or [])]
+        p_str = ", ".join(p_list) if p_list else "Blank Slate"
+        display_rows.append({
+            "Species": p.get("display_name") or p.get("species"),
+            "Gender": p.get("gender", "?"),
+            "Lv": p.get("level", 1),
+            "Rank": f"{p.get('rank', 0)} Star",
+            "Action": p.get("audit_action_label"),
+            "Reason": p.get("audit_reason"),
+            "Passives": p_str,
+        })
+    click.echo(tabulate(display_rows, headers="keys", tablefmt="github"))
+
+
 @cli.command("boss-party")
 @click.argument("boss_name")
 @click.option("--save-path", "-p", help="Path to Level.sav file.")

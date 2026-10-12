@@ -3,33 +3,66 @@ import { BASE_CATEGORY_MAP } from '../constants/gameData';
 import { useTableSort } from '../hooks/useTableSort';
 import { PassiveBadge } from './common/PassiveBadge';
 import { PalInstanceTooltip } from './common/PalInstanceTooltip';
+import { BuildingsTechView } from './BuildingsTechView';
 
 export function BaseCampsView({ bases = [], saveLoaded, fetchBases, fetchInstances, pals = [], setSelectedPal }) {
+  const [activeSubTab, setActiveSubTab] = useState('camps');
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, height: '100%', minHeight: 0, overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
-        {!saveLoaded ? (
-          <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please load a save file in the Save Game tab first.</p>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {bases.map(base => (
-              <BaseCampCard
-                key={base.base_camp_id}
-                base={base}
-                pals={pals}
-                setSelectedPal={setSelectedPal}
-                onBaseRenamed={() => {
-                  fetchBases();
-                  fetchInstances();
-                }}
-              />
-            ))}
-            {bases.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>No base camps found in save file.</p>}
-          </div>
-        )}
+      <div style={{ flexShrink: 0, marginBottom: '0.75rem', display: 'flex', gap: '0.5rem' }}>
+        <button
+          className={`pill-btn ${activeSubTab === 'camps' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('camps')}
+        >
+          🏰 Camps & Workers ({bases.length})
+        </button>
+        <button
+          className={`pill-btn ${activeSubTab === 'facilities' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('facilities')}
+        >
+          🏗️ Base Facilities
+        </button>
+        <button
+          className={`pill-btn ${activeSubTab === 'technology' ? 'active' : ''}`}
+          onClick={() => setActiveSubTab('technology')}
+        >
+          🔬 Technology Tree
+        </button>
       </div>
+
+      {activeSubTab === 'camps' ? (
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, paddingRight: '0.4rem', paddingBottom: '2rem' }}>
+          {!saveLoaded ? (
+            <div className="glass-card" style={{ textAlign: 'center', padding: '4rem' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.25rem' }}>No save file loaded. Please load a save file in the Save Game tab first.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+              {bases.map(base => (
+                <BaseCampCard
+                  key={base.base_camp_id}
+                  base={base}
+                  pals={pals}
+                  setSelectedPal={setSelectedPal}
+                  onBaseRenamed={() => {
+                    fetchBases();
+                    fetchInstances();
+                  }}
+                />
+              ))}
+              {bases.length === 0 && <p style={{ color: 'var(--text-secondary)' }}>No base camps found in save file.</p>}
+            </div>
+          )}
+        </div>
+      ) : (
+        <BuildingsTechView
+          activeSubTab={activeSubTab}
+          onSubTabChange={setActiveSubTab}
+          saveLoaded={saveLoaded}
+          showSubTabButtons={false}
+        />
+      )}
     </div>
   );
 }

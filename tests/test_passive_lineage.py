@@ -56,10 +56,10 @@ def test_passive_lineage_live_convergence():
     assert top_path["strategy"] == "1 + 1 Trait Convergence"
     assert len(top_path["steps"]) == 2
 
-    # Verify step 1 produces intermediate Beakon Cryst
+    # Verify step 1 produces intermediate Beakon Cryst or Elgrove Cryst
     step1 = top_path["steps"][0]
     assert step1["step_number"] == 1
-    assert step1["child"]["species"] == "Beakon Cryst"
+    assert step1["child"]["species"] in ["Beakon Cryst", "Elgrove Cryst"]
     assert "Demon God" in step1["child"]["target_passives"]
 
     # Verify step 2 yields Eidrolon

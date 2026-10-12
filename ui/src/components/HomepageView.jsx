@@ -25,7 +25,7 @@ export function HomepageView({ onSelectMode, currentWorld, instancesCount, bases
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>Global Game Data</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1rem' }}>
-              Explore master Pal specifications, item recipes, technology trees, and breeding combinations directly from game files.
+              Explore master Pal specifications, combat skills, passive traits, and crafting recipes directly from game files.
             </p>
           </div>
           <div>
@@ -47,7 +47,7 @@ export function HomepageView({ onSelectMode, currentWorld, instancesCount, bases
             </div>
             <h2 style={{ fontSize: '1.35rem', fontWeight: 800, marginBottom: '0.4rem' }}>Active World Data</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5, marginBottom: '1rem' }}>
-              Inspect live save file analytics for your selected active world. Audit captured Pals & IVs, personal inventory, storage chests, and condenser candidates.
+              Inspect live save file analytics for your selected active world. Audit captured Pals, base camps & facilities, technology progression, and storage chests.
             </p>
           </div>
           <div>

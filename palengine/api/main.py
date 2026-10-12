@@ -207,6 +207,12 @@ def get_condense_candidates() -> list[dict[str, Any]]:
     return db_engine.get_condense_candidates()
 
 
+@app.get("/api/save/palbox-cleanup")
+def get_palbox_cleanup() -> dict[str, Any]:
+    """Returns comprehensive Palbox audit, triaging scores, and cleanup recommendations."""
+    return db_engine.get_palbox_cleanup_recommendations()
+
+
 @app.get("/api/save/missions")
 def get_active_missions() -> list[dict[str, Any]]:
     """Returns active uncompleted sub-missions evaluated against targeted inventory items and caught Pals."""
@@ -444,6 +450,9 @@ def get_recipe(item_id: str) -> dict[str, Any]:
 def get_buildings(
     category: Optional[str] = None,
     search: Optional[str] = None,
+    is_unlocked: Optional[bool] = None,
+    is_built: Optional[bool] = None,
+    unlock_method: Optional[str] = None,
 ) -> list[dict[str, Any]]:
     """Queries base camp buildings & infrastructure."""
     filters: dict[str, Any] = {}
@@ -451,21 +460,38 @@ def get_buildings(
         filters["category"] = category
     if search:
         filters["search"] = search
+    if is_unlocked is not None:
+        filters["is_unlocked"] = is_unlocked
+    if is_built is not None:
+        filters["is_built"] = is_built
+    if unlock_method:
+        filters["unlock_method"] = unlock_method
     return db_engine.query_buildings(filters)
 
 
 @app.get("/api/tech_tree")
+@app.get("/api/technology")
 def get_tech_tree(
     level: Optional[int] = None,
     is_ancient: Optional[bool] = None,
+    search: Optional[str] = None,
+    is_unlocked: Optional[bool] = None,
+    is_built: Optional[bool] = None,
 ) -> list[dict[str, Any]]:
-    """Queries technology tree unlock nodes."""
+    """Queries technology tree unlock nodes with live player unlocks and mappings."""
     filters: dict[str, Any] = {}
     if level is not None:
         filters["level"] = level
     if is_ancient is not None:
         filters["is_ancient"] = is_ancient
+    if search:
+        filters["search"] = search
+    if is_unlocked is not None:
+        filters["is_unlocked"] = is_unlocked
+    if is_built is not None:
+        filters["is_built"] = is_built
     return db_engine.query_tech_tree(filters)
+
 
 
 @app.get("/api/work_types")

@@ -3,7 +3,6 @@ import BaseOptimizerView from './components/BaseOptimizerView';
 import PaldexMasterView from './components/PaldexMasterView';
 import SkillsCatalogView from './components/SkillsCatalogView';
 import ItemsCatalogView from './components/ItemsCatalogView';
-import BuildingsTechView from './components/BuildingsTechView';
 import InventoryView from './components/InventoryView';
 import SaveGameExplorerView from './components/SaveGameExplorerView';
 import BaseCampsView from './components/BaseCampsView';
@@ -16,6 +15,7 @@ import { WorldOverviewView, WelcomeView } from './components/WorldOverviewView';
 import BaseMigrationView from './components/BaseMigrationView';
 import PalDetailModal from './components/common/PalDetailModal';
 import BossCounterView from './components/BossCounterView';
+import PalboxCleanerView from './components/PalboxCleanerView';
 
 function TabKeepAlive({ id, activeTab, mode, visitedTabs, children }) {
   if (!visitedTabs.has(id)) return null;
@@ -356,9 +356,6 @@ function App() {
                 <div className={`nav-item ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setActiveTab('items')}>
                   📦 Items & Recipes
                 </div>
-                <div className={`nav-item ${activeTab === 'buildings' ? 'active' : ''}`} onClick={() => setActiveTab('buildings')}>
-                  🏗️ Facilities & Tech
-                </div>
               </>
             )}
 
@@ -404,7 +401,7 @@ function App() {
                   🎒 Save Inventory
                 </div>
                 <div className={`nav-item ${activeTab === 'bases' ? 'active' : ''}`} onClick={() => setActiveTab('bases')}>
-                  🏰 Base Camps
+                  🏰 Base Camps & Facilities
                 </div>
                 <div className={`nav-item ${activeTab === 'base_optimizer' ? 'active' : ''}`} onClick={() => setActiveTab('base_optimizer')}>
                   🏰 Base Optimizer
@@ -414,6 +411,9 @@ function App() {
                 </div>
                 <div className={`nav-item ${activeTab === 'condenser' ? 'active' : ''}`} onClick={() => setActiveTab('condenser')}>
                   ⭐ Condenser
+                </div>
+                <div className={`nav-item ${activeTab === 'palbox_cleaner' ? 'active' : ''}`} onClick={() => setActiveTab('palbox_cleaner')}>
+                  🧹 Palbox Cleaner
                 </div>
                 <div className={`nav-item ${activeTab === 'missions' ? 'active' : ''}`} onClick={() => setActiveTab('missions')}>
                   📜 Sub-Missions
@@ -448,12 +448,12 @@ function App() {
               activeTab === 'paldex' ? 'Palworld 1.0+ Master Paldex' :
               activeTab === 'skills' ? 'Skills Database Catalog' :
               activeTab === 'items' ? 'Items & Crafting Catalog' :
-              activeTab === 'buildings' ? 'Base Facilities & Technology Tree' :
               activeTab === 'inventory' ? 'Save Inventory & Chest Storage' :
               activeTab === 'save_game' ? 'World Pals Explorer' :
-              activeTab === 'bases' ? 'Base Camp Overview' :
+              activeTab === 'bases' ? 'Base Camps, Facilities & Technology Tree' :
               activeTab === 'base_optimizer' ? 'Base Camp Pal Recommendation & Optimizer Engine' :
               activeTab === 'condenser' ? 'Condenser Recommendations' :
+              activeTab === 'palbox_cleaner' ? 'Palbox Cleaner & Space Triaging' :
               activeTab === 'missions' ? 'Active NPC Sub-Missions' :
               activeTab === 'boss_counter' ? 'Boss Counter Recommender' :
               activeTab === 'settings' ? 'System Settings' : 'Breeding Center'
@@ -463,12 +463,12 @@ function App() {
               activeTab === 'paldex' ? 'Browse all Pal species, base stats, elements, work capabilities, learned skills, and drops.' :
               activeTab === 'skills' ? 'Explore active combat skills, passive traits, and partner abilities.' :
               activeTab === 'items' ? 'Search items, equipment, and crafting recipe ingredients.' :
-              activeTab === 'buildings' ? 'Explore base buildings and technology tree unlocks.' :
               activeTab === 'inventory' ? 'Inspect items in your personal inventory, equipped loadouts, and base chests.' :
               activeTab === 'save_game' ? 'Click any captured Pal to view its full Paldex bio, element, skills, and stats.' :
-              activeTab === 'bases' ? 'Audit placed infrastructure and active base camp workers.' :
+              activeTab === 'bases' ? 'Audit placed infrastructure & workers, inspect base facilities, and explore technology tree progression.' :
               activeTab === 'base_optimizer' ? 'Automated work suitability demand matching, nocturnal 24/7 duty cycle bonuses, and food satiety balance.' :
               activeTab === 'condenser' ? 'View the absolute best Pals to condense based on your duplicates, IVs, and passives.' :
+              activeTab === 'palbox_cleaner' ? 'Deterministic Palbox audit: Protects investments & clean 2+2 breeding stock, and identifies freeable slots.' :
               activeTab === 'missions' ? 'Track and fulfill NPC quest requirements using your personal inventory, base chests, and caught Pals.' :
               activeTab === 'boss_counter' ? 'Evaluate boss encounters, elemental weaknesses, and optimal 5-Pal counter parties from your save roster.' :
               activeTab === 'settings' ? 'Manage save file loading and database source settings.' :
@@ -542,11 +542,6 @@ function App() {
           <ItemsCatalogView />
         </TabKeepAlive>
 
-        {/* 🏗️ Base Facilities & Tech Tree Tab */}
-        <TabKeepAlive id="buildings" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
-          <BuildingsTechView />
-        </TabKeepAlive>
-
         {/* Selected Pal Detail Modal */}
         {selectedPal && (
           <PalDetailModal pal={selectedPal} onClose={() => setSelectedPal(null)} />
@@ -602,6 +597,16 @@ function App() {
         {/* ⭐ Condenser Tab */}
         <TabKeepAlive id="condenser" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
           <CondenserView
+            pals={pals}
+            setSelectedPal={setSelectedPal}
+            worldId={selectedWorldId}
+            saveLoaded={saveLoaded}
+          />
+        </TabKeepAlive>
+
+        {/* 🧹 Palbox Cleaner Tab */}
+        <TabKeepAlive id="palbox_cleaner" activeTab={activeTab} mode={mode} visitedTabs={visitedTabs}>
+          <PalboxCleanerView
             pals={pals}
             setSelectedPal={setSelectedPal}
             worldId={selectedWorldId}

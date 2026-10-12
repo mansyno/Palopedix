@@ -115,9 +115,11 @@ export function PassiveBadge({
     setPos(null);
   };
 
+  const isExtraSmall = size === 'xs';
   const isSmall = size === 'sm';
   const isLarge = size === 'lg' || size === 'modal';
-  const cardHeight = isSmall ? '23px' : isLarge ? '36px' : '28px';
+  const cardHeight = isExtraSmall ? '22px' : isSmall ? '23px' : isLarge ? '36px' : '28px';
+  const cardMaxWidth = isExtraSmall ? '145px' : isSmall ? '160px' : '284px';
 
   return (
     <span
@@ -142,7 +144,7 @@ export function PassiveBadge({
             style={{
               height: cardHeight,
               width: 'auto',
-              maxWidth: isSmall ? '160px' : '284px',
+              maxWidth: cardMaxWidth,
               objectFit: 'contain',
               borderRadius: '3px',
               display: 'inline-block',

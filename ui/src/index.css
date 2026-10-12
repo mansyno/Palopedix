@@ -274,6 +274,39 @@ input[type="text"]:focus, select:focus {
   background: rgba(255, 255, 255, 0.15);
 }
 
+/* Pill Buttons for Tabs / Sub-options */
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1.15rem;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.88rem;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.pill-btn.active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.4) 0%, rgba(168, 85, 247, 0.4) 100%);
+  color: #ffffff;
+  border-color: rgba(168, 85, 247, 0.7);
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
+  font-weight: 700;
+}
+
 /* Paldex Grid */
 .pals-grid {
   display: grid;
